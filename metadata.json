@@ -1,0 +1,7 @@
+{
+  "name": "EviroSafe",
+  "description": "A smart HSE tool for comprehensive safety management, featuring AI-powered risk assessment, training, and reporting.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
