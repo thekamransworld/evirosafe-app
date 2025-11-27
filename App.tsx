@@ -1,4 +1,4 @@
-
+import { DemoBanner } from "./components/DemoBanner";
 
 
 import React, { useEffect } from 'react';
