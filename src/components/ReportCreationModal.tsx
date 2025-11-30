@@ -1,12 +1,14 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
-import { generateReportFromNaturalLanguage } from '../services/geminiService';
+
+// --- IMPORTS FOR AI & STORAGE ---
+import { generateSafetyReport } from '../lib/gemini';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "../firebase";
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -85,9 +87,10 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   
-  // AI State
+  // UI States
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // <--- Added Uploading State
 
   const stakeholders = useMemo(() => {
     const projectManager = projects.find(p => p.id === formData.project_id)?.manager_id;
@@ -163,46 +166,70 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     );
   };
 
+  // --- AI Report Handler ---
   const handleQuickAiReport = async () => {
       if(!aiPrompt.trim()) return;
       setIsAiLoading(true);
+      setError('');
+      
       try {
-          // Pass the currently selected type so AI knows context
-          const aiResponse = await generateReportFromNaturalLanguage(aiPrompt, formData.type);
+          // We include the Report Type in the prompt to give AI context
+          const fullPrompt = `Type: ${formData.type}. Details: ${aiPrompt}`;
           
+          // Call the REAL Gemini AI (from lib/gemini.js)
+          const aiData = await generateSafetyReport(fullPrompt);
+          
+          if (!aiData) {
+              throw new Error("No data received from AI");
+          }
+
+          // Map the AI response (Simple JSON) to the Form Fields (Complex State)
           const newFormData: any = {
               ...formData,
-              description: formData.description || aiPrompt, // Prefer existing description if edited, else use prompt
-              conditions: "Automatically filled by AI based on description context.", // Placeholder as prompt doesn't return this field anymore directly
-              immediate_actions: "Pending review based on AI analysis.", // Placeholder
-              identification: {
-                  was_fire: aiResponse.wasFire,
-                  was_injury: aiResponse.wasInjuryOrIllness,
-                  was_environment: aiResponse.wasEnvironmentImpacted
+              // AI 'description' replaces or appends to user prompt
+              description: aiData.description, 
+              
+              // Map 'rootCause' to 'conditions' field (closest fit)
+              conditions: aiData.rootCause ? `Root Cause: ${aiData.rootCause}` : formData.conditions,
+              
+              // Map 'recommendation' to 'immediate_actions' field
+              immediate_actions: aiData.recommendation || formData.immediate_actions,
+              
+              // Try to map risk level if it exists
+              risk_pre_control: {
+                   severity: aiData.riskLevel === 'High' ? 3 : aiData.riskLevel === 'Medium' ? 2 : 1,
+                   likelihood: aiData.riskLevel === 'High' ? 3 : aiData.riskLevel === 'Medium' ? 2 : 1
               },
-              classification_codes: aiResponse.incidentCodes,
-              ai_suggested_evidence: aiResponse.evidenceSuggestedItems,
-              ai_evidence_summary: aiResponse.evidenceSummary
+              
+              // Add a nice summary badge
+              ai_evidence_summary: `AI Analysis: Risk detected as ${aiData.riskLevel}`,
+              
+              // Clear previous AI suggestions to avoid confusion since simple AI doesn't return list yet
+              ai_suggested_evidence: [] 
           };
 
+          // Special handling for Leadership events
           if (formData.type === 'Leadership Event' || formData.type === 'Positive Observation') {
               newFormData.details = {
                   ...defaultDetails.leadership,
                   ...formData.details,
-                  key_observations: aiPrompt 
+                  key_observations: aiData.description 
               };
           }
 
           setFormData(newFormData);
+
       } catch (e) {
           console.error(e);
-          setError("AI analysis failed. Please try again.");
+          setError("AI analysis failed. Check your connection or API Key.");
       } finally {
           setIsAiLoading(false);
       }
   };
 
-  const handleSubmit = () => {
+  // --- UPDATED SUBMIT HANDLER WITH REAL UPLOAD ---
+  const handleSubmit = async () => {
+    // 1. Validation
     if (!formData.project_id) {
         setError("A project must be selected.");
         return;
@@ -221,9 +248,40 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     }
     
     setError('');
-    const mockUrls = evidenceFiles.map(file => `https://picsum.photos/seed/${file.name}/400/300`);
-    handleCreateReport({ ...formData, evidence_urls: mockUrls });
-    onClose();
+    setIsSubmitting(true); // Start Spinner
+
+    try {
+      // 2. Upload Files to Firebase Storage
+      let realUrls: string[] = [];
+      
+      if (evidenceFiles.length > 0) {
+          const uploadPromises = evidenceFiles.map(async (file) => {
+            // Create a unique filename: evidence/TIMESTAMP_filename.jpg
+            const fileRef = ref(storage, `evidence/${Date.now()}_${file.name}`);
+            
+            // Upload the actual bytes
+            const snapshot = await uploadBytes(fileRef, file);
+            
+            // Get the public URL
+            return await getDownloadURL(snapshot.ref);
+          });
+
+          // Wait for ALL photos to upload
+          realUrls = await Promise.all(uploadPromises);
+      }
+
+      // 3. Save the report with the REAL links
+      // Note: If no files, realUrls is just empty []
+      await handleCreateReport({ ...formData, evidence_urls: realUrls });
+      
+      onClose(); // Success!
+
+    } catch (err) {
+      console.error("Upload/Save error:", err);
+      setError("Failed to submit report. Please check your internet connection.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isInjuryType = ['First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)', 'Restricted Work Case (RWC)', 'Accident', 'Incident'].includes(formData.type);
@@ -277,7 +335,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                                 value={aiPrompt} 
                                 onChange={(e) => setAiPrompt(e.target.value)} 
                                 onKeyDown={(e) => e.key === 'Enter' && handleQuickAiReport()}
-                                placeholder={`Describe the ${formData.type.toLowerCase()}...`} 
+                                placeholder={`Describe the ${formData.type.toLowerCase()}... (e.g., "Fire in chemical storage")`} 
                                 className="flex-1 p-2 text-sm border border-primary-300 dark:border-primary-700 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-black/30"
                             />
                             <Button onClick={handleQuickAiReport} disabled={isAiLoading || !aiPrompt.trim()}>
@@ -429,8 +487,10 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
             {error && <p className="text-sm text-red-500 mt-4 text-center font-semibold">{error}</p>}
         </div>
         <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
-            <Button variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSubmit}>Submit Report</Button>
+            <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? 'Uploading & Saving...' : 'Submit Report'}
+            </Button>
         </div>
       </div>
     </div>
