@@ -1,9 +1,10 @@
-
 import React, { createContext, useState, useMemo, useContext, useEffect } from 'react';
 import { organizations as initialOrganizations, users as initialUsers } from './data';
 import { planTemplates, translations, supportedLanguages, roles } from './config';
 import type { Organization, User, Report, ReportStatus, CapaAction, Notification, ChecklistRun, Inspection, Plan as PlanType, PlanStatus, PlanType as PlanTypeName, Rams as RamsType, RamsStatus, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, Project, View, ReportClassification, InspectionStatus, RamsStep, Severity, Likelihood, Ptw, Action, Resource, Scope, Sign, ChecklistTemplate, ActionItem } from './types';
 import * as supabaseService from './services/supabaseService';
+// FIREBASE IMPORT
+import { saveReportToDb, fetchReportsFromDb } from './services/reportService';
 import { useToast } from './components/ui/Toast';
 
 
@@ -301,10 +302,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
+            
+            // 1. LOAD REAL REPORTS (Isolated try/catch so it succeeds even if mock data fails)
             try {
-                const [projs, reps, insps, checks, plans, rams, tbts, courses, records, sessions, notifs, ptws, sgn, tmpls] = await Promise.all([
+                const dbReports = await fetchReportsFromDb();
+                console.log("DB Reports Loaded:", dbReports);
+                setReportList(dbReports as Report[]);
+            } catch (error) {
+                console.error("Failed to load reports from DB", error);
+            }
+
+            // 2. LOAD MOCK DATA (Separate try/catch)
+            try {
+                const [projs, insps, checks, plans, rams, tbts, courses, records, sessions, notifs, ptws, sgn, tmpls] = await Promise.all([
                     supabaseService.getProjects(),
-                    supabaseService.getReports(),
                     supabaseService.getInspections(),
                     supabaseService.getChecklistRuns(),
                     supabaseService.getPlans(),
@@ -318,8 +329,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     supabaseService.getSigns(),
                     supabaseService.getChecklistTemplates()
                 ]);
+
                 setProjects(projs);
-                setReportList(reps);
+                // Note: We do NOT overwrite reportList here, so Real DB data stays!
                 setInspectionList(insps);
                 setChecklistRunList(checks);
                 setPlanList(plans);
@@ -333,8 +345,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setSigns(sgn);
                 setChecklistTemplates(tmpls);
             } catch (error) {
-                console.error("Failed to load data", error);
-                toast.error("Failed to load initial data.");
+                console.warn("Mock data failed to load (Expected on live site), using defaults where available.", error);
             } finally {
                 setIsLoading(false);
             }
@@ -342,10 +353,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loadData();
     }, []);
 
-    const handleCreateReport = (reportData: any) => {
-        const newReport: Report = {
+    const handleCreateReport = async (reportData: any) => {
+        const newReport = {
             ...reportData,
-            id: `REP-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
             org_id: activeOrg.id,
             reporter_id: activeUser?.id || 'unknown',
             status: 'submitted',
@@ -355,10 +365,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         if(!newReport.capa) newReport.capa = [];
 
-        setReportList(prev => [newReport, ...prev]);
-        toast.success("Report submitted successfully.");
+        try {
+            // Save to Firestore
+            const savedReport = await saveReportToDb(newReport);
+            // Update UI
+            setReportList(prev => [savedReport, ...prev]);
+            toast.success("Report saved to Cloud Database.");
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to save report.");
+        }
     };
     
+    // ... (The rest of the file remains exactly the same) ...
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
         reportList.forEach(report => {
