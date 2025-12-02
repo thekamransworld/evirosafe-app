@@ -1,6 +1,4 @@
-
-
-import React, { useState, Fragment } from 'react';
+import React, { useState } from 'react';
 import type { Report, User, ReportStatus, CapaAction, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, RootCause, ReportClassification } from '../types';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
@@ -35,27 +33,27 @@ const TabButton: React.FC<{ label: string; isActive: boolean; onClick: () => voi
     </button>
 );
 
-
 const Section: React.FC<{ title: string; children: React.ReactNode; fullWidth?: boolean }> = ({ title, children, fullWidth = false }) => (
   <div className={`py-4 border-b dark:border-dark-border ${fullWidth ? 'col-span-2' : ''}`}>
     <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">{title}</h3>
-    <div className="text-gray-800 dark:text-gray-200">{children}</div>
+    <div className="text-gray-800 dark:text-gray-200">{children || 'N/A'}</div>
   </div>
 );
 
-
 export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
-  const { report, users, activeUser, onClose, onStatusChange, onCapaActionChange, onAcknowledgeReport } = props;
+  const { report, users = [], activeUser, onClose, onStatusChange, onCapaActionChange, onAcknowledgeReport } = props;
   const { can } = useAppContext();
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('details');
   
-  const canApprove = can('approve', 'reports');
-  const [editedClassification, setEditedClassification] = useState<ReportClassification>(report.classification);
-  const [editedRootCause, setEditedRootCause] = useState<RootCause | undefined>(report.root_cause);
+  // EXTRA SAFETY: If report is null/undefined, don't render
+  if (!report) return null;
 
+  const canApprove = can('approve', 'reports');
+  const [editedClassification, setEditedClassification] = useState<ReportClassification>(report.classification || 'To Be Determined');
+  const [editedRootCause, setEditedRootCause] = useState<RootCause | undefined>(report.root_cause);
 
   const handleGenerateSummary = async () => {
     setIsLoadingSummary(true);
@@ -64,18 +62,30 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
     setIsLoadingSummary(false);
   };
 
-  const getUser = (userId: string) => users.find(u => u.id === userId);
-  const risk = getRiskLevel(report.risk_pre_control);
+  // SAFETY: Handle case where users list is empty or undefined
+  const getUser = (userId: string) => {
+      if (!users || !userId) return { name: 'Unknown User' };
+      return users.find(u => u.id === userId) || { name: 'Unknown User' };
+  };
+  
+  const safeRiskMatrix = report.risk_pre_control || { severity: 1, likelihood: 1 };
+  const risk = getRiskLevel(safeRiskMatrix);
 
-  const hasAcknowledged = report.acknowledgements.some(ack => ack.user_id === activeUser.id);
-  const canAcknowledge = report.distribution.user_ids.includes(activeUser.id) && !hasAcknowledged;
+  const acknowledgements = report.acknowledgements || [];
+  const distributionList = report.distribution?.user_ids || [];
+  const capaList = report.capa || [];
+  const auditList = report.audit_trail || [];
 
-  const isCreator = report.creator_id === activeUser.id;
+  const hasAcknowledged = acknowledgements.some(ack => ack.user_id === activeUser?.id);
+  const canAcknowledge = distributionList.includes(activeUser?.id) && !hasAcknowledged;
+
+  const isCreator = report.creator_id === activeUser?.id;
   const isHighOrCritical = risk.level === 'High' || risk.level === 'Critical';
   const selfApprovalBlocked = isCreator && isHighOrCritical;
 
   const renderDetails = () => {
-      const details = report.details;
+      const details = report.details || {}; 
+      
       if (['Incident', 'Accident', 'First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)', 'Restricted Work Case (RWC)'].includes(report.type)) {
           const acc = details as AccidentDetails;
           return <><Section title="Injured Person">{acc.person_name}</Section><Section title="Nature of Injury">{acc.nature_of_injury}</Section><Section title="Body Part Affected">{acc.body_part_affected}</Section><Section title="Treatment Given">{acc.treatment_given}</Section></>;
@@ -100,14 +110,14 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
           const le = details as LeadershipEventDetails;
           return (
               <>
-                <Section title="Event Code"><Badge color="purple">{le.event_type_code}</Badge></Section>
+                <Section title="Event Code"><Badge color="purple">{le.event_type_code || 'N/A'}</Badge></Section>
                 <Section title="Leader">{le.leader_name}</Section>
                 <Section title="Participants">{le.attendees_count}</Section>
                 <Section title="Key Observations" fullWidth>{le.key_observations}</Section>
               </>
           );
       }
-      return null;
+      return <p className="col-span-2 text-gray-500 italic p-4">No specific details recorded for this category.</p>;
   }
   
   return (
@@ -117,7 +127,9 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
           <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0">
             <div>
               <h2 id="report-title" className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate max-w-2xl">{report.type} - {report.id}</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Reported by {getUser(report.reporter_id)?.name || 'Unknown'} on {new Date(report.reported_at).toLocaleDateString()}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Reported by {getUser(report.reporter_id)?.name} on {report.reported_at ? new Date(report.reported_at).toLocaleDateString() : 'N/A'}
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <ActionsBar onPrint={() => window.print()} onDownloadPdf={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} />
@@ -132,16 +144,16 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                     {report.classification_codes?.map(code => <Badge key={code} color="gray">{code}</Badge>)}
                     <Badge color={risk.color} size="md">{risk.level} Risk</Badge>
                  </div>
-                 <Badge color={report.status === 'closed' ? 'green' : 'blue'}>{report.status.replace('_', ' ')}</Badge>
+                 <Badge color={report.status === 'closed' ? 'green' : 'blue'}>{report.status?.replace('_', ' ') || 'Unknown'}</Badge>
               </div>
               
               {['Leadership Event', 'Positive Observation'].includes(report.type) ? (
                   <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6 border border-blue-100 dark:border-blue-800">
                       <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 mb-2">Leadership Engagement</h3>
-                      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{(report.details as LeadershipEventDetails).key_observations}</p>
+                      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{(report.details as LeadershipEventDetails)?.key_observations || 'No observations.'}</p>
                   </div>
               ) : (
-                  <p className="text-gray-700 dark:text-gray-300 mb-6">{report.description}</p>
+                  <p className="text-gray-700 dark:text-gray-300 mb-6">{report.description || 'No description provided.'}</p>
               )}
               
               <div className="border-b dark:border-dark-border mb-4">
@@ -163,14 +175,19 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                 )}
 
                 <div className="grid grid-cols-2 gap-x-6 mt-4">
-                    <Section title="Location">{report.location.text} - {report.location.specific_area}</Section>
-                    <Section title="Date & Time">{new Date(report.occurred_at).toLocaleString()}</Section>
+                    <Section title="Location">
+                        {report.location?.text || 'Unknown'} {report.location?.specific_area ? `- ${report.location.specific_area}` : ''}
+                    </Section>
+                    <Section title="Date & Time">{report.occurred_at ? new Date(report.occurred_at).toLocaleString() : 'Unknown'}</Section>
+                    
                     {!['Leadership Event', 'Positive Observation'].includes(report.type) && <Section title="Conditions">{report.conditions || 'N/A'}</Section>}
-                    {!['Leadership Event', 'Positive Observation'].includes(report.type) && <Section title="Immediate Actions">{report.immediate_actions}</Section>}
+                    {!['Leadership Event', 'Positive Observation'].includes(report.type) && <Section title="Immediate Actions">{report.immediate_actions || 'N/A'}</Section>}
+                    
                     {renderDetails()}
+                    
                     {!['Leadership Event', 'Positive Observation'].includes(report.type) && (
                         <Section title="Initial Risk Assessment" fullWidth>
-                            <RiskMatrixDisplay matrix={report.risk_pre_control} />
+                            <RiskMatrixDisplay matrix={safeRiskMatrix} />
                         </Section>
                     )}
                     {report.ai_suggested_evidence && report.ai_suggested_evidence.length > 0 && (
@@ -178,6 +195,19 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                             <ul className="list-disc list-inside text-sm text-blue-600 dark:text-blue-400">
                                 {report.ai_suggested_evidence.map((ev, i) => <li key={i}>{ev}</li>)}
                             </ul>
+                        </Section>
+                    )}
+                    
+                    {/* SAFE GUARD: Check for Evidence Photos */}
+                    {report.evidence_urls && report.evidence_urls.length > 0 && (
+                        <Section title="Evidence Photos" fullWidth>
+                            <div className="flex gap-2 flex-wrap">
+                                {report.evidence_urls.map((url, i) => (
+                                    <a key={i} href={url} target="_blank" rel="noreferrer">
+                                        <img src={url} alt="Evidence" className="w-24 h-24 object-cover rounded-md border border-gray-300 hover:opacity-75 transition-opacity" />
+                                    </a>
+                                ))}
+                            </div>
                         </Section>
                     )}
                 </div>
@@ -193,19 +223,19 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                           </select>
                        </Section>
                        <Section title="Root Cause">
-                         <select value={editedRootCause} onChange={e => setEditedRootCause(e.target.value as RootCause)} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md">
+                         <select value={editedRootCause || 'Other'} onChange={e => setEditedRootCause(e.target.value as RootCause)} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md">
                              {(['Human Error', 'Equipment Failure', 'Process Deficiency', 'Environment', 'Other'] as RootCause[]).map(c => <option key={c} value={c}>{c}</option>)}
                          </select>
                        </Section>
                     </div>
                   )}
                   <div className="space-y-4">
-                      {report.capa.map((action, index) => (
+                      {capaList.map((action, index) => (
                         <div key={index} className="p-3 border rounded-md">
                           <p className={`font-semibold text-sm ${action.type === 'Corrective' ? 'text-blue-600' : 'text-purple-600'}`}>{action.type} Action</p>
                           <p className="text-gray-800 dark:text-gray-200">{action.action}</p>
                           <div className="text-xs text-gray-500 mt-2 flex justify-between items-center">
-                              <span>Owner: {getUser(action.owner_id)?.name} | Due: {new Date(action.due_date).toLocaleDateString()}</span>
+                              <span>Owner: {getUser(action.owner_id)?.name} | Due: {action.due_date ? new Date(action.due_date).toLocaleDateString() : 'No Date'}</span>
                               <select 
                                 value={action.status} 
                                 onChange={(e) => onCapaActionChange(report.id, index, e.target.value as CapaAction['status'])}
@@ -217,7 +247,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                           </div>
                         </div>
                       ))}
-                      {report.capa.length === 0 && <p className="text-sm text-gray-500 text-center">No CAPA items assigned yet.</p>}
+                      {capaList.length === 0 && <p className="text-sm text-gray-500 text-center">No CAPA items assigned yet.</p>}
                   </div>
                 </Card>
               </div>
@@ -225,12 +255,12 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
               <div className={activeTab === 'distribution' ? '' : 'hidden'}>
                   <Card title="Distribution & Acknowledgements">
                       <ul className="space-y-3">
-                          {report.distribution.user_ids.map(userId => {
+                          {distributionList.map(userId => {
                               const user = getUser(userId);
-                              const ack = report.acknowledgements.find(a => a.user_id === userId);
+                              const ack = acknowledgements.find(a => a.user_id === userId);
                               return (
                                   <li key={userId} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-dark-background rounded-md">
-                                      <span className="font-semibold text-sm">{user?.name || 'Unknown User'}</span>
+                                      <span className="font-semibold text-sm">{user?.name}</span>
                                       {ack ? (
                                           <span className="text-xs text-green-600">Acknowledged on {new Date(ack.acknowledged_at).toLocaleDateString()}</span>
                                       ) : (
@@ -239,12 +269,13 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                                   </li>
                               )
                           })}
+                          {distributionList.length === 0 && <p className="text-gray-500 text-sm italic">No distribution list defined.</p>}
                       </ul>
                   </Card>
               </div>
               
               <div className={activeTab === 'audit' ? '' : 'hidden'}>
-                <AuditTrail logs={report.audit_trail} users={users} />
+                <AuditTrail logs={auditList} users={users} />
               </div>
 
             </main>
@@ -273,17 +304,11 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
         onClose={() => setIsEmailModalOpen(false)}
         documentTitle={`Report: ${report.type} - ${report.id}`}
         documentLink={`${window.location.href}?report=${report.id}`}
-        defaultRecipients={report.distribution.user_ids.map(id => users.find(u => u.id === id)).filter(Boolean) as User[]}
+        defaultRecipients={report.distribution?.user_ids?.map(id => users.find(u => u.id === id)).filter(Boolean) as User[] || []}
       />
     </>
   );
 };
 
-
 // Icons
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
-const FireIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.362-3.797z" /></svg>;
-const UserInjuredIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>;
-const ExclamationIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>;
-const UserRemoveIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5H21M13.5 10.5L11.25 3.375M13.5 10.5L11.25 17.625M3.75 21V15.75M3.75 21H10.5M3.75 21L11.25 15.75" /></svg>;
-const CogIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m15-3.75a7.5 7.5 0 11-15 0 7.5 7.5 0 0115 0z" /></svg>;
