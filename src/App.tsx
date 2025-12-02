@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
+import { Sidebar } from './components/Sidebar'; // Imported correctly at the top
 import { roles as rolesConfig } from './config'; 
 
 // --- Import Feature Components ---
@@ -45,12 +46,82 @@ import { TrainingCourseModal } from './components/TrainingCourseModal';
 import { TrainingSessionModal } from './components/TrainingSessionModal';
 import { TrainingRecordModal } from './components/TrainingRecordModal';
 import { SessionAttendanceModal } from './components/SessionAttendanceModal';
-import { Sidebar } from './components/Sidebar';
+
+// --- Global Modals Component ---
+const GlobalModals = () => {
+    const { activeUser } = useAppContext(); 
+    const { 
+        isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
+        isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
+        isPlanCreationModalOpen, setIsPlanCreationModalOpen, selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit,
+        isRamsCreationModalOpen, setIsRamsCreationModalOpen, selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit,
+        isTbtCreationModalOpen, setIsTbtCreationModalOpen, selectedTbt, setSelectedTbt,
+        isCourseModalOpen, setCourseModalOpen, isSessionModalOpen, setSessionModalOpen, isAttendanceModalOpen, setAttendanceModalOpen,
+        courseForSession, sessionForAttendance
+    } = useModalContext();
+
+    const { 
+        handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
+        handleCreatePtw, handleUpdatePtw,
+        handleCreatePlan, handlePlanStatusChange, handleUpdatePlan,
+        handleCreateRams, handleRamsStatusChange, handleUpdateRams,
+        handleCreateTbt, handleUpdateTbt,
+        handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
+        projects, usersList, trainingCourseList
+    } = useDataContext();
+
+    if (!activeUser) return null;
+
+    return (
+        <>
+            <ReportCreationModal 
+                isOpen={isReportCreationModalOpen} 
+                onClose={() => setIsReportCreationModalOpen(false)}
+                initialData={reportInitialData} 
+            />
+            {selectedReport && (
+                <ReportDetailModal 
+                    report={selectedReport} 
+                    users={usersList} 
+                    activeUser={activeUser}
+                    onClose={() => setSelectedReport(null)}
+                    onStatusChange={handleStatusChange}
+                    onCapaActionChange={handleCapaActionChange}
+                    onAcknowledgeReport={handleAcknowledgeReport}
+                />
+            )}
+            <PtwCreationModal
+                isOpen={isPtwCreationModalOpen}
+                onClose={() => setIsPtwCreationModalOpen(false)}
+                onSubmit={handleCreatePtw}
+                mode={ptwCreationMode}
+            />
+            {selectedPtw && (
+                <PtwDetailModal
+                    ptw={selectedPtw}
+                    onClose={() => setSelectedPtw(null)}
+                    onUpdate={handleUpdatePtw}
+                />
+            )}
+            <PlanCreationModal isOpen={isPlanCreationModalOpen} onClose={() => setIsPlanCreationModalOpen(false)} onSubmit={handleCreatePlan} projects={projects} />
+            {selectedPlan && <PlanDetailModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onStatusChange={handlePlanStatusChange} />}
+            {selectedPlanForEdit && <PlanEditorModal plan={selectedPlanForEdit} onClose={() => setSelectedPlanForEdit(null)} onSave={handleUpdatePlan} onSubmitForReview={handlePlanStatusChange} />}
+            <RamsCreationModal isOpen={isRamsCreationModalOpen} onClose={() => setIsRamsCreationModalOpen(false)} onSubmit={handleCreateRams} projects={projects} activeUser={activeUser} />
+            {selectedRams && <RamsDetailModal rams={selectedRams} onClose={() => setSelectedRams(null)} onStatusChange={handleRamsStatusChange} />}
+            {selectedRamsForEdit && <RamsEditorModal rams={selectedRamsForEdit} onClose={() => setSelectedRamsForEdit(null)} onSave={handleUpdateRams} onSubmitForReview={handleRamsStatusChange} />}
+            <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={activeUser} />
+            {selectedTbt && <TbtSessionModal session={selectedTbt} onClose={() => setSelectedTbt(null)} onUpdate={handleUpdateTbt} users={usersList} />}
+            <TrainingCourseModal isOpen={isCourseModalOpen} onClose={() => setCourseModalOpen(false)} courses={trainingCourseList} onUpdateCourse={handleCreateOrUpdateCourse} />
+            {courseForSession && <TrainingSessionModal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} onSubmit={handleScheduleSession} course={courseForSession} projects={projects} users={usersList} />}
+            {sessionForAttendance && <SessionAttendanceModal isOpen={isAttendanceModalOpen} onClose={() => setAttendanceModalOpen(false)} onSubmit={handleCloseSession} session={sessionForAttendance} users={usersList} />}
+        </>
+    );
+};
 
 // --- Main App Content ---
 const AppContent = () => {
   const { currentView, activeUser, isLoading } = useAppContext();
-  const { currentUser } = useAuth(); // <--- NEW CHECK
+  const { currentUser } = useAuth(); 
   
   const { 
       projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
@@ -63,14 +134,13 @@ const AppContent = () => {
       setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw
   } = useModalContext();
 
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // GATEKEEPER: Check Firebase User instead of local user
+  // GATEKEEPER: Check Firebase User
   if (!currentUser) {
     return <LoginScreen />;
   }
 
-  // Fallback loading
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading EviroSafe...</div>;
 
   return (
@@ -82,7 +152,6 @@ const AppContent = () => {
          setOpen={setSidebarOpen}
       />
       
-      {/* Dynamic Margin based on Sidebar state */}
       <main className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
         <DemoBanner />
         <div className="flex-1 p-8 overflow-y-auto">
