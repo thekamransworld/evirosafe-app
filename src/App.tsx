@@ -144,7 +144,6 @@ const AppContent = () => {
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading EviroSafe...</div>;
 
   return (
-    // FIX: Using bg-slate-50 for Light Mode Background
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Sidebar 
          currentView={currentView} 
@@ -228,4 +227,4 @@ export default function App() {
     </AuthProvider>
   );
 }
-// Force Update
+// Fix Applied
