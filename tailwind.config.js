@@ -1,9 +1,8 @@
-
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
-    "./**/*.{js,ts,jsx,tsx}",
+    "./src/**/*.{js,ts,jsx,tsx}", // <--- FIXED: Only scans src folder to prevent build crashes
   ],
   darkMode: 'class',
   theme: {
