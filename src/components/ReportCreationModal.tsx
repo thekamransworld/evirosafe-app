@@ -5,10 +5,8 @@ import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
 
-// --- IMPORTS FOR AI & STORAGE ---
+// --- IMPORTS FOR AI (Firebase Storage Removed) ---
 import { generateSafetyReport } from '../lib/gemini';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "../firebase";
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -90,7 +88,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   // UI States
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // <--- Added Uploading State
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const stakeholders = useMemo(() => {
     const projectManager = projects.find(p => p.id === formData.project_id)?.manager_id;
@@ -166,49 +164,32 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     );
   };
 
-  // --- AI Report Handler ---
   const handleQuickAiReport = async () => {
       if(!aiPrompt.trim()) return;
       setIsAiLoading(true);
       setError('');
       
       try {
-          // We include the Report Type in the prompt to give AI context
           const fullPrompt = `Type: ${formData.type}. Details: ${aiPrompt}`;
-          
-          // Call the REAL Gemini AI (from lib/gemini.js)
           const aiData = await generateSafetyReport(fullPrompt);
           
           if (!aiData) {
               throw new Error("No data received from AI");
           }
 
-          // Map the AI response (Simple JSON) to the Form Fields (Complex State)
           const newFormData: any = {
               ...formData,
-              // AI 'description' replaces or appends to user prompt
               description: aiData.description, 
-              
-              // Map 'rootCause' to 'conditions' field (closest fit)
               conditions: aiData.rootCause ? `Root Cause: ${aiData.rootCause}` : formData.conditions,
-              
-              // Map 'recommendation' to 'immediate_actions' field
               immediate_actions: aiData.recommendation || formData.immediate_actions,
-              
-              // Try to map risk level if it exists
               risk_pre_control: {
                    severity: aiData.riskLevel === 'High' ? 3 : aiData.riskLevel === 'Medium' ? 2 : 1,
                    likelihood: aiData.riskLevel === 'High' ? 3 : aiData.riskLevel === 'Medium' ? 2 : 1
               },
-              
-              // Add a nice summary badge
               ai_evidence_summary: `AI Analysis: Risk detected as ${aiData.riskLevel}`,
-              
-              // Clear previous AI suggestions to avoid confusion since simple AI doesn't return list yet
               ai_suggested_evidence: [] 
           };
 
-          // Special handling for Leadership events
           if (formData.type === 'Leadership Event' || formData.type === 'Positive Observation') {
               newFormData.details = {
                   ...defaultDetails.leadership,
@@ -227,7 +208,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
       }
   };
 
-  // --- UPDATED SUBMIT HANDLER WITH REAL UPLOAD ---
+  // --- NEW CLOUDINARY SUBMIT HANDLER ---
   const handleSubmit = async () => {
     // 1. Validation
     if (!formData.project_id) {
@@ -248,37 +229,45 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     }
     
     setError('');
-    setIsSubmitting(true); // Start Spinner
+    setIsSubmitting(true);
 
     try {
-      // 2. Upload Files to Firebase Storage
+      // 2. Upload to Cloudinary (Bypassing Firebase CORS)
       let realUrls: string[] = [];
       
       if (evidenceFiles.length > 0) {
           const uploadPromises = evidenceFiles.map(async (file) => {
-            // Create a unique filename: evidence/TIMESTAMP_filename.jpg
-            const fileRef = ref(storage, `evidence/${Date.now()}_${file.name}`);
+            const formData = new FormData();
+            formData.append('file', file);
+            // NOTE: This preset 'evirosafe_preset' MUST exist in Cloudinary Settings
+            formData.append('upload_preset', 'evirosafe_preset'); 
             
-            // Upload the actual bytes
-            const snapshot = await uploadBytes(fileRef, file);
-            
-            // Get the public URL
-            return await getDownloadURL(snapshot.ref);
+            // Your Cloud Name is injected here:
+            const response = await fetch('https://api.cloudinary.com/v1_1/dsw9llfdo/image/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                console.error("Cloudinary Error:", errData);
+                throw new Error(errData.error?.message || 'Upload failed');
+            }
+            const data = await response.json();
+            return data.secure_url; 
           });
 
-          // Wait for ALL photos to upload
           realUrls = await Promise.all(uploadPromises);
       }
 
-      // 3. Save the report with the REAL links
-      // Note: If no files, realUrls is just empty []
+      // 3. Save the report to Firebase Database
       await handleCreateReport({ ...formData, evidence_urls: realUrls });
       
-      onClose(); // Success!
+      onClose();
 
-    } catch (err) {
-      console.error("Upload/Save error:", err);
-      setError("Failed to submit report. Please check your internet connection.");
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setError(`Failed to submit: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }
