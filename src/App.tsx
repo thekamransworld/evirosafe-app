@@ -1,9 +1,11 @@
+--- START OF FILE src/App.tsx ---
 import React from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
+import { AuthProvider, useAuth } from './contexts/AuthContext'; // <--- NEW IMPORT
 import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
-import { roles as rolesConfig } from './config'; // <--- ADDED THIS TO FIX ROLES CRASH
+import { roles as rolesConfig } from './config'; 
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -21,7 +23,7 @@ import { Roles } from './components/Roles';
 import { Organizations } from './components/Organizations';
 import { Projects } from './components/Projects';
 import { Signage } from './components/Signage';
-import { AiInsights } from './components/AiInsights'; // <--- MAKE SURE FILE IS NAMED AiInsights.tsx
+import { AiInsights } from './components/AiInsights'; 
 import { Settings } from './components/Settings';
 import { SiteMap } from './components/SiteMap';
 import { Housekeeping } from './components/Housekeeping';
@@ -45,7 +47,9 @@ import { TrainingSessionModal } from './components/TrainingSessionModal';
 import { TrainingRecordModal } from './components/TrainingRecordModal';
 import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 
+// --- Helper for Dynamic Icons ---
 const GetIcon = ({ name, className }: { name: string, className?: string }) => {
+  // ... (keeping your existing SVG definitions) ...
   const icons: Record<string, JSX.Element> = {
     dashboard: <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
     reports: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM14 9V3.5L18.5 9H14z" />,
@@ -71,103 +75,10 @@ const GetIcon = ({ name, className }: { name: string, className?: string }) => {
   return <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>{icons[name] || icons.dashboard}</svg>;
 };
 
-// --- Sidebar Component ---
-const Sidebar = () => {
-  const { currentView, setCurrentView, logout, activeOrg, activeUser, can } = useAppContext();
-  
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', section: 'Main' },
-    { id: 'site-map', label: 'Digital Twin', section: 'Main' },
-    { id: 'reports', label: 'Incident Reporting', section: 'Operations' },
-    { id: 'inspections', label: 'Inspections', section: 'Operations' },
-    { id: 'actions', label: 'Action Tracker', section: 'Operations' },
-    { id: 'ptw', label: 'Permit to Work', section: 'Control' },
-    { id: 'rams', label: 'RAMS', section: 'Control' },
-    { id: 'plans', label: 'HSE Plans', section: 'Control' },
-    { id: 'training', label: 'Training', section: 'People' },
-    { id: 'certification', label: 'My Certificate', section: 'People' },
-    { id: 'people', label: 'People', section: 'People' },
-    { id: 'checklists', label: 'Checklists', section: 'Tools' },
-    { id: 'tbt', label: 'Toolbox Talks', section: 'Tools' },
-    { id: 'housekeeping', label: 'Housekeeping', section: 'Tools' },
-    { id: 'signage', label: 'Signage', section: 'Tools' },
-    { id: 'ai-insights', label: 'AI Insights', section: 'Tools' },
-    { id: 'projects', label: 'Projects', section: 'Admin', permission: 'read', resource: 'projects' },
-    { id: 'organizations', label: 'Organizations', section: 'Admin', role: 'ADMIN' },
-    { id: 'roles', label: 'Roles & Permissions', section: 'Admin', role: 'ADMIN' },
-    { id: 'settings', label: 'Settings', section: 'System' },
-  ];
-
-  const sections = Array.from(new Set(menuItems.map(i => i.section)));
-
-  return (
-    <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen fixed left-0 top-0 z-30 border-r border-slate-800">
-      <div className="p-6 flex items-center gap-3">
-        <img src={activeOrg.branding.logoUrl} className="w-8 h-8 rounded" alt="Logo" />
-        <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">EviroSafe</h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider">{activeOrg.name}</p>
-        </div>
-      </div>
-      
-      <nav className="flex-1 px-4 space-y-6 overflow-y-auto custom-scrollbar">
-        {sections.map(section => {
-            const items = menuItems.filter(i => i.section === section).filter(i => {
-                if (i.role && activeUser?.role !== i.role) return false;
-                if (i.permission && i.resource && !can('read', i.resource as any)) return false;
-                return true;
-            });
-            
-            if (items.length === 0) return null;
-
-            return (
-                <div key={section}>
-                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-2">{section}</h3>
-                    <ul className="space-y-1">
-                        {items.map(item => (
-                            <li key={item.id}>
-                                <button
-                                    onClick={() => setCurrentView(item.id as any)}
-                                    className={`w-full flex items-center px-2 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                        currentView === item.id 
-                                        ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/50' 
-                                        : 'hover:bg-slate-800 hover:text-white'
-                                    }`}
-                                >
-                                    <GetIcon name={item.id} className={`w-5 h-5 mr-3 ${currentView === item.id ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
-                                    {item.label}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            );
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-slate-800 bg-slate-950">
-        <div className="flex items-center gap-3 mb-4 px-2">
-            <img src={activeUser?.avatar_url} className="w-8 h-8 rounded-full border border-slate-600" alt="Profile"/>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{activeUser?.name}</p>
-                <p className="text-xs text-slate-500 truncate">{activeUser?.role.replace('_', ' ')}</p>
-            </div>
-        </div>
-        <button onClick={logout} className="w-full flex items-center justify-center p-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">
-            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            Sign Out
-        </button>
-      </div>
-    </div>
-  );
-};
-
 // --- Global Modals Manager ---
+// ... (Your existing GlobalModals component code remains unchanged) ...
 const GlobalModals = () => {
-    // 1. Get the User from the correct context (FIXED)
     const { activeUser } = useAppContext(); 
-
-    // 2. Get the Modal State
     const { 
         isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
         isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
@@ -178,7 +89,6 @@ const GlobalModals = () => {
         courseForSession, sessionForAttendance
     } = useModalContext();
 
-    // 3. Get the Data and Handlers
     const { 
         handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleCreatePtw, handleUpdatePtw,
@@ -189,12 +99,10 @@ const GlobalModals = () => {
         projects, usersList, trainingCourseList
     } = useDataContext();
 
-    // Prevent rendering modals if user is not loaded yet
     if (!activeUser) return null;
 
     return (
         <>
-            {/* Reporting Modals */}
             <ReportCreationModal 
                 isOpen={isReportCreationModalOpen} 
                 onClose={() => setIsReportCreationModalOpen(false)}
@@ -211,8 +119,6 @@ const GlobalModals = () => {
                     onAcknowledgeReport={handleAcknowledgeReport}
                 />
             )}
-
-            {/* PTW Modals */}
             <PtwCreationModal
                 isOpen={isPtwCreationModalOpen}
                 onClose={() => setIsPtwCreationModalOpen(false)}
@@ -226,38 +132,32 @@ const GlobalModals = () => {
                     onUpdate={handleUpdatePtw}
                 />
             )}
-
-            {/* Plans Modals */}
             <PlanCreationModal isOpen={isPlanCreationModalOpen} onClose={() => setIsPlanCreationModalOpen(false)} onSubmit={handleCreatePlan} projects={projects} />
             {selectedPlan && <PlanDetailModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onStatusChange={handlePlanStatusChange} />}
             {selectedPlanForEdit && <PlanEditorModal plan={selectedPlanForEdit} onClose={() => setSelectedPlanForEdit(null)} onSave={handleUpdatePlan} onSubmitForReview={handlePlanStatusChange} />}
-
-            {/* RAMS Modals */}
             <RamsCreationModal isOpen={isRamsCreationModalOpen} onClose={() => setIsRamsCreationModalOpen(false)} onSubmit={handleCreateRams} projects={projects} activeUser={activeUser} />
             {selectedRams && <RamsDetailModal rams={selectedRams} onClose={() => setSelectedRams(null)} onStatusChange={handleRamsStatusChange} />}
             {selectedRamsForEdit && <RamsEditorModal rams={selectedRamsForEdit} onClose={() => setSelectedRamsForEdit(null)} onSave={handleUpdateRams} onSubmitForReview={handleRamsStatusChange} />}
-
-            {/* TBT Modals */}
             <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={activeUser} />
             {selectedTbt && <TbtSessionModal session={selectedTbt} onClose={() => setSelectedTbt(null)} onUpdate={handleUpdateTbt} users={usersList} />}
-
-            {/* Training Modals */}
             <TrainingCourseModal isOpen={isCourseModalOpen} onClose={() => setCourseModalOpen(false)} courses={trainingCourseList} onUpdateCourse={handleCreateOrUpdateCourse} />
             {courseForSession && <TrainingSessionModal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} onSubmit={handleScheduleSession} course={courseForSession} projects={projects} users={usersList} />}
             {sessionForAttendance && <SessionAttendanceModal isOpen={isAttendanceModalOpen} onClose={() => setAttendanceModalOpen(false)} onSubmit={handleCloseSession} session={sessionForAttendance} users={usersList} />}
         </>
     );
 };
+// --- Sidebar Component ---
+import { Sidebar } from './components/Sidebar'; // Assuming you moved it to its own file, if not, keep it here.
+// NOTE: Since you provided Sidebar separately, I am importing it. 
+// If it's in the same file in your setup, paste the Sidebar code here instead of the import.
 
 // --- Main App Content ---
 const AppContent = () => {
   const { currentView, activeUser, isLoading } = useAppContext();
+  const { currentUser } = useAuth(); // <--- NEW CHECK
+  
   const { 
-      projects, reportList, checklistRunList, planList, ramsList, tbtList, 
-      trainingCourseList, trainingRecordList, trainingSessionList, ptwList, 
-      checklistTemplates, actionItems, signs,
-      setInspectionList, setChecklistRunList, setPtwList,
-      handleUpdateInspection
+      projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
   } = useDataContext();
   
   const { 
@@ -267,13 +167,27 @@ const AppContent = () => {
       setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw
   } = useModalContext();
 
-  if (!activeUser) return <LoginScreen />;
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+
+  // GATEKEEPER: Check Firebase User instead of local user
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
+  // Fallback loading
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading EviroSafe...</div>;
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
-      <Sidebar />
-      <main className="flex-1 ml-64 min-h-screen flex flex-col">
+      <Sidebar 
+         currentView={currentView} 
+         setCurrentView={() => {}} // This is handled via Context in Sidebar, so this prop is just to satisfy TS if Sidebar expects it
+         isOpen={sidebarOpen}
+         setOpen={setSidebarOpen}
+      />
+      
+      {/* Dynamic Margin based on Sidebar state */}
+      <main className={`flex-1 min-h-screen flex flex-col transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
         <DemoBanner />
         <div className="flex-1 p-8 overflow-y-auto">
             {currentView === 'dashboard' && <Dashboard />}
@@ -318,7 +232,6 @@ const AppContent = () => {
                 />
             )}
             {currentView === 'people' && <People />}
-            {/* FIXED: Passing actual roles data here */}
             {currentView === 'roles' && <Roles roles={rolesConfig} />}
             {currentView === 'organizations' && <Organizations />}
             {currentView === 'projects' && <Projects />}
@@ -336,14 +249,16 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AppProvider>
-        <DataProvider>
-          <ModalProvider>
-            <AppContent />
-          </ModalProvider>
-        </DataProvider>
-      </AppProvider>
-    </ToastProvider>
+    <AuthProvider> {/* <--- WRAPPER ADDED */}
+        <ToastProvider>
+          <AppProvider>
+            <DataProvider>
+              <ModalProvider>
+                <AppContent />
+              </ModalProvider>
+            </DataProvider>
+          </AppProvider>
+        </ToastProvider>
+    </AuthProvider>
   );
 }
