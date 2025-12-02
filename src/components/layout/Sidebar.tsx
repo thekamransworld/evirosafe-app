@@ -1,4 +1,3 @@
---- START OF FILE src/components/Sidebar.tsx ---
 import React from 'react';
 import type { View, Resource } from '../../types';
 import { logoSrc } from '../../config';

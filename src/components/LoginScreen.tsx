@@ -1,4 +1,3 @@
---- START OF FILE src/components/LoginScreen.tsx ---
 import React, { useState } from 'react';
 import { logoSrc } from '../config';
 import { useAuth } from '../contexts/AuthContext';
