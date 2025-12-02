@@ -144,8 +144,8 @@ const AppContent = () => {
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading EviroSafe...</div>;
 
   return (
-    // FIX: Changed bg-slate-50 to bg-slate-900 to force dark mode background
-    <div className="flex min-h-screen bg-slate-900 text-slate-100 transition-colors duration-200">
+    // FIX: Restored bg-slate-50 (Light Mode) and text colors
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors duration-200">
       <Sidebar 
          currentView={currentView} 
          setCurrentView={() => {}} 
