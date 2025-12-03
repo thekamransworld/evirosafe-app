@@ -232,7 +232,8 @@ const GlobalModals = () => {
 
 // --- Main App Content ---
 const AppContent = () => {
-  const { currentView, activeUser, isLoading } = useAppContext();
+  // FIX: Extracted setCurrentView from context
+  const { currentView, setCurrentView, activeUser, isLoading } = useAppContext();
   const { currentUser } = useAuth();
 
   const {
@@ -262,7 +263,6 @@ const AppContent = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // GATEKEEPER: Check Firebase User
   if (!currentUser) {
     return <LoginScreen />;
   }
@@ -275,16 +275,15 @@ const AppContent = () => {
     );
 
   return (
-    // 🔥 unified dark background – removed bg-slate-50 & dark: variant
     <div className="flex min-h-screen bg-slate-950 text-slate-100 transition-all duration-300">
       <Sidebar
         currentView={currentView}
-        setCurrentView={() => {}}
+        // FIX: Connected the real function here!
+        setCurrentView={setCurrentView}
         isOpen={sidebarOpen}
         setOpen={setSidebarOpen}
       />
 
-      {/* 🔥 no margin-left hack; flex takes care of space */}
       <main className="flex-1 min-h-screen flex flex-col transition-all duration-300">
         <DemoBanner />
         <div className="flex-1 p-8 overflow-y-auto">
