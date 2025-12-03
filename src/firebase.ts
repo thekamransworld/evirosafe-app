@@ -3,16 +3,18 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
-// FIX: Use import.meta.env for Vite
+// Direct configuration to ensure immediate connection
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyBsG6olIcDkJpNNVcK3RPoH0jScmocZanM",
+  authDomain: "evirosafe-auth.firebaseapp.com",
+  projectId: "evirosafe-auth",
+  storageBucket: "evirosafe-auth.firebasestorage.app",
+  messagingSenderId: "549739145640",
+  appId: "1:549739145640:web:aa0d67ab931bfc7cdcd59d",
+  measurementId: "G-NLZV3LWNEM"
 };
 
+// Initialize Firebase (checks if app is already running to prevent crashes)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 const db = getFirestore(app);
