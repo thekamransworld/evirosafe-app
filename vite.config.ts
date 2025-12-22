@@ -13,27 +13,26 @@ export default defineConfig({
         short_name: 'EviroSafe',
         description: 'Next-Gen HSE Command Center',
         theme_color: '#020617',
-        background_color: '#ffffff',
+        background_color: '#020617',
         display: 'standalone',
         icons: [
           {
-            src: 'icons/evirosafe-192.png',
+            src: '/icons/evirosafe-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: 'icons/evirosafe-512.png',
+            src: '/icons/evirosafe-512.png',
             sizes: '512x512',
             type: 'image/png'
           }
         ]
       },
-
-      // ✅ FIX: allow precaching files bigger than 2MiB
+      // FIX: Increase the limit to 4MB or 5MB to prevent build errors
       workbox: {
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024 // 8 MiB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
-
       devOptions: {
         enabled: true
       }
