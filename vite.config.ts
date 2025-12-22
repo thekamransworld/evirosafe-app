@@ -28,14 +28,25 @@ export default defineConfig({
           }
         ]
       },
-      // FIX: Increase the limit to 4MB or 5MB to prevent build errors
       workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
         globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       },
       devOptions: {
         enabled: true
       }
     })
-  ]
+  ],
+  build: {
+    chunkSizeWarningLimit: 1600, // Increase chunk size warning limit
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor'; // Split vendor code into separate chunk
+          }
+        }
+      }
+    }
+  }
 });
