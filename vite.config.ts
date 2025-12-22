@@ -13,24 +13,29 @@ export default defineConfig({
         short_name: 'EviroSafe',
         description: 'Next-Gen HSE Command Center',
         theme_color: '#020617',
-        background_color: '#020617',
+        background_color: '#ffffff',
         display: 'standalone',
         icons: [
           {
-            src: '/icons/evirosafe-192.png',
+            src: 'icons/evirosafe-192.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/icons/evirosafe-512.png',
+            src: 'icons/evirosafe-512.png',
             sizes: '512x512',
             type: 'image/png'
           }
         ]
       },
-      // --- FIX: Disable PWA in Dev to stop console errors ---
+
+      // ✅ FIX: allow precaching files bigger than 2MiB
+      workbox: {
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024 // 8 MiB
+      },
+
       devOptions: {
-        enabled: false 
+        enabled: true
       }
     })
   ]
