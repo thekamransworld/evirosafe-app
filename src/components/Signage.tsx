@@ -8,7 +8,7 @@ import { useAppContext, useDataContext } from '../contexts';
 import { SearchInput } from './ui/SearchInput';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { EmptyState } from './ui/EmptyState';
-import { Modal } from './ui/Modal';
+import { BaseModal } from './ui/BaseModal';
 import { Tooltip } from './ui/Tooltip';
 import { ConfirmationDialog } from './ui/ConfirmationDialog';
 import { FavoritesManager } from './ui/FavoritesManager';
