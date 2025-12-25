@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import type { Role, Resource, Action, Scope } from '../types';
 import { allPossiblePermissions } from '../config';
@@ -12,24 +11,27 @@ interface RolesProps {
 
 const PermissionRow: React.FC<{ resource: Resource, actions: Action[], scopes: Scope[], rolePermissions: any, onPermissionChange: any }> = ({ resource, actions, scopes, rolePermissions, onPermissionChange }) => {
   return (
-    <tr className="border-b">
-      <td className="py-3 px-4 font-semibold capitalize">{resource.replace('_', ' ')}</td>
+    <tr className="border-b dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+      <td className="py-3 px-4 font-semibold capitalize text-slate-900 dark:text-slate-100">
+        {resource.replace('_', ' ')}
+      </td>
       {allPossiblePermissions.find(p => p.resource === 'reports')!.actions.map(action => (
         <td key={action} className="py-3 px-4 text-center">
           {actions.includes(action) ? (
             <input
               type="checkbox"
-              className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
               checked={rolePermissions[resource]?.actions.includes(action) || false}
               onChange={(e) => onPermissionChange(resource, action, e.target.checked)}
             />
-          ) : null}
+          ) : (
+            <span className="block w-4 h-4 mx-auto bg-gray-100 dark:bg-slate-800 rounded-sm opacity-50"></span>
+          )}
         </td>
       ))}
     </tr>
   );
 };
-
 
 export const Roles: React.FC<RolesProps> = ({ roles: initialRoles }) => {
   const { can } = useAppContext();
@@ -68,7 +70,10 @@ export const Roles: React.FC<RolesProps> = ({ roles: initialRoles }) => {
   return (
     <div>
         <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-text-primary">Roles & Permissions</h1>
+            <div>
+                <h1 className="text-3xl font-bold text-white">Roles & Permissions</h1>
+                <p className="text-slate-400 mt-1">Manage access levels and system capabilities</p>
+            </div>
             {can('create', 'roles') && (
                 <Button>
                     <PlusIcon className="w-5 h-5 mr-2" />
@@ -78,48 +83,64 @@ export const Roles: React.FC<RolesProps> = ({ roles: initialRoles }) => {
         </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Left Sidebar: Role List */}
         <div className="md:col-span-1">
-          <Card className="p-0">
-            <div className="p-4 border-b">
-                <h3 className="font-semibold">Roles</h3>
+          <Card className="p-0 overflow-hidden">
+            <div className="p-4 border-b dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">
+                <h3 className="font-bold text-slate-800 dark:text-white">Available Roles</h3>
             </div>
-            <ul>
+            <ul className="divide-y dark:divide-slate-700">
               {roles.map((role) => (
                 <li key={role.key}>
                   <button
                     onClick={() => setSelectedRole(role)}
-                    className={`w-full text-left px-4 py-3 text-sm ${
-                      selectedRole.key === role.key ? 'bg-primary-50 text-primary-700 font-semibold' : 'hover:bg-gray-50'
+                    className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 ${
+                      selectedRole.key === role.key 
+                        ? 'bg-primary-50 text-primary-700 font-bold border-l-4 border-primary-600 dark:bg-primary-900/20 dark:text-primary-400' 
+                        : 'text-slate-600 hover:bg-gray-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 border-l-4 border-transparent'
                     }`}
                   >
-                    {role.label}
-                    {role.is_system && <span className="ml-2 text-xs text-gray-400">(System)</span>}
+                    <div className="flex justify-between items-center">
+                        <span>{role.label}</span>
+                        {role.is_system && (
+                            <span className="text-[10px] uppercase tracking-wider bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded dark:bg-slate-700 dark:text-slate-400">
+                                System
+                            </span>
+                        )}
+                    </div>
                   </button>
                 </li>
               ))}
             </ul>
           </Card>
         </div>
+
+        {/* Right Content: Permissions Table */}
         <div className="md:col-span-3">
           <Card>
-             <div className="border-b pb-4 mb-4 flex justify-between items-center">
+             <div className="border-b dark:border-slate-700 pb-4 mb-4 flex justify-between items-center">
                 <div>
-                    <h2 className="text-xl font-bold">{selectedRole.label}</h2>
-                    <p className="text-sm text-text-secondary">Configure permissions for this role.</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{selectedRole.label}</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Configure resource access and functional permissions for this role.
+                    </p>
                 </div>
                 <Button>Save Changes</Button>
             </div>
+            
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="border-b">
-                    <th className="py-2 px-4 text-left font-medium text-gray-500 uppercase">Resource</th>
+                <thead className="bg-gray-50 dark:bg-slate-800">
+                  <tr className="border-b dark:border-slate-700">
+                    <th className="py-3 px-4 text-left font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-xs">Resource</th>
                     {allPossiblePermissions.find(p => p.resource === 'reports')!.actions.map(action => (
-                      <th key={action} className="py-2 px-4 text-center font-medium text-gray-500 uppercase w-20">{action}</th>
+                      <th key={action} className="py-3 px-4 text-center font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider text-xs w-24">
+                          {action}
+                      </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y dark:divide-slate-700">
                   {allPossiblePermissions.map(p => (
                     <PermissionRow 
                       key={p.resource}
@@ -139,7 +160,6 @@ export const Roles: React.FC<RolesProps> = ({ roles: initialRoles }) => {
     </div>
   );
 };
-
 
 // Icon
 const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (

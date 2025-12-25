@@ -1,26 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type {
   CanonicalPtwPayload,
-  PtwConfinedSpacePayload,
+  Ptw,
+  PtwType,
+  PtwSafetyRequirement,
   PtwHotWorkPayload,
   PtwLiftingPayload,
-  Ptw,
-  PtwPpe,
-  PtwSafetyRequirement,
-  PtwType,
+  PtwConfinedSpacePayload,
+  PtwExcavationPayload,
   PtwRoadClosurePayload,
   PtwWorkAtHeightPayload,
-  PtwExcavationPayload,
+  PtwWorkflowStage
 } from '../types';
 import { Button } from './ui/Button';
-// FIX: Import everything from the main config file
 import { ptwTypeDetails, emptySignoff, emptySignature, emptyExtension, emptyClosure, ptwChecklistData } from '../config';
 import { useDataContext, useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
 
 // --- ICONS ---
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>;
-const XMarkIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 
 const GLOBAL_PTW_REQUIREMENTS = {
@@ -68,11 +66,7 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
         ends_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 16),
         risk_assessment_ref: '',
         emergency_contact: '',
-        work_method_statement: '',
         number_of_workers: 1,
-        is_hot_work: false,
-        is_energy_isolation_required: false,
-        environmental_concerns: '',
     });
 
     const [error, setError] = useState('');
@@ -127,20 +121,20 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
             response: 'N/A' as const,
         }));
         
-        const attachmentData = evidenceFiles.map((file, i) => ({
+        const attachmentData = evidenceFiles.map((file) => ({
             name: file.name,
             url: `https://source.unsplash.com/random/200x200?sig=${Math.random()}` 
         }));
 
         const basePayload: CanonicalPtwPayload = {
-            creator_id: activeUser.id,
-            permit_no: mode === 'new' ? '' : formData.manual_permit_no,
+            creator_id: activeUser?.id || 'unknown',
+            permit_no: mode === 'new' ? `PTW-${Date.now().toString().slice(-6)}` : formData.manual_permit_no,
             category: 'standard',
             requester: { 
-              name: activeUser.name, 
-              email: activeUser.email, 
+              name: activeUser?.name || 'Unknown', 
+              email: activeUser?.email || '', 
               mobile: '555-0101', 
-              designation: activeUser.role, 
+              designation: activeUser?.role || 'Worker', 
               contractor: formData.contractor_name || 'Internal', 
               signature: '',
             },
@@ -154,6 +148,9 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
                     end_time: formData.ends_at.split('T')[1] 
                 },
                 associated_permits: [],
+                risk_assessment_ref: formData.risk_assessment_ref,
+                emergency_contact: formData.emergency_contact,
+                number_of_workers: formData.number_of_workers
             },
             safety_requirements: checklist,
             ppe: { hard_hat: true, safety_shoes: true, safety_harness: false, goggles: false, coverall: false, respirator: false, safety_gloves: false, vest: false },
@@ -163,18 +160,65 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
             extension: emptyExtension,
             closure: emptyClosure,
             attachments: attachmentData,
-            audit: [],
+            
+            // New Workflow Fields
+            isolations: [],
+            risk_analysis: {
+                risk_level: 'Medium',
+                total_risk_score: 12,
+                base_score: 10,
+                complexity_factor: 1.2,
+                weather_factor: 1.0,
+                time_factor: 1.0,
+                auto_controls: ['Standard PPE', 'TBT Required']
+            },
+            global_compliance: {
+                standards: GLOBAL_PTW_REQUIREMENTS.globalStandards
+            }
         };
         
-        let payload: Ptw['payload'] = basePayload;
+        // Type-specific payload adjustments
+        let payload: any = basePayload;
+        if (selectedType === 'Hot Work') {
+             payload = { ...basePayload, fire_watcher: { name: '', mobile: '' }, post_watch_minutes: 30 } as PtwHotWorkPayload;
+        } else if (selectedType === 'Lifting') {
+             payload = { ...basePayload, load_calculation: { load_weight: 0, utilization_percent: 0 } } as PtwLiftingPayload;
+        } else if (selectedType === 'Confined Space Entry') {
+             payload = { ...basePayload, gas_tests: [], entry_log: [] } as PtwConfinedSpacePayload;
+        } else if (selectedType === 'Excavation') {
+             payload = { ...basePayload, soil_type: 'A', cave_in_protection: [] } as PtwExcavationPayload;
+        } else if (selectedType === 'Road Closure') {
+             payload = { ...basePayload, closure_type: 'partial' } as PtwRoadClosurePayload;
+        } else if (selectedType === 'Work at Height') {
+             payload = { ...basePayload, access_equipment: { step_ladder: false, independent_scaffolding: false, tower_mobile_scaffolding: false, scissor_lift: false, articulated_telescopic_boom: false, boatswain_chair: false, man_basket: false, rope_access_system: false, roof_ladder: false, other: '' } } as PtwWorkAtHeightPayload;
+        }
 
-        const newPtw: Omit<Ptw, 'id' | 'org_id' | 'approvals' | 'audit_log'> = {
+        const initialStage: PtwWorkflowStage = 'DRAFT';
+
+        const newPtw: any = {
             project_id: formData.project_id,
             type: selectedType,
-            status: 'DRAFT',
-            title: formData.work_description,
+            status: initialStage,
+            title: formData.work_description.substring(0, 50) + (formData.work_description.length > 50 ? '...' : ''),
             payload: payload,
-        }
+            roles: {
+                requester_id: activeUser?.id || '',
+                issuer_id: '', // To be assigned
+                approver_id: '', // To be assigned
+                receiver_id: '', // To be assigned
+            },
+            workflow_log: [
+                {
+                    stage: 'DRAFT',
+                    action: 'Permit Created',
+                    user_id: activeUser?.id || '',
+                    timestamp: new Date().toISOString(),
+                    comments: 'Initial draft created via system'
+                }
+            ],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
         
         onSubmit(newPtw);
         handleClose();
@@ -222,6 +266,7 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
 
                     {step === 2 && selectedType && (
                         <div className="space-y-6">
+                             {/* GLOBAL COMPLIANCE */}
                              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <h3 className="font-bold text-blue-900 dark:text-blue-200 mb-3 flex items-center">
                                     <span className="mr-2">🌍</span> Mandatory Safety Checks
@@ -244,6 +289,7 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
                                 </div>
                             </div>
                             
+                            {/* FORM FIELDS */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                                 <FormField label="Project">
                                     <select value={formData.project_id} onChange={e => setFormData(p => ({...p, project_id: e.target.value}))} className="w-full p-2 border border-gray-300 dark:border-dark-border bg-white dark:bg-dark-background text-gray-900 dark:text-white rounded-md shadow-sm">
@@ -265,6 +311,7 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
                                 </FormField>
                             </div>
 
+                            {/* EVIDENCE UPLOAD */}
                             <div className="border-t pt-4 dark:border-dark-border">
                                 <h4 className="font-bold text-gray-900 dark:text-white mb-2">Attachments / Evidence</h4>
                                 <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 relative">

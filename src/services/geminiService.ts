@@ -1,236 +1,154 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// 1. Setup API Key (Hardcoded for immediate testing)
-const API_KEY = "AIzaSyBr_UMiJV7o6e1iV1dFjRF5zVckUr46D3M";
+// Access API Key from environment variables
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
+// Initialize API
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// Helper: Clean JSON response
-const cleanJson = (text: string) => {
-  try {
-    return text.replace(/```json/g, "").replace(/```/g, "").trim();
-  } catch (e) {
-    return text;
-  }
-};
+// --- MOCK DATA GENERATORS (Fallback) ---
+const getMockRiskForecast = () => ({
+    risk_level: 'Medium',
+    summary: 'Moderate risk detected due to high temperatures and ongoing lifting operations (Mock Data).',
+    recommendations: ['Enforce hydration breaks', 'Check lifting gear certification', 'Monitor wind speeds']
+});
 
-// Helper: Get Model
-const getModel = () => {
-    return genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-};
+const getMockSafetyReport = (prompt: string) => `## AI Safety Assessment (Mock)\n\n**Subject:** ${prompt}\n\n**Analysis:**\nBased on standard safety protocols, the situation described involves potential hazards related to site operations.\n\n**Recommendations:**\n1. Isolate the area.\n2. Verify permits.\n3. Conduct a TBT.`;
 
-// --- REAL AI FUNCTIONS ---
-
-export const generateRamsContent = async (prompt: string) => {
-  if (!API_KEY) {
-      console.warn("Gemini API Key is missing. Using mock data.");
-      return mockRams(prompt); 
-  }
-
-  try {
-    const model = getModel();
-    const systemPrompt = `
-      You are an HSE Expert. Generate a comprehensive Risk Assessment & Method Statement (RAMS) for the activity: "${prompt}".
-      Return ONLY valid JSON. No markdown formatting. Structure:
-      {
-        "overview": "Detailed summary",
-        "competence": "Required qualifications",
-        "emergency_arrangements": "Emergency procedures",
-        "sequence_of_operations": [
-          {
-            "step_no": 1,
-            "description": "Step description",
-            "hazards": [{ "id": "h1", "description": "Hazard" }],
-            "controls": [{ "id": "c1", "description": "Control", "hierarchy": "administrative" }], 
-            "risk_before": { "severity": 4, "likelihood": 4 }, 
-            "risk_after": { "severity": 2, "likelihood": 2 }
-          }
-        ]
-      }
-    `;
-
-    const result = await model.generateContent(systemPrompt);
-    const response = await result.response;
-    const text = cleanJson(response.text());
-    return JSON.parse(text);
-
-  } catch (error) {
-    console.error("AI Generation Failed:", error);
-    return mockRams(prompt);
-  }
-};
-
-export const generateTbtContent = async (title: string) => {
-  if (!API_KEY) return mockTbt(title);
-
-  try {
-    const model = getModel();
-    const result = await model.generateContent(`
-      Generate a Toolbox Talk for "${title}". 
-      Return ONLY valid JSON:
-      {
-        "summary": "Brief summary",
-        "hazards": ["Hazard 1", "Hazard 2"],
-        "controls": ["Control 1", "Control 2"],
-        "questions": ["Question 1", "Question 2"]
-      }
-    `);
-    return JSON.parse(cleanJson(result.response.text()));
-  } catch (e) {
-    console.error("AI TBT Failed:", e);
-    return mockTbt(title);
-  }
-};
-
-export const generateCourseContent = async (title: string) => {
-  if (!API_KEY) return mockCourse(title);
-
-  try {
-    const model = getModel();
-    const result = await model.generateContent(`
-      Create a training course syllabus for "${title}".
-      Return ONLY valid JSON:
-      {
-        "syllabus": "Markdown formatted syllabus...",
-        "learning_objectives": ["Obj 1", "Obj 2"]
-      }
-    `);
-    return JSON.parse(cleanJson(result.response.text()));
-  } catch (e) {
-    console.error("AI Course Failed:", e);
-    return mockCourse(title);
-  }
-};
-
-export const generateSafetyReport = async (prompt: string) => {
-  if (!API_KEY) return mockSafetyReport(prompt);
-
-  try {
-    const model = getModel();
-    const result = await model.generateContent(`
-      Analyze this safety incident: "${prompt}".
-      Return ONLY valid JSON:
-      {
-        "riskLevel": "Low/Medium/High/Critical",
-        "rootCause": "Likely root cause",
-        "recommendation": "Immediate actions",
-        "description": "Professional description"
-      }
-    `);
-    return JSON.parse(cleanJson(result.response.text()));
-  } catch (e) {
-    console.error("AI Report Failed:", e);
-    return mockSafetyReport(prompt);
-  }
-};
-
-export const generateAiRiskForecast = async () => {
-    if (!API_KEY) return mockRiskForecast();
-    
-    try {
-        const model = getModel();
-        const result = await model.generateContent(`
-            Generate a daily site safety risk forecast.
-            Return ONLY valid JSON:
-            {
-                "risk_level": "Low/Medium/High",
-                "summary": "Short forecast summary",
-                "recommendations": ["Action 1", "Action 2", "Action 3"]
-            }
-        `);
-        return JSON.parse(cleanJson(result.response.text()));
-    } catch (e) {
-        console.error("AI Forecast Failed:", e);
-        return mockRiskForecast();
-    }
-}
-
-export const generateCertificationInsight = async (profile: any) => {
-    if (!API_KEY) return mockCertInsight();
-    
-    try {
-        const model = getModel();
-        const result = await model.generateContent(`
-            Analyze this HSE profile and suggest next certification steps.
-            Profile: ${JSON.stringify(profile)}
-            Return ONLY valid JSON:
-            {
-                "nextLevelRecommendation": "Recommendation text",
-                "missingItems": ["Item 1", "Item 2"]
-            }
-        `);
-        return JSON.parse(cleanJson(result.response.text()));
-    } catch (e) {
-        return mockCertInsight();
-    }
-}
-
-export const translateText = async (text: string, lang: string) => {
-    if (!API_KEY) return `[Mock Translation]: ${text}`;
-    try {
-        const model = getModel();
-        const result = await model.generateContent(`Translate to ${lang}: "${text}"`);
-        return result.response.text();
-    } catch(e) {
-        return text;
-    }
-}
-
-export const generateReportSummary = async (json: string) => {
-    if (!API_KEY) return "AI Summary unavailable (Mock Mode).";
-    
-    try {
-        const model = getModel();
-        const result = await model.generateContent(`Summarize this incident report in 1 paragraph: ${json}`);
-        return result.response.text();
-    } catch (e) {
-        return "Failed to generate summary.";
-    }
-};
-
-// --- MOCK FALLBACKS ---
-const mockRams = (prompt: string) => ({
-    overview: `(Mock) Method Statement for: ${prompt}.`,
-    competence: "All personnel must hold valid cards.",
+const getMockRams = (prompt: string) => ({
+    overview: `Method Statement for: ${prompt}\n\n1. Ensure work area is barricaded.\n2. Verify all permits are active.\n3. Conduct TBT before start.`,
+    competence: "All personnel must hold valid cards and specific training for this task.",
     sequence_of_operations: [
         {
             step_no: 1,
-            description: "Site Preparation (Mock)",
-            hazards: [{ id: "h1", description: "Slips, Trips" }],
+            description: "Site Preparation",
+            hazards: [{ id: "h1", description: "Slips, Trips, Falls" }],
             controls: [{ id: "c1", description: "Good housekeeping", hierarchy: "administrative" }],
             risk_before: { severity: 3, likelihood: 3 },
             risk_after: { severity: 3, likelihood: 1 }
         }
     ],
-    emergency_arrangements: "Standard site emergency plan applies."
+    emergency_arrangements: "In case of emergency, stop work immediately and proceed to assembly point A."
 });
 
-const mockTbt = (title: string) => ({
-    summary: `(Mock) Discussion on ${title}`,
-    hazards: ["Generic Hazard 1", "Generic Hazard 2"],
-    controls: ["Wear PPE", "Follow procedures"],
-    questions: ["Do you understand?", "Any questions?"]
+const getMockTbt = (title: string) => ({
+    summary: `Today we are discussing ${title}. Key safety points include hazard identification and control measures.`,
+    hazards: ["Unexpected movement", "Falling objects", "Pinch points"],
+    controls: ["Stay within walkways", "Wear helmet and gloves", "Maintain eye contact"],
+    questions: ["What is the main hazard?", "Who is the supervisor?"]
 });
 
-const mockCourse = (title: string) => ({
-    syllabus: `# (Mock) Course: ${title}\n\n## Module 1\n- Introduction`,
-    learning_objectives: ["Objective 1", "Objective 2"]
+const getMockCourse = (title: string) => ({
+    syllabus: `# Course: ${title}\n\n## Module 1: Introduction\n- Overview\n- Regulations\n\n## Module 2: Safety\n- Risk Controls\n- PPE`,
+    learning_objectives: ["Understand risks", "Apply controls", "Emergency response"]
 });
 
-const mockSafetyReport = (prompt: string) => ({
-    riskLevel: 'Medium',
-    rootCause: 'Under investigation (Mock)',
-    recommendation: 'Review procedures (Mock)',
-    description: prompt
-});
+// --- API FUNCTIONS ---
 
-const mockRiskForecast = () => ({
-    risk_level: 'Medium',
-    summary: 'Moderate risk detected (Mock Data).',
-    recommendations: ['Check PPE', 'Hydrate']
-});
+export const generateAiRiskForecast = async () => {
+    if (!API_KEY) return getMockRiskForecast();
+    
+    try {
+        // Use 'gemini-pro' as it is generally available
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" }); 
+        const prompt = "Analyze construction site risks for today: 38C temperature, 62 workers, lifting operations. Return JSON with risk_level (Low/Medium/High), summary, and recommendations array.";
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        // Attempt to parse JSON from AI response
+        try {
+            // Clean up markdown code blocks if present
+            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            return JSON.parse(jsonStr);
+        } catch (e) {
+            console.warn("AI JSON parse failed, using mock", e);
+            return getMockRiskForecast();
+        }
+    } catch (error) {
+        console.error("AI Service Error (Risk Forecast):", error);
+        return getMockRiskForecast();
+    }
+};
 
-const mockCertInsight = () => ({
-    nextLevelRecommendation: "Complete 5 more inspections.",
-    missingItems: ["Advanced First Aid"]
-});
+export const generateSafetyReport = async (prompt: string) => {
+    if (!API_KEY) return getMockSafetyReport(prompt);
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(`Generate a safety report for: ${prompt}`);
+        return result.response.text();
+    } catch (error) {
+        console.error("AI Service Error (Safety Report):", error);
+        return getMockSafetyReport(prompt);
+    }
+};
+
+export const generateRamsContent = async (prompt: string) => {
+    if (!API_KEY) return getMockRams(prompt);
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(`Generate RAMS content JSON for: ${prompt}. Fields: overview, competence, sequence_of_operations (array of steps with hazards/controls), emergency_arrangements.`);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("AI Service Error (RAMS):", error);
+        return getMockRams(prompt);
+    }
+};
+
+export const generateTbtContent = async (title: string) => {
+    if (!API_KEY) return getMockTbt(title);
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(`Generate Toolbox Talk JSON for '${title}'. Fields: summary, hazards (array), controls (array), questions (array).`);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("AI Service Error (TBT):", error);
+        return getMockTbt(title);
+    }
+};
+
+export const generateCourseContent = async (title: string) => {
+    if (!API_KEY) return getMockCourse(title);
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(`Generate training course JSON for '${title}'. Fields: syllabus (markdown string), learning_objectives (array).`);
+        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(text);
+    } catch (error) {
+        console.error("AI Service Error (Course):", error);
+        return getMockCourse(title);
+    }
+};
+
+export const generateReportSummary = async (json: string) => {
+    if (!API_KEY) return "AI Summary: Incident details recorded. Investigation pending.";
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(`Summarize this safety report JSON in 2 sentences: ${json}`);
+        return result.response.text();
+    } catch (error) {
+        return "AI Summary: Incident details recorded. Investigation pending.";
+    }
+};
+
+export const generateCertificationInsight = async (profile: any) => {
+    // Mock only for now as this is complex logic
+    return {
+        nextLevelRecommendation: "Focus on leading more safety inspections to reach the 'Advanced' level.",
+        missingItems: ["Lead 5 TBTs", "Complete 'Advanced Risk Assessment' course"]
+    };
+};
+
+export const translateText = async (text: string, lang: string) => {
+    if (!API_KEY) return `[${lang}] ${text}`;
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(`Translate to ${lang}: ${text}`);
+        return result.response.text();
+    } catch (error) {
+        return `[${lang}] ${text}`;
+    }
+};

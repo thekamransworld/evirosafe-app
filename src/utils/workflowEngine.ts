@@ -1,0 +1,110 @@
+import type { Ptw, PtwWorkflowStage, PtwWorkflowLog } from '../types';
+
+export class PtwWorkflowEngine {
+  // Define valid transitions
+  private static transitions: Record<PtwWorkflowStage, PtwWorkflowStage[]> = {
+    DRAFT: ['REQUESTED'],
+    REQUESTED: ['ISSUER_REVIEW', 'DRAFT'],
+    ISSUER_REVIEW: ['ISSUER_SIGNED', 'DRAFT'],
+    ISSUER_SIGNED: ['IV_REVIEW', 'PENDING_APPROVAL'],
+    IV_REVIEW: ['PENDING_APPROVAL', 'DRAFT'],
+    PENDING_APPROVAL: ['APPROVAL'],
+    APPROVAL: ['APPROVER_SIGNED', 'DRAFT'],
+    APPROVER_SIGNED: ['AUTHORIZATION'],
+    AUTHORIZATION: ['HANDOVER_PENDING'],
+    HANDOVER_PENDING: ['SITE_HANDOVER'],
+    SITE_HANDOVER: ['ACTIVE'],
+    ACTIVE: ['SUSPENDED', 'COMPLETION_PENDING'],
+    SUSPENDED: ['ACTIVE', 'CANCELLED'],
+    COMPLETION_PENDING: ['JOINT_INSPECTION'],
+    JOINT_INSPECTION: ['CLOSED', 'ACTIVE'],
+    CLOSED: ['ARCHIVED'],
+    CANCELLED: ['ARCHIVED'],
+    ARCHIVED: []
+  };
+
+  // Check if transition is valid
+  static canTransition(from: PtwWorkflowStage, to: PtwWorkflowStage): boolean {
+    return this.transitions[from]?.includes(to) || false;
+  }
+
+  // Get next possible stages
+  static getNextStages(current: PtwWorkflowStage): PtwWorkflowStage[] {
+    return this.transitions[current] || [];
+  }
+
+  // Create workflow log entry
+  static createLogEntry(
+    stage: PtwWorkflowStage,
+    action: string,
+    userId: string,
+    comments?: string
+  ): PtwWorkflowLog {
+    return {
+      stage,
+      action,
+      user_id: userId,
+      timestamp: new Date().toISOString(),
+      comments,
+      signoff_type: 'digital'
+    };
+  }
+
+  // Validate role permissions for transition
+  static validateRolePermission(
+    currentStage: PtwWorkflowStage,
+    userRole: string,
+    userId: string,
+    ptw: Ptw
+  ): { allowed: boolean; message: string } {
+    // In a real app, you'd check against ptw.roles.issuer_id etc.
+    // For demo purposes, we check roles generally
+    const isAdmin = userRole === 'ADMIN';
+    const isHSE = userRole === 'HSE_MANAGER';
+    const isIssuer = userRole === 'SUPERVISOR' || userRole === 'HSE_MANAGER'; // Simplified for demo
+    const isApprover = userRole === 'HSE_MANAGER' || userRole === 'ORG_ADMIN';
+    const isReceiver = true; // Usually the worker/supervisor logged in
+
+    if (isAdmin) return { allowed: true, message: 'Admin Override' };
+
+    switch (currentStage) {
+      case 'DRAFT':
+        return { allowed: true, message: '' }; // Anyone can submit
+      
+      case 'REQUESTED':
+        return { allowed: isIssuer || isHSE, message: 'Only issuer can review requested permits' };
+      
+      case 'ISSUER_REVIEW':
+        return { allowed: isIssuer, message: 'Only issuer can sign off on review' };
+      
+      case 'ISSUER_SIGNED':
+        return { allowed: true, message: '' }; // System transition usually
+      
+      case 'PENDING_APPROVAL':
+      case 'APPROVAL':
+        return { allowed: isApprover, message: 'Only approver can review and sign' };
+      
+      case 'AUTHORIZATION':
+        return { allowed: isIssuer, message: 'Only issuer can authorize permit' };
+      
+      case 'HANDOVER_PENDING':
+      case 'SITE_HANDOVER':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can accept handover' };
+      
+      case 'ACTIVE':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can update work status' };
+      
+      case 'COMPLETION_PENDING':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can mark work complete' };
+      
+      case 'JOINT_INSPECTION':
+        return { allowed: isIssuer || isHSE, message: 'Joint inspection requires issuer' };
+      
+      case 'CLOSED':
+        return { allowed: isIssuer, message: 'Only issuer can close permit' };
+      
+      default:
+        return { allowed: false, message: 'Action not allowed' };
+    }
+  }
+}

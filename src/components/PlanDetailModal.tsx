@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import type { Plan, PlanStatus, User } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -14,7 +13,7 @@ interface PlanDetailModalProps {
   onStatusChange: (planId: string, newStatus: PlanStatus) => void;
 }
 
-const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
+const getStatusColor = (status: PlanStatus | undefined): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
   switch (status) {
     case 'published': return 'green';
     case 'approved': return 'blue';
@@ -28,7 +27,7 @@ const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red'
 const DetailItem: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <div>
     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
-    <div className="text-sm text-gray-800 mt-1">{children}</div>
+    <div className="text-sm text-gray-800 dark:text-gray-200 mt-1">{children}</div>
   </div>
 );
 
@@ -62,7 +61,15 @@ const WorkflowActions: React.FC<{ status: PlanStatus, onAction: (newStatus: Plan
 }
 
 export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose, onStatusChange }) => {
-  const [activeSection, setActiveSection] = React.useState(plan.content.body_json[0]?.title || '');
+  // Safety check: if plan is null/undefined, don't render
+  if (!plan) return null;
+
+  // Safe access to nested properties
+  const bodyJson = plan.content?.body_json || [];
+  const attachments = plan.content?.attachments || [];
+  const status = plan.status || 'draft'; // Default to draft if missing
+
+  const [activeSection, setActiveSection] = useState(bodyJson[0]?.title || '');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   const handlePrint = () => window.print();
@@ -70,92 +77,93 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
   return (
     <>
     <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <header className="p-4 border-b flex justify-between items-center flex-shrink-0">
+      <div className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-6xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{plan.title} ({plan.version})</h2>
-            <p className="text-sm text-gray-500">{plan.type} Plan</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{plan.title} ({plan.version})</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{plan.type} Plan</p>
           </div>
           <div className="flex items-center gap-4">
              <ActionsBar onPrint={handlePrint} onDownloadPdf={handlePrint} onEmail={() => setIsEmailModalOpen(true)} />
-             <Badge color={getStatusColor(plan.status)}>{plan.status.replace('_', ' ')}</Badge>
-             <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon className="w-6 h-6" /></button>
+             {/* FIX: Added safety check for status.replace */}
+             <Badge color={getStatusColor(status)}>{(status || '').replace('_', ' ')}</Badge>
+             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
           </div>
         </header>
 
         <div className="flex-grow flex overflow-hidden">
-            <nav className="w-64 bg-gray-50 border-r overflow-y-auto p-4 flex-shrink-0">
-                <h3 className="text-xs font-bold uppercase text-gray-500 mb-2">Sections</h3>
+            <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0">
+                <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2">Sections</h3>
                 <ul>
-                    {plan.content.body_json.map(section => (
+                    {bodyJson.map(section => (
                         <li key={section.title}>
                             <button
                                 onClick={() => setActiveSection(section.title)}
-                                className={`w-full text-left p-2 rounded-md text-sm font-medium ${activeSection === section.title ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-200'}`}
+                                className={`w-full text-left p-2 rounded-md text-sm font-medium ${activeSection === section.title ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'hover:bg-gray-200 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300'}`}
                             >
                                 {section.title}
                             </button>
                         </li>
                     ))}
-                     {plan.content.body_json.length === 0 && <p className="text-sm text-gray-500">No content sections.</p>}
+                     {bodyJson.length === 0 && <p className="text-sm text-gray-500">No content sections.</p>}
                 </ul>
             </nav>
 
             <main className="flex-1 p-8 overflow-y-auto">
-                 {plan.status === 'under_review' && (
-                    <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
+                 {status === 'under_review' && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
                         <div className="flex">
                             <div className="flex-shrink-0">
                                 <MailIcon className="h-5 w-5 text-yellow-400" aria-hidden="true" />
                             </div>
                             <div className="ml-3">
-                                <p className="text-sm text-yellow-700">
+                                <p className="text-sm text-yellow-700 dark:text-yellow-300">
                                 A review request has been sent to the Client. This plan is pending approval.
                                 </p>
                             </div>
                         </div>
                     </div>
                 )}
-                {plan.content.body_json.map(section => (
+                {bodyJson.map(section => (
                     <div key={section.title} className={activeSection === section.title ? '' : 'hidden'}>
-                        <h1 className="text-2xl font-bold border-b pb-2 mb-4">{section.title}</h1>
-                        <div className="prose max-w-none">
+                        <h1 className="text-2xl font-bold border-b dark:border-dark-border pb-2 mb-4 text-gray-900 dark:text-white">{section.title}</h1>
+                        <div className="prose max-w-none dark:prose-invert text-gray-800 dark:text-gray-300">
                             <ReactMarkdown>{section.content}</ReactMarkdown>
                         </div>
                     </div>
                 ))}
-                 {plan.content.body_json.length === 0 && <p className="text-center text-gray-500">This plan has no content yet.</p>}
+                 {bodyJson.length === 0 && <p className="text-center text-gray-500">This plan has no content yet.</p>}
             </main>
 
-            <aside className="w-80 bg-gray-50 border-l p-6 overflow-y-auto flex-shrink-0">
-                <h3 className="text-lg font-bold mb-4">Details</h3>
+            <aside className="w-80 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-6 overflow-y-auto flex-shrink-0">
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Details</h3>
                 <div className="space-y-4">
-                    <DetailItem label="Prepared By"><PersonDetail person={plan.people.prepared_by} /></DetailItem>
-                    <DetailItem label="Reviewed By"><PersonDetail person={plan.people.reviewed_by} /></DetailItem>
-                    <DetailItem label="Client Approved By"><PersonDetail person={plan.people.approved_by_client} /></DetailItem>
-                    <DetailItem label="Last Updated">{new Date(plan.dates.updated_at).toLocaleDateString()}</DetailItem>
-                    <DetailItem label="Next Review">{new Date(plan.dates.next_review_at).toLocaleDateString()}</DetailItem>
+                    <DetailItem label="Prepared By"><PersonDetail person={plan.people?.prepared_by} /></DetailItem>
+                    <DetailItem label="Reviewed By"><PersonDetail person={plan.people?.reviewed_by} /></DetailItem>
+                    <DetailItem label="Client Approved By"><PersonDetail person={plan.people?.approved_by_client} /></DetailItem>
+                    <DetailItem label="Last Updated">{plan.dates?.updated_at ? new Date(plan.dates.updated_at).toLocaleDateString() : 'N/A'}</DetailItem>
+                    <DetailItem label="Next Review">{plan.dates?.next_review_at ? new Date(plan.dates.next_review_at).toLocaleDateString() : 'N/A'}</DetailItem>
                     <DetailItem label="Tags">
                         <div className="flex flex-wrap gap-1">
-                            {plan.meta.tags.map(tag => <Badge key={tag} color="gray" size="sm">{tag}</Badge>)}
+                            {plan.meta?.tags?.map(tag => <Badge key={tag} color="gray" size="sm">{tag}</Badge>)}
                         </div>
                     </DetailItem>
                 </div>
-                 <h3 className="text-lg font-bold mt-6 mb-4">Attachments</h3>
+                 <h3 className="text-lg font-bold mt-6 mb-4 text-gray-900 dark:text-white">Attachments</h3>
                  <ul className="space-y-2">
-                     {plan.content.attachments.map(att => (
-                         <li key={att.name} className="flex items-center p-2 bg-white border rounded-md">
+                     {attachments.map(att => (
+                         <li key={att.name} className="flex items-center p-2 bg-white dark:bg-dark-card border dark:border-dark-border rounded-md">
                              <PaperClipIcon className="w-5 h-5 text-gray-400 mr-2" />
                              <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary-600 hover:underline flex-1 truncate">{att.name}</a>
                          </li>
                      ))}
-                     {plan.content.attachments.length === 0 && <p className="text-sm text-gray-500">No attachments.</p>}
+                     {attachments.length === 0 && <p className="text-sm text-gray-500">No attachments.</p>}
                  </ul>
             </aside>
         </div>
 
-        <footer className="p-4 border-t bg-gray-100 flex justify-end items-center flex-shrink-0">
-            <WorkflowActions status={plan.status} onAction={(newStatus) => onStatusChange(plan.id, newStatus)} />
+        <footer className="p-4 border-t bg-gray-100 dark:bg-dark-card dark:border-dark-border flex justify-end items-center flex-shrink-0">
+            <WorkflowActions status={status} onAction={(newStatus) => onStatusChange(plan.id, newStatus)} />
         </footer>
       </div>
     </div>
@@ -164,7 +172,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
         onClose={() => setIsEmailModalOpen(false)}
         documentTitle={`Plan: ${plan.title}`}
         documentLink={`${window.location.href}?plan=${plan.id}`}
-        defaultRecipients={[plan.people.prepared_by, plan.people.reviewed_by, plan.people.approved_by_client].filter(Boolean) as User[]}
+        defaultRecipients={[plan.people?.prepared_by, plan.people?.reviewed_by, plan.people?.approved_by_client].filter(Boolean) as User[]}
     />
     </>
   );

@@ -1,385 +1,238 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Plan, PlanContentSection, PlanStatus } from '../types';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { useAppContext } from '../contexts';
-import { 
-  Sparkles, Plus, Link, Paperclip,
-  Eye, EyeOff, Save, Send,
-  MessageSquare, Users, Clock, CheckCircle,
-  AlertTriangle, X
-} from 'lucide-react';
-import MDEditor from '@uiw/react-md-editor';
+import { useToast } from './ui/Toast'; // Import Toast for feedback
 
 interface PlanEditorModalProps {
   plan: Plan;
   onClose: () => void;
   onSave: (plan: Plan) => void;
   onSubmitForReview: (planId: string, newStatus: PlanStatus) => void;
-  onAIGenerateSection?: (sectionTitle: string, context: string) => Promise<string>;
 }
 
-export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({ 
-  plan, onClose, onSave, onSubmitForReview, onAIGenerateSection 
-}) => {
+const RightRailSection: React.FC<{ title: string, children: React.ReactNode, action?: React.ReactNode }> = ({ title, children, action }) => (
+    <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+            <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider">{title}</h3>
+            {action}
+        </div>
+        <div className="p-3 bg-white dark:bg-dark-card border dark:border-dark-border rounded-lg space-y-2 shadow-sm">
+            {children}
+        </div>
+    </div>
+);
+
+export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({ plan, onClose, onSave, onSubmitForReview }) => {
   const [editedPlan, setEditedPlan] = useState<Plan>(JSON.parse(JSON.stringify(plan)));
   const [activeSection, setActiveSection] = useState<PlanContentSection | null>(editedPlan.content.body_json[0] || null);
-  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [wordCount, setWordCount] = useState(0);
-  
-  const editorRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
-    if (activeSection) {
-      const words = activeSection.content.split(/\s+/).filter(word => word.length > 0).length;
-      setWordCount(words);
+    // If the active section is deleted from the plan, reset to the first one
+    if (activeSection && !editedPlan.content.body_json.find(s => s.title === activeSection.title)) {
+        setActiveSection(editedPlan.content.body_json[0] || null);
     }
-  }, [activeSection]);
+  }, [editedPlan.content.body_json, activeSection]);
 
   const handleSectionContentChange = (newContent: string) => {
     if (!activeSection) return;
     const newSections = editedPlan.content.body_json.map(s => 
-      s.title === activeSection.title ? { ...s, content: newContent } : s
+        s.title === activeSection.title ? { ...s, content: newContent } : s
     );
     setEditedPlan(p => ({ ...p, content: { ...p.content, body_json: newSections } }));
     setActiveSection(s => s ? { ...s, content: newContent } : null);
   };
-
-  const handleAddSection = () => {
-    const newSection: PlanContentSection = {
-      title: `New Section ${editedPlan.content.body_json.length + 1}`,
-      content: '',
-      is_complete: false
-    };
-    const newSections = [...editedPlan.content.body_json, newSection];
+  
+  const handleSectionCompletionChange = (title: string, isComplete: boolean) => {
+    const newSections = editedPlan.content.body_json.map(s => 
+        s.title === title ? { ...s, is_complete: isComplete } : s
+    );
     setEditedPlan(p => ({ ...p, content: { ...p.content, body_json: newSections } }));
-    setActiveSection(newSection);
   };
 
-  const handleAIGenerate = async () => {
-    if (!activeSection || !onAIGenerateSection) return;
-    
-    setIsGeneratingAI(true);
-    try {
-      const aiContent = await onAIGenerateSection(
-        activeSection.title,
-        editedPlan.title + " " + editedPlan.type + " " + editedPlan.meta.description
-      );
-      
-      if (aiContent) {
-        handleSectionContentChange(aiContent);
-      }
-    } catch (error) {
-      console.error('AI generation failed:', error);
-    } finally {
-      setIsGeneratingAI(false);
-    }
-  };
+  const handleMetaChange = (field: keyof Plan['meta'], value: string | string[]) => {
+      setEditedPlan(p => ({ ...p, meta: { ...p.meta, [field]: value }}));
+  }
 
-  const completionPercentage = editedPlan.content.body_json.length > 0
-    ? Math.round((editedPlan.content.body_json.filter(s => s.is_complete).length / editedPlan.content.body_json.length) * 100)
-    : 0;
+  const handleSaveDraft = () => {
+      onSave(editedPlan);
+      toast.success("Draft saved successfully.");
+      onClose();
+  };
 
   const handleSaveAndSubmit = () => {
+    // 1. Save the current state of the plan
     onSave(editedPlan);
+    // 2. Trigger the status change
     onSubmitForReview(editedPlan.id, 'under_review');
+    // 3. Close the modal
+    toast.success("Plan submitted for review.");
+    onClose();
+  };
+
+  const handleLinkItem = (type: string) => {
+      // Placeholder for linking functionality
+      // In a real app, this would open a selector modal
+      toast.info(`Link ${type} feature coming soon.`);
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+      <div className="bg-gray-100 dark:bg-black rounded-xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
+        
         {/* Header */}
-        <header className="p-4 border-b bg-white dark:bg-gray-800 flex justify-between items-center">
-          <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              Editing: <span className="text-blue-600">{editedPlan.title}</span>
-            </h2>
-            <div className="flex items-center space-x-4 mt-1 text-sm">
-              <Badge color={completionPercentage >= 80 ? 'green' : completionPercentage >= 50 ? 'blue' : 'amber'}>
-                {completionPercentage}% Complete
-              </Badge>
-              <span className="text-gray-500">v{editedPlan.version}</span>
-              <span className="text-gray-500">{editedPlan.type}</span>
+        <header className="p-4 border-b bg-white dark:bg-dark-card dark:border-dark-border flex justify-between items-center flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                <FileTextIcon className="w-6 h-6" />
+            </div>
+            <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Plan Editor: {editedPlan.title}</h2>
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span>Status: {editedPlan.status}</span>
+                    <span>•</span>
+                    <span>Version: {editedPlan.version}</span>
+                </div>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowPreview(!showPreview)}
-            >
-              {showPreview ? (
-                <>
-                  <EyeOff className="w-4 h-4 mr-2" />
-                  Hide Preview
-                </>
-              ) : (
-                <>
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview
-                </>
-              )}
-            </Button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full text-gray-500 transition-colors">
+            <CloseIcon className="w-6 h-6" />
+          </button>
         </header>
 
-        {/* Main Content */}
         <div className="flex-grow flex overflow-hidden">
-          {/* Left Sidebar - Sections */}
-          <nav className="w-64 bg-white dark:bg-gray-800 border-r overflow-y-auto p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Sections</h3>
-              <Button size="sm" onClick={handleAddSection}>
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-            
-            <div className="space-y-1">
-              {editedPlan.content.body_json.map(section => (
-                <button
-                  key={section.title}
-                  onClick={() => setActiveSection(section)}
-                  className={`w-full text-left p-3 rounded-lg flex items-center justify-between transition-colors ${
-                    activeSection?.title === section.title
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{section.title}</p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {section.content ? `${section.content.split(' ').length} words` : 'Empty'}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {section.is_complete ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Progress Section */}
-            <div className="mt-6 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600 dark:text-gray-400">Progress</span>
-                <span className="font-semibold">{completionPercentage}%</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full ${
-                    completionPercentage >= 80 ? 'bg-green-500' :
-                    completionPercentage >= 50 ? 'bg-blue-500' :
-                    'bg-amber-500'
-                  }`}
-                  style={{ width: `${completionPercentage}%` }}
-                />
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-2">
-                <span>
-                  {editedPlan.content.body_json.filter(s => s.is_complete).length} of {editedPlan.content.body_json.length} sections
-                </span>
-                <span>{wordCount} words</span>
-              </div>
-            </div>
-          </nav>
-
-          {/* Center Editor */}
-          <main className="flex-1 p-6 overflow-y-auto">
-            {activeSection ? (
-              <div className="h-full flex flex-col">
-                <div className="flex justify-between items-center mb-4">
-                  <input
-                    type="text"
-                    value={activeSection.title}
-                    onChange={(e) => {
-                      const newSections = editedPlan.content.body_json.map(s =>
-                        s.title === activeSection.title ? { ...s, title: e.target.value } : s
-                      );
-                      setEditedPlan(p => ({ ...p, content: { ...p.content, body_json: newSections } }));
-                      setActiveSection(s => s ? { ...s, title: e.target.value } : null);
-                    }}
-                    className="text-2xl font-bold bg-transparent border-0 focus:ring-0 w-full"
-                    placeholder="Section Title"
-                  />
-                  <div className="flex items-center space-x-2">
-                    <label className="flex items-center text-sm cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={activeSection.is_complete}
-                        onChange={(e) => {
-                          const newSections = editedPlan.content.body_json.map(s =>
-                            s.title === activeSection.title ? { ...s, is_complete: e.target.checked } : s
-                          );
-                          setEditedPlan(p => ({ ...p, content: { ...p.content, body_json: newSections } }));
-                          setActiveSection(s => s ? { ...s, is_complete: e.target.checked } : null);
-                        }}
-                        className="mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      Mark as Complete
-                    </label>
-                  </div>
+            {/* Left Navigation */}
+            <nav className="w-72 bg-white dark:bg-dark-card border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0">
+                <div className="flex justify-between items-center mb-4 px-2">
+                    <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider">Sections</h3>
+                    <button className="text-blue-600 hover:text-blue-700 text-xs font-bold" onClick={() => toast.info("Add Section feature coming soon")}>+ ADD</button>
                 </div>
+                <ul className="space-y-1">
+                    {editedPlan.content.body_json.map(section => (
+                        <li key={section.title}>
+                            <button
+                                onClick={() => setActiveSection(section)}
+                                className={`w-full text-left p-3 rounded-lg text-sm flex items-center justify-between transition-all ${
+                                    activeSection?.title === section.title 
+                                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 ring-1 ring-blue-200 dark:ring-blue-800' 
+                                    : 'hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300'
+                                }`}
+                            >
+                                <span className="truncate pr-2 font-medium">{section.title}</span>
+                                <input 
+                                    type="checkbox" 
+                                    checked={section.is_complete}
+                                    onChange={(e) => handleSectionCompletionChange(section.title, e.target.checked)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="h-4 w-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-800"
+                                />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            </nav>
 
-                {showPreview ? (
-                  <div className="border rounded-lg p-6 bg-white dark:bg-gray-800 flex-1 overflow-y-auto">
-                    <div className="prose dark:prose-invert max-w-none">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {activeSection.content || '*No content yet*'}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
+            {/* Center Content Editor */}
+            <main className="flex-1 flex flex-col bg-white dark:bg-dark-background relative">
+                {activeSection ? (
+                    <>
+                        <div className="p-6 border-b dark:border-dark-border">
+                            <input 
+                                type="text" 
+                                value={activeSection.title} 
+                                readOnly 
+                                className="text-2xl font-bold w-full bg-transparent focus:outline-none text-gray-900 dark:text-white placeholder-gray-400"
+                            />
+                        </div>
+                        <textarea 
+                            value={activeSection.content}
+                            onChange={(e) => handleSectionContentChange(e.target.value)}
+                            className="flex-1 w-full p-6 resize-none focus:outline-none font-mono text-sm leading-relaxed text-gray-800 dark:text-gray-300 bg-transparent"
+                            placeholder="Enter section content here. Markdown is supported."
+                        />
+                    </>
                 ) : (
-                  <div className="border rounded-lg overflow-hidden flex-1 flex flex-col">
-                    <div className="border-b bg-gray-50 dark:bg-gray-800 p-2 flex justify-between">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">Markdown Editor</span>
-                        <Badge size="sm" color="blue">Live Preview</Badge>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleAIGenerate}
-                        disabled={isGeneratingAI}
-                        className={isGeneratingAI ? 'opacity-50 cursor-not-allowed' : ''}
-                      >
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        {isGeneratingAI ? 'Generating...' : 'AI Generate'}
-                      </Button>
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                        <FileTextIcon className="w-16 h-16 mb-4 opacity-20" />
+                        <p>Select a section from the left to begin editing.</p>
                     </div>
-                    <div className="flex-1" data-color-mode="light">
-                      <MDEditor
-                        value={activeSection.content}
-                        onChange={(val) => handleSectionContentChange(val || '')}
-                        height="100%"
-                        preview="live"
-                        visibleDragbar={false}
-                        textareaProps={{
-                          placeholder: "Write your section content here... You can use markdown for formatting."
-                        }}
-                      />
-                    </div>
-                  </div>
                 )}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                <FileText className="w-16 h-16 mb-4 text-gray-300" />
-                <p className="text-lg">Select a section to begin editing</p>
-                <p className="text-sm mt-2">Or create a new section to get started</p>
-                <Button className="mt-4" onClick={handleAddSection}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add First Section
-                </Button>
-              </div>
-            )}
-          </main>
+            </main>
 
-          {/* Right Sidebar - Tools & Metadata */}
-          <aside className="w-80 bg-white dark:bg-gray-800 border-l p-4 overflow-y-auto">
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Tools & References</h3>
-            
-            {/* AI Assistant */}
-            <div className="mb-6 p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 rounded-lg">
-              <div className="flex items-center mb-2">
-                <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400 mr-2" />
-                <h4 className="font-semibold text-purple-700 dark:text-purple-300">AI Assistant</h4>
-              </div>
-              <p className="text-sm text-purple-600 dark:text-purple-400 mb-3">
-                Get AI suggestions for this section
-              </p>
-              <div className="space-y-2">
-                <Button size="sm" variant="outline" className="w-full" onClick={() => console.log('Improve grammar')}>
-                  ✨ Improve Grammar
-                </Button>
-                <Button size="sm" variant="outline" className="w-full" onClick={() => console.log('Expand section')}>
-                  📝 Expand Section
-                </Button>
-                <Button size="sm" variant="outline" className="w-full" onClick={() => console.log('Add compliance')}>
-                  🛡️ Add Compliance
-                </Button>
-              </div>
-            </div>
+            {/* Right Metadata Rail */}
+            <aside className="w-80 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-6 overflow-y-auto flex-shrink-0">
+                <RightRailSection title="Metadata">
+                    <div className="text-sm space-y-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">VERSION</label>
+                            <input 
+                                type="text" 
+                                value={editedPlan.version} 
+                                onChange={e => setEditedPlan(p => ({...p, version: e.target.value}))} 
+                                className="w-full p-2 border rounded-md bg-white dark:bg-dark-card dark:border-dark-border dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                         <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">TAGS</label>
+                            <input 
+                                type="text" 
+                                value={editedPlan.meta.tags?.join(', ') || ''} 
+                                onChange={e => handleMetaChange('tags', e.target.value.split(',').map(t=>t.trim()))} 
+                                className="w-full p-2 border rounded-md bg-white dark:bg-dark-card dark:border-dark-border dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Comma separated"
+                            />
+                        </div>
+                    </div>
+                </RightRailSection>
 
-            {/* Quick Templates */}
-            <div className="mb-6">
-              <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-3">Quick Templates</h4>
-              <div className="grid grid-cols-2 gap-2">
-                {['Scope', 'Responsibilities', 'Procedure', 'Training', 'Monitoring', 'References'].map(template => (
-                  <button
-                    key={template}
-                    onClick={() => handleSectionContentChange(activeSection?.content + `\n\n## ${template}\n\n[Content for ${template} section]`)}
-                    className="p-2 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
-                  >
-                    {template}
-                  </button>
-                ))}
-              </div>
-            </div>
+                <RightRailSection title="Attachments" action={<button onClick={() => handleLinkItem('Attachment')} className="text-blue-600 hover:text-blue-700 text-lg font-bold">+</button>}>
+                    {editedPlan.content.attachments.length > 0 ? (
+                        editedPlan.content.attachments.map(att => (
+                            <div key={att.name} className="flex items-center text-sm p-2 hover:bg-gray-50 dark:hover:bg-white/5 rounded">
+                                <PaperClipIcon className="w-4 h-4 mr-2 text-gray-400 shrink-0"/>
+                                <span className="truncate text-gray-700 dark:text-gray-300">{att.name}</span>
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-xs text-gray-400 italic p-2">No attachments uploaded.</p>
+                    )}
+                </RightRailSection>
+                
+                <RightRailSection title="Linked RAMS" action={<button onClick={() => handleLinkItem('RAMS')} className="text-sm font-medium text-blue-600 hover:underline">Link</button>}>
+                    <p className="text-xs text-gray-400 italic p-2">No linked RAMS.</p>
+                </RightRailSection>
 
-            {/* Linked Documents */}
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="font-semibold text-gray-700 dark:text-gray-300">Linked Documents</h4>
-                <Button size="sm" variant="ghost">
-                  <Link className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="space-y-2">
-                {editedPlan.content.attachments.map(att => (
-                  <div key={att.name} className="flex items-center p-2 bg-gray-50 dark:bg-gray-900 rounded">
-                    <Paperclip className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm truncate">{att.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Comments */}
-            <div>
-              <button
-                onClick={() => setShowComments(!showComments)}
-                className="flex items-center justify-between w-full p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded"
-              >
-                <span className="font-semibold text-gray-700 dark:text-gray-300">Comments</span>
-                <MessageSquare className="w-4 h-4 text-gray-500" />
-              </button>
-            </div>
-          </aside>
+                <RightRailSection title="Linked PTWs" action={<button onClick={() => handleLinkItem('PTW')} className="text-sm font-medium text-blue-600 hover:underline">Link</button>}>
+                    <p className="text-xs text-gray-400 italic p-2">No linked PTWs.</p>
+                </RightRailSection>
+            </aside>
         </div>
 
-        {/* Footer */}
-        <footer className="p-4 border-t bg-white dark:bg-gray-800 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
-            <Button variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={() => onSave(editedPlan)}>
-              <Save className="w-4 h-4 mr-2" />
-              Save Draft
-            </Button>
-          </div>
-          <div className="flex items-center space-x-3">
-            <span className="text-sm text-gray-500">
-              Last saved: {new Date().toLocaleTimeString()}
-            </span>
-            <Button onClick={handleSaveAndSubmit} className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
-              <Send className="w-4 h-4 mr-2" />
-              Submit for Review
-            </Button>
-          </div>
+        <footer className="p-4 border-t bg-white dark:bg-dark-card dark:border-dark-border flex justify-between items-center flex-shrink-0">
+            <Button variant="secondary" onClick={onClose}>Cancel</Button>
+            <div className="flex gap-3">
+                <Button variant="secondary" onClick={handleSaveDraft}>Save Draft</Button>
+                <Button onClick={handleSaveAndSubmit} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    Save & Submit for Review
+                </Button>
+            </div>
         </footer>
       </div>
     </div>
   );
 };
+
+
+// Icons
+const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
+const PaperClipIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.122 2.122l7.81-7.81" />
+    </svg>
+);
+const FileTextIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+);

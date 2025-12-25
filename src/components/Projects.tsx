@@ -3,11 +3,9 @@ import type { Project, User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext, useDataContext } from '../contexts';
-
-// --- ICONS ---
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>;
-const BuildingIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" /></svg>;
+import { useAppContext, useDataContext, useModalContext } from '../contexts';
+import { ProjectDetails } from './ProjectDetails';
+import { Plus, MapPin, Calendar, Users } from 'lucide-react';
 
 // --- Project Creation Modal ---
 interface ProjectCreationModalProps {
@@ -24,28 +22,17 @@ const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onC
         location: '',
         start_date: new Date().toISOString().split('T')[0],
         finish_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        manager_id: '',
+        manager_id: users.find(u => u.role === 'SUPERVISOR' || u.role === 'HSE_MANAGER')?.id || '',
         type: 'Construction'
     });
     const [error, setError] = useState('');
 
     const handleSubmit = () => {
-        if (!formData.name.trim() || !formData.code.trim()) {
-            setError('Project Name and Code are required.');
+        if (!formData.name.trim() || !formData.code.trim() || !formData.manager_id) {
+            setError('Project Name, Code, and Manager are required.');
             return;
         }
         onSubmit(formData);
-        // Reset form
-        setFormData({
-            name: '',
-            code: '',
-            location: '',
-            start_date: new Date().toISOString().split('T')[0],
-            finish_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            manager_id: '',
-            type: 'Construction'
-        });
-        onClose();
     };
 
     if (!isOpen) return null;
@@ -53,18 +40,16 @@ const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onC
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create New Project</h3>
-                </div>
+                <div className="p-6 border-b dark:border-dark-border"><h3 className="text-xl font-bold text-gray-900 dark:text-white">Create New Project</h3></div>
                 <div className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Name</label>
-                            <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. Tower A" />
+                            <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Code</label>
-                            <input type="text" value={formData.code} onChange={e => setFormData(p => ({...p, code: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. PRJ-001" />
+                            <input type="text" value={formData.code} onChange={e => setFormData(p => ({...p, code: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
                         </div>
                     </div>
                      <div className="grid grid-cols-2 gap-4">
@@ -73,7 +58,7 @@ const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onC
                             <input type="text" value={formData.location} onChange={e => setFormData(p => ({...p, location: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Type</label>
                             <select value={formData.type} onChange={e => setFormData(p => ({...p, type: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
                                 <option>Construction</option>
                                 <option>Shutdown</option>
@@ -96,8 +81,7 @@ const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onC
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Manager</label>
                         <select value={formData.manager_id} onChange={e => setFormData(p => ({...p, manager_id: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                            <option value="">Select Manager</option>
-                            {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                            {users.filter(u => u.role === 'SUPERVISOR' || u.role === 'HSE_MANAGER' || u.role === 'ADMIN').map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                         </select>
                     </div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
@@ -113,7 +97,7 @@ const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onC
 
 
 // --- Project Card Component ---
-const ProjectCard: React.FC<{ project: Project; users: User[] }> = ({ project, users }) => {
+const ProjectCard: React.FC<{ project: Project; users: User[]; onView: (p: Project) => void }> = ({ project, users, onView }) => {
     const getStatusColor = (status: Project['status']): 'green' | 'yellow' | 'gray' => {
         switch (status) { case 'active': return 'green'; case 'pending': return 'yellow'; case 'archived': return 'gray'; }
     };
@@ -122,40 +106,46 @@ const ProjectCard: React.FC<{ project: Project; users: User[] }> = ({ project, u
     const manager = users.find(u => u.id === project.manager_id);
 
     return (
-        <Card className="hover:shadow-lg transition-shadow">
-            <div className="flex justify-between items-start">
-                <div className="flex items-start gap-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
-                        <BuildingIcon className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">{project.name}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{project.code}</p>
-                    </div>
+        <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-primary-500">
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{project.name}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">{project.code}</p>
                 </div>
                 <Badge color={getStatusColor(project.status)}>{project.status}</Badge>
             </div>
             
-            <div className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                <div className="flex justify-between">
-                    <span>Location:</span>
-                    <span className="font-medium">{project.location || 'N/A'}</span>
+            <div className="space-y-3 mb-6">
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                    <MapPin className="w-4 h-4 mr-2 text-gray-400" />
+                    {project.location}
                 </div>
-                <div className="flex justify-between">
-                    <span>Manager:</span>
-                    <span className="font-medium">{manager?.name || 'Unassigned'}</span>
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                    <Users className="w-4 h-4 mr-2 text-gray-400" />
+                    {manager?.name || 'Unassigned'} (Manager)
                 </div>
-                <div className="flex justify-between">
-                    <span>Timeline:</span>
-                    <span className="font-medium">{new Date(project.start_date).toLocaleDateString()} - {new Date(project.finish_date).toLocaleDateString()}</span>
+                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                    <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                    {new Date(project.start_date).toLocaleDateString()} - {new Date(project.finish_date).toLocaleDateString()}
                 </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t dark:border-dark-border flex justify-between items-center">
-                <div className="text-xs text-gray-500">
-                    {crew.length} Team Members
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700">
+                <div className="flex -space-x-2">
+                    {crew.slice(0, 4).map((u, i) => (
+                        <div key={i} className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white dark:border-dark-card flex items-center justify-center text-xs font-bold text-gray-600" title={u.name}>
+                            {u.name.charAt(0)}
+                        </div>
+                    ))}
+                    {crew.length > 4 && (
+                        <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white dark:border-dark-card flex items-center justify-center text-xs font-bold text-gray-500">
+                            +{crew.length - 4}
+                        </div>
+                    )}
                 </div>
-                <Button variant="secondary" size="sm">View Dashboard</Button>
+                <Button variant="secondary" size="sm" onClick={() => onView(project)}>
+                    View Dashboard
+                </Button>
             </div>
         </Card>
     );
@@ -164,19 +154,20 @@ const ProjectCard: React.FC<{ project: Project; users: User[] }> = ({ project, u
 export const Projects: React.FC = () => {
   const { activeOrg, usersList, can } = useAppContext();
   const { projects, handleCreateProject, isLoading } = useDataContext();
+  const { selectedProject, setSelectedProject } = useModalContext(); // Use global state
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Safety check for projects array
-  const orgProjects = useMemo(() => {
-      if (!projects) return [];
-      return projects.filter(p => p.org_id === activeOrg.id);
-  }, [projects, activeOrg]);
-
+  const orgProjects = useMemo(() => projects.filter(p => p.org_id === activeOrg.id), [projects, activeOrg]);
   const canCreate = can('create', 'projects');
 
   const handleSubmit = (data: Omit<Project, 'id' | 'org_id' | 'status'>) => {
     handleCreateProject(data);
     setIsModalOpen(false);
+  }
+
+  // --- CONDITIONAL RENDERING ---
+  if (selectedProject) {
+      return <ProjectDetails project={selectedProject} onBack={() => setSelectedProject(null)} />;
   }
 
   if (isLoading) {
@@ -187,12 +178,12 @@ export const Projects: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-            <h1 className="text-3xl font-bold text-text-primary dark:text-white">Projects</h1>
+            <h1 className="text-3xl font-bold text-text-primary dark:text-white">Projects Dashboard</h1>
             <p className="text-text-secondary dark:text-gray-400">{activeOrg.name}</p>
         </div>
         {canCreate && (
             <Button onClick={() => setIsModalOpen(true)}>
-                <PlusIcon className="w-5 h-5 mr-2" />
+                <Plus className="w-5 h-5 mr-2" />
                 New Project
             </Button>
         )}
@@ -200,23 +191,21 @@ export const Projects: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {orgProjects.map(project => (
-              <ProjectCard key={project.id} project={project} users={usersList} />
+              <ProjectCard 
+                key={project.id} 
+                project={project} 
+                users={usersList} 
+                onView={setSelectedProject} 
+              />
           ))}
       </div>
       
        {orgProjects.length === 0 && (
             <Card>
                 <div className="text-center py-12">
-                    <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center mb-4">
-                        <BuildingIcon className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No projects found</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No projects yet for {activeOrg.name}.</h3>
                     <p className="text-gray-500 mt-1">Create a project to start managing your HSE operations.</p>
-                    {canCreate && (
-                        <div className="mt-6">
-                            <Button onClick={() => setIsModalOpen(true)}>Create First Project</Button>
-                        </div>
-                    )}
+                    {canCreate && <Button className="mt-4" onClick={() => setIsModalOpen(true)}>Create First Project</Button>}
                 </div>
             </Card>
         )}

@@ -1,364 +1,274 @@
-import React, { useState, useMemo } from 'react';
-import type { Organization, Project, User } from '../types';
+import React, { useState } from 'react';
+import type { Organization } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
-import { roles as rolesData } from '../config';
-import { FormField } from './ui/FormField';
-import { Building, Users, Briefcase, Plus, Settings, ArrowRight } from 'lucide-react';
+import { 
+  Building2, Shield, TrendingUp, TrendingDown, 
+  Search, Grid, List, Download, Plus, MapPin, Calendar,
+  Briefcase, Users2, Truck, ArrowRight, Globe, MoreVertical
+} from 'lucide-react';
+import { OrganizationDetails } from './OrganizationDetails';
 
-// --- SUB-COMPONENT: PROJECT CREATION MODAL ---
-interface ProjectCreationModalProps {
+// --- Organization Creation Modal ---
+interface OrganizationCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: Omit<Project, 'id' | 'org_id' | 'status'>) => void;
-  orgId: string;
-  availableManagers: User[];
+  onSubmit: (data: any) => void;
 }
 
-const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onClose, onSubmit, orgId, availableManagers }) => {
+const OrganizationCreationModal: React.FC<OrganizationCreationModalProps> = ({ isOpen, onClose, onSubmit }) => {
     const [formData, setFormData] = useState({
         name: '',
-        code: '',
-        location: '',
-        start_date: new Date().toISOString().split('T')[0],
-        finish_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        manager_id: '',
-        type: 'Construction'
+        industry: 'Construction',
+        country: 'United Arab Emirates',
+        primaryColor: '#3B82F6'
     });
-    const [error, setError] = useState('');
 
     const handleSubmit = () => {
-        if (!formData.name.trim() || !formData.code.trim()) {
-            setError('Project Name and Code are required.');
-            return;
-        }
-        onSubmit(formData);
-        onClose();
+        if (!formData.name) return;
+        onSubmit({
+            ...formData,
+            domain: `${formData.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.safetypro.com`,
+            timezone: 'GMT+4',
+            branding: {
+                logoUrl: `https://ui-avatars.com/api/?name=${formData.name}&background=${formData.primaryColor.replace('#', '')}&color=fff`,
+                primaryColor: formData.primaryColor
+            }
+        });
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                 <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create New Project</h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Building2 className="w-5 h-5" />
+                        Create Organization
+                    </h3>
                 </div>
                 <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Project Name">
-                            <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. Tower A" />
-                        </FormField>
-                        <FormField label="Project Code">
-                            <input type="text" value={formData.code} onChange={e => setFormData(p => ({...p, code: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. PRJ-001" />
-                        </FormField>
-                    </div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Location">
-                            <input type="text" value={formData.location} onChange={e => setFormData(p => ({...p, location: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
-                        </FormField>
-                        <FormField label="Type">
-                            <select value={formData.type} onChange={e => setFormData(p => ({...p, type: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                                <option>Construction</option>
-                                <option>Shutdown</option>
-                                <option>Operations</option>
-                                <option>Maintenance</option>
-                            </select>
-                        </FormField>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Start Date">
-                            <input type="date" value={formData.start_date} onChange={e => setFormData(p => ({...p, start_date: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
-                        </FormField>
-                        <FormField label="Finish Date">
-                            <input type="date" value={formData.finish_date} onChange={e => setFormData(p => ({...p, finish_date: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
-                        </FormField>
-                    </div>
-                    <FormField label="Project Manager">
-                        <select 
-                            value={formData.manager_id} 
-                            onChange={e => setFormData(p => ({...p, manager_id: e.target.value}))} 
-                            className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white"
-                        >
-                            <option value="">Select Manager...</option>
-                            {availableManagers.length > 0 ? (
-                                availableManagers.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)
-                            ) : (
-                                <option disabled>No eligible managers found in this Org</option>
-                            )}
-                        </select>
-                    </FormField>
-                    {error && <p className="text-sm text-red-500">{error}</p>}
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Create Project</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- SUB-COMPONENT: INVITE USER MODAL ---
-const InviteUserModal: React.FC<{ isOpen: boolean, onClose: () => void, orgId: string }> = ({ isOpen, onClose, orgId }) => {
-    const { handleInviteUser } = useAppContext();
-    const [formData, setFormData] = useState({ name: '', email: '', role: 'WORKER' as User['role'] });
-
-    const handleSubmit = () => {
-        handleInviteUser({ ...formData, org_id: orgId });
-        onClose();
-        setFormData({ name: '', email: '', role: 'WORKER' });
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite Team Member</h3>
-                </div>
-                <div className="p-6 space-y-4">
-                    <FormField label="Full Name"><input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" /></FormField>
-                    <FormField label="Email"><input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" /></FormField>
-                    <FormField label="Role">
-                        <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value as User['role']}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                            {rolesData.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                        </select>
-                    </FormField>
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Send Invite</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- SUB-COMPONENT: ORGANIZATION DETAIL VIEW ---
-const OrganizationDetail: React.FC<{ org: Organization, onBack: () => void }> = ({ org, onBack }) => {
-    const { usersList, activeUser } = useAppContext();
-    const { projects, handleCreateProject } = useDataContext();
-    const [activeTab, setActiveTab] = useState<'overview' | 'projects' | 'team'>('overview');
-    
-    // Modals
-    const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-
-    const orgProjects = projects.filter(p => p.org_id === org.id);
-    const orgUsers = usersList.filter(u => u.org_id === org.id);
-    
-    // Filter users who can be managers (Supervisors, Managers, Admins)
-    const eligibleManagers = orgUsers.filter(u => ['HSE_MANAGER', 'SUPERVISOR', 'ORG_ADMIN', 'ADMIN'].includes(u.role));
-
-    const handleProjectSubmit = (data: any) => {
-        handleCreateProject({ ...data, org_id: org.id });
-    };
-
-    return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    {activeUser.role === 'ADMIN' && (
-                        <button onClick={onBack} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">
-                            <ArrowRight className="w-5 h-5 rotate-180 text-gray-500" />
-                        </button>
-                    )}
-                    <img src={org.branding.logoUrl} alt={org.name} className="w-12 h-12 rounded-lg bg-white object-contain p-1" />
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{org.name}</h1>
-                        <p className="text-sm text-gray-500">{org.industry} • {org.country}</p>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Industry</label>
+                        <select value={formData.industry} onChange={e => setFormData(p => ({...p, industry: e.target.value}))} className="w-full p-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white">
+                            <option>Construction</option><option>Oil & Gas</option><option>Manufacturing</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
+                        <select value={formData.country} onChange={e => setFormData(p => ({...p, country: e.target.value}))} className="w-full p-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white">
+                            <option>United Arab Emirates</option><option>Saudi Arabia</option><option>Qatar</option>
+                        </select>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status.toUpperCase()}</Badge>
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end gap-3 border-t dark:border-dark-border">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Create</Button>
                 </div>
             </div>
-
-            {/* Tabs */}
-            <div className="border-b border-gray-200 dark:border-dark-border">
-                <nav className="-mb-px flex space-x-8">
-                    {['overview', 'projects', 'team'].map((tab) => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`py-4 px-1 border-b-2 font-medium text-sm capitalize ${
-                                activeTab === tab
-                                    ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </nav>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <Card className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full text-blue-600"><Briefcase /></div>
-                            <div>
-                                <p className="text-sm text-gray-500">Total Projects</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{orgProjects.length}</p>
-                            </div>
-                        </div>
-                    </Card>
-                    <Card className="p-6">
-                        <div className="flex items-center gap-4">
-                            <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full text-purple-600"><Users /></div>
-                            <div>
-                                <p className="text-sm text-gray-500">Team Members</p>
-                                <p className="text-2xl font-bold text-gray-900 dark:text-white">{orgUsers.length}</p>
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-            )}
-
-            {activeTab === 'projects' && (
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Projects</h3>
-                        <Button onClick={() => setIsProjectModalOpen(true)} leftIcon={<Plus className="w-4 h-4"/>}>Add Project</Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {orgProjects.map(project => (
-                            <Card key={project.id} className="hover:border-emerald-500 transition-colors cursor-pointer">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 dark:text-white">{project.name}</h4>
-                                        <p className="text-xs text-gray-500 font-mono">{project.code}</p>
-                                    </div>
-                                    <Badge color={project.status === 'active' ? 'green' : 'gray'}>{project.status}</Badge>
-                                </div>
-                                <div className="mt-4 text-sm text-gray-600 dark:text-gray-400">
-                                    <p>Manager: {usersList.find(u => u.id === project.manager_id)?.name || 'Unassigned'}</p>
-                                    <p>Location: {project.location}</p>
-                                </div>
-                            </Card>
-                        ))}
-                        {orgProjects.length === 0 && <p className="text-gray-500 italic">No projects yet.</p>}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'team' && (
-                <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Team Members</h3>
-                        <Button onClick={() => setIsInviteModalOpen(true)} leftIcon={<Plus className="w-4 h-4"/>}>Invite Member</Button>
-                    </div>
-                    <Card noPadding>
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
-                            <thead className="bg-gray-50 dark:bg-white/5">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-                                {orgUsers.map(user => (
-                                    <tr key={user.id}>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center">
-                                                <img className="h-8 w-8 rounded-full mr-3" src={user.avatar_url} alt="" />
-                                                <div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
-                                                    <div className="text-xs text-gray-500">{user.email}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{user.role.replace('_', ' ')}</td>
-                                        <td className="px-6 py-4"><Badge color={user.status === 'active' ? 'green' : 'yellow'}>{user.status}</Badge></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </Card>
-                </div>
-            )}
-
-            <ProjectCreationModal 
-                isOpen={isProjectModalOpen} 
-                onClose={() => setIsProjectModalOpen(false)} 
-                onSubmit={handleProjectSubmit}
-                orgId={org.id}
-                availableManagers={eligibleManagers}
-            />
-            <InviteUserModal 
-                isOpen={isInviteModalOpen} 
-                onClose={() => setIsInviteModalOpen(false)} 
-                orgId={org.id} 
-            />
         </div>
     );
 };
 
-// --- MAIN COMPONENT ---
+// --- Quick Stats Component ---
+const QuickStats: React.FC<{ title: string; value: number | string; icon: React.ReactNode; change?: number; color?: string; }> = ({ title, value, icon, change, color = 'blue' }) => {
+    const colorClasses: any = {
+        blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-600',
+        green: 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800 text-green-600',
+        purple: 'bg-purple-50 dark:bg-purple-900/20 border-purple-100 dark:border-purple-800 text-purple-600',
+        amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-600',
+    };
+
+    return (
+        <Card className={`p-4 border ${colorClasses[color].split(' ')[2]}`}>
+            <div className="flex justify-between items-center">
+                <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
+                    {change !== undefined && (
+                        <div className="flex items-center mt-1">
+                            {change >= 0 ? <TrendingUp className="w-3 h-3 text-green-500 mr-1" /> : <TrendingDown className="w-3 h-3 text-red-500 mr-1" />}
+                            <span className={`text-xs font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Math.abs(change)}%</span>
+                        </div>
+                    )}
+                </div>
+                <div className={`p-3 rounded-lg ${colorClasses[color].split(' ')[0]} ${colorClasses[color].split(' ')[4]}`}>
+                    {icon}
+                </div>
+            </div>
+        </Card>
+    );
+};
+
 export const Organizations: React.FC = () => {
-  const { organizations, activeUser, activeOrg, handleCreateOrganization } = useAppContext();
-  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-
-  // If user is ORG_ADMIN, they should only see their own org detail view
-  const isOrgAdmin = activeUser.role === 'ORG_ADMIN';
+  const { organizations, usersList, activeUser, handleCreateOrganization, setActiveOrg } = useAppContext();
+  const { projects, reportList } = useDataContext();
   
-  if (isOrgAdmin) {
-      return <OrganizationDetail org={activeOrg} onBack={() => {}} />;
-  }
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedOrgDetails, setSelectedOrgDetails] = useState<Organization | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // If user is SUPER ADMIN, they see the list first
-  if (selectedOrg) {
-      return <OrganizationDetail org={selectedOrg} onBack={() => setSelectedOrg(null)} />;
+  const filteredOrgs = organizations.filter(org => 
+    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    org.industry.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const overallStats = {
+    totalOrgs: organizations.length,
+    totalProjects: projects.length,
+    totalUsers: usersList.length,
+    activeIncidents: reportList.filter(r => r.status !== 'closed').length,
+  };
+
+  const handleOpenDetails = (org: Organization) => {
+      setActiveOrg(org);
+      setSelectedOrgDetails(org);
+  };
+
+  // --- CONDITIONAL RENDER: Show Details if selected ---
+  if (selectedOrgDetails) {
+      return <OrganizationDetails org={selectedOrgDetails} onBack={() => setSelectedOrgDetails(null)} />;
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
-        <Button onClick={() => setIsCreateModalOpen(true)} leftIcon={<Plus className="w-5 h-5" />}>
-            New Organization
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {organizations.map(org => (
-            <Card key={org.id} className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => setSelectedOrg(org)}>
-                <div className="flex items-center gap-4 mb-4">
-                    <img src={org.branding.logoUrl} alt={org.name} className="w-16 h-16 rounded-xl bg-gray-50 object-contain p-2 border dark:border-gray-700" />
-                    <div>
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white group-hover:text-emerald-500 transition-colors">{org.name}</h3>
-                        <p className="text-sm text-gray-500">{org.industry}</p>
-                    </div>
-                </div>
-                <div className="flex justify-between items-center border-t dark:border-dark-border pt-4">
-                    <Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status}</Badge>
-                    <span className="text-sm text-emerald-600 font-medium flex items-center">Manage <ArrowRight className="w-4 h-4 ml-1"/></span>
-                </div>
-            </Card>
-        ))}
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
+          <p className="text-text-secondary dark:text-gray-400 mt-1">Manage your enterprise hierarchy</p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline"><Download className="w-4 h-4 mr-2" /> Export</Button>
+          {activeUser?.role === 'ADMIN' && (
+            <Button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600">
+              <Plus className="w-5 h-5 mr-2" /> New Organization
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Org Creation Modal (Simplified for brevity) */}
-      {isCreateModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-              <div className="bg-white dark:bg-dark-card p-6 rounded-lg shadow-xl w-full max-w-md">
-                  <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Add Organization</h3>
-                  <p className="text-gray-500 mb-4">Contact system administrator to provision new tenants.</p>
-                  <div className="flex justify-end">
-                      <Button onClick={() => setIsCreateModalOpen(false)}>Close</Button>
-                  </div>
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <QuickStats title="Total Organizations" value={overallStats.totalOrgs} icon={<Building2 className="w-6 h-6" />} change={8} color="blue" />
+        <QuickStats title="Active Projects" value={overallStats.totalProjects} icon={<Briefcase className="w-6 h-6" />} change={12} color="green" />
+        <QuickStats title="Total Users" value={overallStats.totalUsers} icon={<Users2 className="w-6 h-6" />} change={5} color="purple" />
+        <QuickStats title="Active Incidents" value={overallStats.activeIncidents} icon={<Shield className="w-6 h-6" />} change={-2} color="amber" />
+      </div>
+
+      <Card>
+        <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input 
+              type="text" 
+              placeholder="Search organizations..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white"
+            />
           </div>
+          <div className="flex border rounded-lg dark:border-dark-border">
+            <button onClick={() => setViewMode('grid')} className={`p-2 ${viewMode === 'grid' ? 'bg-gray-100 dark:bg-white/10' : ''}`}><Grid className="w-4 h-4" /></button>
+            <button onClick={() => setViewMode('list')} className={`p-2 ${viewMode === 'list' ? 'bg-gray-100 dark:bg-white/10' : ''}`}><List className="w-4 h-4" /></button>
+          </div>
+        </div>
+      </Card>
+
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredOrgs.map(org => {
+            const pCount = projects.filter(p => p.org_id === org.id).length;
+            const uCount = usersList.filter(u => u.org_id === org.id).length;
+            return (
+              <Card 
+                key={org.id} 
+                className="flex flex-col hover:shadow-xl transition-all duration-300 group cursor-pointer hover:-translate-y-1"
+                onClick={() => handleOpenDetails(org)} // Added onClick to Card
+              >
+                <div className="flex-1 p-5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-bold text-white shadow-lg">
+                        {org.branding?.logoUrl && org.branding.logoUrl.length > 50 ? <img src={org.branding.logoUrl} className="h-full w-full object-cover rounded-xl"/> : org.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-text-primary dark:text-white group-hover:text-blue-600 transition-colors">{org.name}</h3>
+                        <div className="flex items-center gap-2 text-sm text-text-secondary dark:text-gray-400 mt-1">
+                          <Globe className="w-3 h-3" /> {org.domain}
+                        </div>
+                      </div>
+                    </div>
+                    <Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status}</Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 py-3 border-y dark:border-gray-700">
+                    <div className="text-center"><div className="text-lg font-bold dark:text-white">{pCount}</div><div className="text-xs text-gray-500">Projects</div></div>
+                    <div className="text-center"><div className="text-lg font-bold dark:text-white">{uCount}</div><div className="text-xs text-gray-500">Users</div></div>
+                    <div className="text-center"><div className="text-lg font-bold dark:text-white">98%</div><div className="text-xs text-gray-500">Safety</div></div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-gray-500 pt-4">
+                    <div className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {org.country}</div>
+                    <div className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {new Date().getFullYear()}</div>
+                  </div>
+                </div>
+                <div className="p-4 border-t dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-white/5">
+                  <span className="text-xs text-gray-500">ID: {org.id}</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-blue-600 hover:text-blue-800"
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent double firing
+                        handleOpenDetails(org);
+                    }}
+                  >
+                    Manage <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card noPadding>
+            <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-white/5 text-gray-500">
+                    <tr><th className="p-4 text-left">Organization</th><th className="p-4 text-left">Industry</th><th className="p-4 text-left">Projects</th><th className="p-4 text-left">Users</th><th className="p-4 text-left">Status</th><th className="p-4 text-left">Actions</th></tr>
+                </thead>
+                <tbody className="divide-y dark:divide-gray-800">
+                    {filteredOrgs.map(org => (
+                        <tr key={org.id} className="hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer" onClick={() => handleOpenDetails(org)}>
+                            <td className="p-4 font-medium dark:text-white">{org.name}</td>
+                            <td className="p-4"><Badge color="blue">{org.industry}</Badge></td>
+                            <td className="p-4">{projects.filter(p => p.org_id === org.id).length}</td>
+                            <td className="p-4">{usersList.filter(u => u.org_id === org.id).length}</td>
+                            <td className="p-4"><Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status}</Badge></td>
+                            <td className="p-4">
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenDetails(org);
+                                    }}
+                                >
+                                    View
+                                </Button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </Card>
       )}
+
+      <OrganizationCreationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={(data) => { handleCreateOrganization(data); setIsModalOpen(false); }} />
     </div>
   );
 };

@@ -9,17 +9,53 @@ import type {
   ChecklistRun, Inspection, Plan as PlanType, PlanStatus, 
   Rams as RamsType, RamsStatus, TbtSession, 
   TrainingCourse, TrainingRecord, TrainingSession, Project, View, 
-  Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem 
+  Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem,
+  Equipment, Training, Subcontractor
 } from './types';
 import { useToast } from './components/ui/Toast';
-import { db } from './firebase'; // Import Firebase
-import { 
-  collection, addDoc, onSnapshot, query, orderBy, updateDoc, doc, setDoc 
-} from 'firebase/firestore';
-import { MASTER_CHECKLIST_LIBRARY } from './data/checklistLibrary';
+
+// --- MOCK DATA ---
+const MOCK_PROJECTS: Project[] = [
+  { id: 'p1', name: 'Downtown Construction', status: 'Active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction', budget: 5000000, budget_spent: 2500000, progress: 50, safe_man_hours: 12000, safety_score: 95, quality_score: 90, environmental_score: 88, currency: 'USD' },
+  { id: 'p2', name: 'Refinery Maintenance', status: 'Active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance', budget: 2000000, budget_spent: 500000, progress: 25, safe_man_hours: 5000, safety_score: 88, quality_score: 85, environmental_score: 92, currency: 'USD' }
+];
+
+const MOCK_EQUIPMENT: Equipment[] = [
+    { id: 'eq1', project_id: 'p1', name: 'Mobile Crane 50T', type: 'Crane', serial_number: 'CR-50-01', status: 'operational', last_inspection_date: '2023-10-01', next_inspection_date: '2024-04-01', condition: 'good', last_inspected_by: 'user_3' },
+    { id: 'eq2', project_id: 'p1', name: 'Excavator CAT 320', type: 'Earthmoving', serial_number: 'EX-320-05', status: 'maintenance', last_inspection_date: '2023-09-15', next_inspection_date: '2023-12-15', condition: 'fair', last_inspected_by: 'user_3' }
+];
+
+const MOCK_TRAINING: Training[] = [
+    { id: 'tr1', project_id: 'p1', title: 'Work at Height', description: 'Mandatory for all scaffolders', date: '2023-11-01', status: 'completed', instructor_id: 'user_2', attendees_count: 15 },
+    { id: 'tr2', project_id: 'p1', title: 'Confined Space Entry', description: 'For tank entry team', date: '2023-11-05', status: 'scheduled', instructor_id: 'user_2', attendees_count: 8 }
+];
+
+const MOCK_SUBCONTRACTORS: Subcontractor[] = [
+    { id: 'sub1', org_id: 'org1', name: 'Alpha Scaffolding', specialization: 'Scaffolding', status: 'active', workers_count: 25, compliance_score: 95 },
+    { id: 'sub2', org_id: 'org1', name: 'Beta Electrical', specialization: 'Electrical', status: 'active', workers_count: 12, compliance_score: 88 }
+];
+
+const MOCK_INSPECTIONS: Inspection[] = [];
+const MOCK_CHECKLIST_RUNS: ChecklistRun[] = [];
+const MOCK_PLANS: PlanType[] = [];
+const MOCK_RAMS: RamsType[] = [];
+const MOCK_TBTS: TbtSession[] = [];
+const MOCK_COURSES: TrainingCourse[] = [];
+const MOCK_RECORDS: TrainingRecord[] = [];
+const MOCK_SESSIONS: TrainingSession[] = [];
+const MOCK_NOTIFICATIONS: Notification[] = [
+    { id: 'n1', report_id: 'rep_1', user_id: 'user_1', is_read: false, message: 'System connected successfully.', timestamp: new Date().toISOString() }
+];
+const MOCK_PTWS: Ptw[] = [];
+const MOCK_TEMPLATES: ChecklistTemplate[] = [
+    {
+        id: 'ct_1', org_id: 'org_1', category: 'Safety', title: { en: 'Weekly Safety Walkdown' }, 
+        items: [{ id: 'i1', text: { en: 'PPE Compliance' }, description: { en: 'Check helmets, boots, vests' } }]
+    }
+];
 
 // --- APP CONTEXT ---
-type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
+type InvitedUser = { name: string; email: string; role: User['role']; org_id: string; project_id?: string };
 
 interface AppContextType {
   currentView: View;
@@ -55,10 +91,10 @@ const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
-  const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations);
+  const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0]);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [usersList, setUsersList] = useState<User[]>(initialUsers);
+  const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
   const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
   const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
@@ -201,11 +237,13 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
+  equipmentList: Equipment[];
+  trainingList: Training[];
+  subcontractors: Subcontractor[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
   setPtwList: React.Dispatch<React.SetStateAction<Ptw[]>>;
-  setChecklistTemplates: React.Dispatch<React.SetStateAction<ChecklistTemplate[]>>;
   
   handleCreateProject: (data: any) => void;
   handleCreateReport: (data: any) => void;
@@ -237,240 +275,77 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { activeOrg, activeUser } = useAppContext();
     const toast = useToast();
     
-    const [isLoading, setIsLoading] = useState(true);
-    const [projects, setProjects] = useState<Project[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS || []);
     const [reportList, setReportList] = useState<Report[]>([]);
-    const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
-    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
-    const [planList, setPlanList] = useState<PlanType[]>([]);
-    const [ramsList, setRamsList] = useState<RamsType[]>([]);
-    const [tbtList, setTbtList] = useState<TbtSession[]>([]);
-    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>([]);
-    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>([]);
-    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>([]);
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [ptwList, setPtwList] = useState<Ptw[]>([]);
+    const [inspectionList, setInspectionList] = useState<Inspection[]>(MOCK_INSPECTIONS);
+    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>(MOCK_CHECKLIST_RUNS);
+    const [planList, setPlanList] = useState<PlanType[]>(MOCK_PLANS);
+    const [ramsList, setRamsList] = useState<RamsType[]>(MOCK_RAMS);
+    const [tbtList, setTbtList] = useState<TbtSession[]>(MOCK_TBTS);
+    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>(MOCK_COURSES);
+    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>(MOCK_RECORDS);
+    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>(MOCK_SESSIONS);
+    const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+    const [ptwList, setPtwList] = useState<Ptw[]>(MOCK_PTWS);
     const [signs, setSigns] = useState<Sign[]>([]);
-    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MASTER_CHECKLIST_LIBRARY);
+    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
+    
+    // New Data States
+    const [equipmentList, setEquipmentList] = useState<Equipment[]>(MOCK_EQUIPMENT);
+    const [trainingList, setTrainingList] = useState<Training[]>(MOCK_TRAINING);
+    const [subcontractors, setSubcontractors] = useState<Subcontractor[]>(MOCK_SUBCONTRACTORS);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
-    // --- REAL-TIME DATABASE LISTENERS ---
-    useEffect(() => {
-        // 1. Projects
-        const unsubProjects = onSnapshot(query(collection(db, 'projects')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-            setProjects(data);
-        });
-
-        // 2. Reports
-        const unsubReports = onSnapshot(query(collection(db, 'reports'), orderBy('occurred_at', 'desc')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Report));
-            setReportList(data);
-        });
-
-        // 3. PTWs
-        const unsubPtws = onSnapshot(query(collection(db, 'ptws')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Ptw));
-            setPtwList(data);
-        });
-
-        // 4. Inspections
-        const unsubInspections = onSnapshot(query(collection(db, 'inspections')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Inspection));
-            setInspectionList(data);
-        });
-
-        // 5. Actions
-        const unsubActions = onSnapshot(query(collection(db, 'actions')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActionItem));
-            setStandaloneActions(data);
-        });
-
-        // 6. RAMS
-        const unsubRams = onSnapshot(query(collection(db, 'rams')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RamsType));
-            setRamsList(data);
-        });
-
-        // 7. Plans
-        const unsubPlans = onSnapshot(query(collection(db, 'plans')), (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PlanType));
-            setPlanList(data);
-        });
-
-        setIsLoading(false);
-
-        return () => {
-            unsubProjects();
-            unsubReports();
-            unsubPtws();
-            unsubInspections();
-            unsubActions();
-            unsubRams();
-            unsubPlans();
-        };
-    }, []);
-
-    // --- DATABASE WRITERS ---
-
-    const handleCreateProject = async (data: any) => {
-        try {
-            await addDoc(collection(db, 'projects'), { ...data, org_id: activeOrg.id, status: 'active', created_at: new Date().toISOString() });
-            toast.success("Project created in Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save project."); }
-    };
-
     const handleCreateReport = async (reportData: any) => {
-        try {
-            await addDoc(collection(db, 'reports'), {
-                ...reportData,
-                org_id: activeOrg.id,
-                reporter_id: activeUser?.id || 'unknown',
-                status: 'submitted',
-                audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
-                capa: [],
-                acknowledgements: []
-            });
-            toast.success("Report saved to Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save report."); }
+        const newReport = {
+            ...reportData,
+            id: `rep_${Date.now()}`,
+            org_id: activeOrg.id,
+            reporter_id: activeUser?.id || 'unknown',
+            status: 'submitted',
+            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
+            capa: [],
+            acknowledgements: []
+        };
+        setReportList(prev => [newReport, ...prev]);
+        toast.success("Report saved.");
     };
 
-    const handleCreateInspection = async (data: any) => {
-        try {
-            await addDoc(collection(db, 'inspections'), {
-                ...data,
-                org_id: activeOrg.id,
-                findings: [],
-                status: data.status || 'Draft',
-                audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }]
-            });
-            toast.success("Inspection saved to Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save inspection."); }
+    const handleCreateInspection = (data: any) => {
+        const newInspection = {
+            ...data,
+            id: `insp_${Date.now()}`,
+            org_id: activeOrg.id,
+            findings: [],
+            status: 'Ongoing',
+            audit_trail: [{ 
+                user_id: activeUser?.id || 'system', 
+                timestamp: new Date().toISOString(), 
+                action: 'Inspection Created' 
+            }]
+        };
+        setInspectionList(prev => [newInspection as Inspection, ...prev]);
+        toast.success("Inspection created successfully.");
     };
 
-    const handleCreatePtw = async (data: any) => {
-        try {
-            await addDoc(collection(db, 'ptws'), {
-                ...data,
-                org_id: activeOrg.id,
-                status: 'DRAFT',
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                audit_log: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'PTW Created' }]
-            });
-            toast.success("Permit saved to Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save permit."); }
-    };
-
-    const handleCreateStandaloneAction = async (data: any) => {
-        try {
-            await addDoc(collection(db, 'actions'), {
-                ...data,
-                status: 'Open',
-                source: { type: 'Standalone', id: '-', description: 'Direct Entry' },
-                origin: { type: 'standalone', parentId: '', itemId: '' }
-            });
-            toast.success("Action saved to Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save action."); }
-    };
-
-    const handleCreateRams = async (data: any) => {
-        try {
-            await addDoc(collection(db, 'rams'), { ...data, status: 'draft', created_at: new Date().toISOString() });
-            toast.success("RAMS saved to Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save RAMS."); }
-    };
-
-    const handleCreatePlan = async (data: any) => {
-        try {
-            await addDoc(collection(db, 'plans'), { 
-                ...data, 
-                status: 'draft', 
-                content: { body_json: [], attachments: [] }, 
-                people: { prepared_by: { name: activeUser?.name, email: activeUser?.email } },
-                dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-                meta: { tags: [], change_note: '' },
-                audit_trail: []
-            });
-            toast.success("Plan saved to Database.");
-        } catch (e) { console.error(e); toast.error("Failed to save Plan."); }
-    };
-
-    // --- UPDATERS (Optimistic UI + DB Update) ---
-    
-    const handleStatusChange = async (id: string, status: any) => {
-        const ref = doc(db, 'reports', id);
-        await updateDoc(ref, { status });
-    };
-
-    const handleCapaActionChange = async (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
-        const report = reportList.find(r => r.id === reportId);
-        if (!report) return;
-        const newCapa = [...report.capa];
-        if (newCapa[capaIndex]) {
-            newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
-            const ref = doc(db, 'reports', reportId);
-            await updateDoc(ref, { capa: newCapa });
-        }
-    };
-
-    const handleUpdateActionStatus = async (origin: any, newStatus: any) => {
-        if (origin.type === 'report-capa') {
-            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
-        } else if (origin.type === 'standalone') {
-             const ref = doc(db, 'actions', origin.parentId); // parentId is the doc ID for standalone
-             await updateDoc(ref, { status: newStatus });
-        }
-    };
-
-    const handleUpdateInspection = async (data: any, action?: any) => {
-        const ref = doc(db, 'inspections', data.id);
-        // If status change is needed based on action, calculate it here
-        let newStatus = data.status;
-        if (action === 'submit') newStatus = 'Submitted';
-        if (action === 'approve') newStatus = 'Approved';
-        if (action === 'close') newStatus = 'Closed';
-        
-        await updateDoc(ref, { ...data, status: newStatus });
-        toast.success("Inspection updated.");
-    };
-
-    const handleUpdatePtw = async (data: any) => {
-        const ref = doc(db, 'ptws', data.id);
-        await updateDoc(ref, data);
-        toast.success("Permit updated.");
-    };
-
-    const handleUpdatePlan = async (data: any) => {
-        const ref = doc(db, 'plans', data.id);
-        await updateDoc(ref, data);
-        toast.success("Plan updated.");
+    const handleCreateStandaloneAction = (data: any) => {
+        const newAction: ActionItem = {
+            id: `act_${Date.now()}`,
+            action: data.action,
+            owner_id: data.owner_id,
+            due_date: data.due_date,
+            status: 'Open',
+            // @ts-ignore
+            priority: data.priority,
+            project_id: data.project_id,
+            source: { type: 'Standalone' as any, id: '-', description: 'Direct Entry' },
+            origin: { type: 'standalone' as any, parentId: '', itemId: '' }
+        };
+        setStandaloneActions(prev => [newAction, ...prev]);
+        toast.success("Action created.");
     };
     
-    const handlePlanStatusChange = async (id: string, status: any) => {
-        const ref = doc(db, 'plans', id);
-        await updateDoc(ref, { status });
-    };
-
-    const handleUpdateRams = async (data: any) => {
-        const ref = doc(db, 'rams', data.id);
-        await updateDoc(ref, data);
-        toast.success("RAMS updated.");
-    };
-
-    const handleRamsStatusChange = async (id: string, status: any) => {
-        const ref = doc(db, 'rams', id);
-        await updateDoc(ref, { status });
-    };
-
-    // --- MOCK HANDLERS (For features not yet in DB) ---
-    const handleAcknowledgeReport = (id: string) => setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: [...r.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }] } : r));
-    const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
-    const handleUpdateTbt = (d: any) => setTbtList(prev => prev.map(t => t.id === d.id ? d : t));
-    const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
-    const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
-    const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
-
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
         reportList.forEach(report => {
@@ -490,12 +365,54 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...items, ...standaloneActions];
     }, [reportList, standaloneActions]);
 
+    const handleUpdateActionStatus = (origin: any, newStatus: any) => {
+        if (origin.type === 'report-capa') {
+            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
+        } else if (origin.type === 'standalone') {
+             setStandaloneActions(prev => prev.map(a => 
+                a.id === origin.parentId ? { ...a, status: newStatus } : a
+            ));
+        }
+    };
+
+    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
+        setReportList(prev => prev.map(r => {
+            if (r.id === reportId) {
+                const newCapa = [...r.capa];
+                if (newCapa[capaIndex]) {
+                    newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
+                    return { ...r, capa: newCapa };
+                }
+            }
+            return r;
+        }));
+    };
+
+    const handleCreateProject = (data: any) => setProjects(prev => [...prev, { ...data, id: `proj_${Date.now()}`, org_id: activeOrg.id, status: 'active' }]);
+    const handleStatusChange = (id: string, s: any) => setReportList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
+    const handleAcknowledgeReport = (id: string) => setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: [...r.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }] } : r));
+    const handleUpdateInspection = (i: any) => setInspectionList(prev => prev.map(x => x.id === i.id ? i : x));
+    const handleCreatePtw = (d: any) => setPtwList(prev => [{ ...d, id: `ptw_${Date.now()}`, status: 'DRAFT' }, ...prev]);
+    const handleUpdatePtw = (d: any) => setPtwList(prev => prev.map(p => p.id === d.id ? d : p));
+    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
+    const handleUpdatePlan = (d: any) => setPlanList(prev => prev.map(p => p.id === d.id ? d : p));
+    const handlePlanStatusChange = (id: string, s: any) => setPlanList(prev => prev.map(p => p.id === id ? { ...p, status: s } : p));
+    const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
+    const handleUpdateRams = (d: any) => setRamsList(prev => prev.map(r => r.id === d.id ? d : r));
+    const handleRamsStatusChange = (id: string, s: any) => setRamsList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
+    const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
+    const handleUpdateTbt = (d: any) => setTbtList(prev => prev.map(t => t.id === d.id ? d : t));
+    const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
+    const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
+    const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
+
     const value = {
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
         actionItems,
-        setInspectionList, setChecklistRunList, setPtwList, setChecklistTemplates,
+        equipmentList, trainingList, subcontractors,
+        setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,

@@ -1,25 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, 
-  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwStoppage
+  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
+  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage, 
+  PtwWorkflowStage, PtwIsolation, PtwLiveSensor
 } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
 import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
+import { PtwWorkflowEngine } from '../utils/workflowEngine';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
-import { useToast } from './ui/Toast';
-import { ActionsBar } from './ui/ActionsBar';
-import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
 import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
-import { generatePdf } from '../utils/pdfGenerator'; // <--- NEW IMPORT
+import { useToast } from './ui/Toast';
+import { ActionsBar } from './ui/ActionsBar';
+import { EmailModal } from './ui/EmailModal';
+import { 
+  CheckCircle, Clock, FileText, Search, MapPin, PenTool, 
+  Handshake, Lock, ShieldCheck, AlertTriangle, 
+  Activity, UserCheck, FileCheck, Shield, AlertCircle,
+  Download, QrCode, Camera, WifiOff, Battery, ThermometerSun,
+  Wind as WindIcon, Volume2, Play, Pause, RotateCcw, Eye
+} from 'lucide-react';
 
 interface PtwDetailModalProps {
   ptw: Ptw;
   onClose: () => void;
-  onUpdate: (ptw: Ptw, action?: 'submit' | 'approve_proponent' | 'approve_hse' | 'reject' | 'request_revision' | 'activate' | 'close' | 'save' | 'suspend' | 'resume') => void;
+  onUpdate: (ptw: Ptw) => void;
 }
 
 type SectionKey = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII' | 'VIII' | 'IX';
@@ -35,144 +43,194 @@ const sections: { key: SectionKey, title: string }[] = [
     { key: 'IX', title: 'Permit Closure'},
 ];
 
+// Workflow visualization steps
+const WORKFLOW_STEPS: { id: PtwWorkflowStage; label: string; icon: any; role: string }[] = [
+  { id: 'REQUESTED', label: 'Applied', icon: FileText, role: 'Requester' },
+  { id: 'ISSUER_REVIEW', label: 'Review', icon: Search, role: 'Issuer' },
+  { id: 'APPROVAL', label: 'Approval', icon: UserCheck, role: 'Approver' },
+  { id: 'AUTHORIZATION', label: 'Auth', icon: Shield, role: 'System' },
+  { id: 'SITE_HANDOVER', label: 'Handover', icon: Handshake, role: 'Receiver' },
+  { id: 'ACTIVE', label: 'Active', icon: Activity, role: 'Receiver' },
+  { id: 'JOINT_INSPECTION', label: 'Inspect', icon: Eye, role: 'Joint' },
+  { id: 'CLOSED', label: 'Closed', icon: Lock, role: 'Issuer' },
+];
+
 // --- HELPER COMPONENTS ---
 
 const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChange: (value: PtwSafetyRequirement) => void; disabled: boolean }> = ({ index, item, onChange, disabled }) => (
     <tr className={`border-b dark:border-dark-border ${disabled ? '' : 'hover:bg-gray-50 dark:hover:bg-dark-background'}`}>
         <td className="p-2 w-8 text-center text-gray-600 dark:text-gray-400">{index}</td>
         <td className="p-2 text-gray-900 dark:text-gray-200">{item.text}</td>
-        <td className="p-2 w-16 text-center">
-            <input type="radio" name={`check-${item.id}`} checked={item.response === 'Yes'} onChange={() => onChange({ ...item, response: 'Yes' })} disabled={disabled} className="accent-blue-600 w-4 h-4" />
-        </td>
-        <td className="p-2 w-16 text-center">
-            <input type="radio" name={`check-${item.id}`} checked={item.response === 'No'} onChange={() => onChange({ ...item, response: 'No' })} disabled={disabled} className="accent-blue-600 w-4 h-4" />
-        </td>
-        <td className="p-2 w-16 text-center">
-            <input type="radio" name={`check-${item.id}`} checked={item.response === 'N/A'} onChange={() => onChange({ ...item, response: 'N/A' })} disabled={disabled} className="accent-blue-600 w-4 h-4" />
-        </td>
+        <td className="p-2 w-16 text-center"><input type="radio" name={`check-${item.id}`} checked={item.response === 'Yes'} onChange={() => onChange({ ...item, response: 'Yes' })} disabled={disabled} className="accent-blue-600" /></td>
+        <td className="p-2 w-16 text-center"><input type="radio" name={`check-${item.id}`} checked={item.response === 'No'} onChange={() => onChange({ ...item, response: 'No' })} disabled={disabled} className="accent-blue-600" /></td>
+        <td className="p-2 w-16 text-center"><input type="radio" name={`check-${item.id}`} checked={item.response === 'N/A'} onChange={() => onChange({ ...item, response: 'N/A' })} disabled={disabled} className="accent-blue-600" /></td>
     </tr>
 );
 
-const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
-    const { activeUser, can } = useAppContext();
-    const canApprove = can('approve', 'ptw');
-    const isCreator = ptw.payload.creator_id === activeUser?.id;
-    const selfApprovalBlocked = isCreator && canApprove;
-
-    return (
-        <div className="flex items-center space-x-2">
-            {ptw.status === 'DRAFT' && <Button variant="secondary" onClick={onSave}>Save Draft</Button>}
-            {ptw.status === 'DRAFT' && <Button onClick={() => onAction('submit')}>Submit for Review</Button>}
-            
-            {ptw.status === 'SUBMITTED' && canApprove && (
-                <>
-                    <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
-                    <Button onClick={() => onAction('approve_proponent')} disabled={selfApprovalBlocked} title={selfApprovalBlocked ? "You cannot approve a permit you created." : ""}>Approve (Proponent)</Button>
-                </>
-            )}
-            
-            {ptw.status === 'APPROVAL' && canApprove && (
-                 <>
-                    <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
-                    <Button variant="danger" onClick={() => onAction('reject')} disabled={selfApprovalBlocked} title={selfApprovalBlocked ? "You cannot reject a permit you created." : ""}>Reject</Button>
-                    <Button onClick={() => onAction('approve_hse')} disabled={selfApprovalBlocked} title={selfApprovalBlocked ? "You cannot give final approval for a permit you created." : ""}>Approve (HSE)</Button>
-                </>
-            )}
-
-            {ptw.status === 'ACTIVE' && canApprove && <Button variant="danger" onClick={() => onAction('suspend')}>Suspend Permit</Button>}
-            {ptw.status === 'HOLD' && canApprove && <Button onClick={() => onAction('resume')}>Resume Work</Button>}
-            {(ptw.status === 'ACTIVE' || ptw.status === 'HOLD') && <Button onClick={() => onAction('close')}>Close Permit</Button>}
-        </div>
-    )
-}
-
 const InfoField: React.FC<{label: string, value: React.ReactNode}> = ({label, value}) => (
     <div className="border-b py-2 dark:border-dark-border">
-        <span className="font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase">{label}:</span>
-        <span className="ml-2 text-gray-900 dark:text-gray-100 font-medium">{value}</span>
+        <span className="font-semibold text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wide">{label}:</span>
+        <div className="mt-1 text-gray-900 dark:text-gray-100 font-medium">{value}</div>
     </div>
 )
 
 const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, disabled?: boolean }> = ({ label, value, onChange, type = 'text', required = false, disabled = false }) => (
     <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
+        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm mb-1">{label}</label>
         <input
             type={type}
             value={value || ''}
             onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:bg-gray-100 dark:disabled:bg-white/5 disabled:text-gray-500"
+            className="w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:bg-gray-100 dark:disabled:bg-white/5 disabled:text-gray-500"
             required={required}
             disabled={disabled}
         />
     </div>
 );
 
-const FormSelect: React.FC<{ label: string; value: any; onChange: (val: any) => void; options: string[]; disabled?: boolean }> = ({ label, value, onChange, options, disabled = false }) => (
-    <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
-        <select
-            value={value || ''}
-            onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:bg-gray-100 dark:disabled:bg-white/5"
-            disabled={disabled}
-        >
-            <option value="">Select...</option>
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-    </div>
-);
-
 const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, disabled?: boolean }> = ({ label, value, onChange, disabled = false }) => (
     <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
+        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm mb-1">{label}</label>
         <input
             type="text"
             value={value || ''}
             onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-200 disabled:bg-gray-100 dark:disabled:bg-white/5"
-            placeholder={disabled ? "Signed" : "Type Name to Sign"}
+            className="w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-300 disabled:bg-gray-100 dark:disabled:bg-white/5"
+            placeholder={disabled ? "Signed" : "Type name to sign"}
             disabled={disabled}
         />
     </div>
 );
 
+// --- WORKFLOW ACTIONS COMPONENT ---
+const WorkflowActions: React.FC<{ onAction: (stage: PtwWorkflowStage) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
+    const { activeUser, can } = useAppContext();
+    const canApprove = can('approve', 'ptw');
+
+    return (
+        <div className="flex flex-col gap-2 w-full">
+            {ptw.status === 'DRAFT' && (
+                <>
+                    <Button variant="secondary" onClick={onSave} className="w-full">Save Draft</Button>
+                    <Button onClick={() => onAction('REQUESTED')} className="w-full">Submit Application</Button>
+                </>
+            )}
+            
+            {ptw.status === 'REQUESTED' && (
+                <div className="grid grid-cols-2 gap-2">
+                    <Button variant="danger" onClick={() => onAction('DRAFT')}>Return</Button>
+                    <Button onClick={() => onAction('ISSUER_REVIEW')}>Start Review</Button>
+                </div>
+            )}
+
+            {ptw.status === 'ISSUER_REVIEW' && (
+                 <Button onClick={() => onAction('ISSUER_SIGNED')}>Sign & Accept</Button>
+            )}
+
+            {ptw.status === 'ISSUER_SIGNED' && (
+                 <Button onClick={() => onAction('PENDING_APPROVAL')}>Forward to Approver</Button>
+            )}
+
+            {ptw.status === 'PENDING_APPROVAL' && (
+                 <Button onClick={() => onAction('APPROVAL')}>Start Approval</Button>
+            )}
+
+            {ptw.status === 'APPROVAL' && (
+                 <Button onClick={() => onAction('APPROVER_SIGNED')}>Authorize Permit</Button>
+            )}
+
+            {ptw.status === 'APPROVER_SIGNED' && (
+                 <Button onClick={() => onAction('AUTHORIZATION')}>Final Authorization</Button>
+            )}
+
+            {ptw.status === 'AUTHORIZATION' && (
+                 <Button onClick={() => onAction('HANDOVER_PENDING')}>Prepare Handover</Button>
+            )}
+
+            {ptw.status === 'HANDOVER_PENDING' && (
+                 <Button onClick={() => onAction('SITE_HANDOVER')}>Scan QR / Handover</Button>
+            )}
+
+            {ptw.status === 'SITE_HANDOVER' && (
+                 <Button onClick={() => onAction('ACTIVE')}>Accept & Start Work</Button>
+            )}
+
+            {ptw.status === 'ACTIVE' && (
+                 <div className="grid grid-cols-2 gap-2">
+                     <Button variant="secondary" onClick={() => onAction('SUSPENDED')}>Suspend</Button>
+                     <Button onClick={() => onAction('COMPLETION_PENDING')}>Mark Complete</Button>
+                 </div>
+            )}
+
+            {ptw.status === 'SUSPENDED' && (
+                 <Button onClick={() => onAction('ACTIVE')}>Resume Work</Button>
+            )}
+
+            {ptw.status === 'COMPLETION_PENDING' && (
+                 <Button onClick={() => onAction('JOINT_INSPECTION')}>Start Inspection</Button>
+            )}
+
+            {ptw.status === 'JOINT_INSPECTION' && (
+                 <Button onClick={() => onAction('CLOSED')}>Close Permit</Button>
+            )}
+        </div>
+    );
+}
+
 // --- MAIN COMPONENT ---
 
-export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
-  const { ptw, onClose, onUpdate } = props;
+export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, onUpdate }) => {
+  const { activeUser, usersList } = useAppContext();
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
+  const [comment, setComment] = useState('');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const toast = useToast();
-  
-  const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
-  
-  const details = ptwTypeDetails[ptw.type];
-  
-  // Permission Logic
+
+  const getName = (id: string) => usersList.find(u => u.id === id)?.name || 'Unknown';
+
+  // --- PERMISSIONS LOGIC (UPDATED) ---
   const isDraft = formData.status === 'DRAFT';
+  
+  // Requester can edit everything in Draft
   const isEditable = isDraft; 
-  const isProponentEditable = formData.status === 'SUBMITTED' || isDraft;
-  const isHseEditable = formData.status === 'APPROVAL' || isDraft;
-  const isInspectionEditable = formData.status === 'APPROVAL' || isDraft;
-  const isStoppageEditable = formData.status === 'ACTIVE' || formData.status === 'HOLD' || isDraft;
-  const isExtensionEditable = formData.status === 'ACTIVE' || isDraft;
-  const isClosureEditable = formData.status === 'ACTIVE' || formData.status === 'HOLD' || isDraft;
+  
+  // Requester can NOMINATE (fill details) for Proponent/HSE in Draft, but NOT sign
+  const canEditProponentDetails = isDraft || formData.status === 'ISSUER_REVIEW';
+  const canEditHseDetails = isDraft || formData.status === 'APPROVAL';
+  
+  // Signatures are strictly locked to workflow stages
+  const canSignProponent = formData.status === 'ISSUER_REVIEW';
+  const canSignHse = formData.status === 'APPROVAL';
+  
+  const isInspectionEditable = formData.status === 'JOINT_INSPECTION';
+  const isClosureEditable = formData.status === 'ACTIVE' || formData.status === 'COMPLETION_PENDING';
+
+  const hasPermission = PtwWorkflowEngine.validateRolePermission(
+    ptw.status,
+    activeUser?.role || '',
+    activeUser?.id || '',
+    ptw
+  );
 
   useEffect(() => {
       setFormData(JSON.parse(JSON.stringify(ptw)));
   }, [ptw]);
 
-  // Handle nested object updates safely
   const handlePayloadChange = (path: string, value: any) => {
     setFormData(prev => {
         const keys = path.split('.');
-        const newPayload = JSON.parse(JSON.stringify(prev.payload));
+        const newPayload = JSON.parse(JSON.stringify(prev.payload || {}));
         let current: any = newPayload;
+
         for (let i = 0; i < keys.length - 1; i++) {
-            if (!current[keys[i]]) current[keys[i]] = {}; // Create object if missing
-            current = current[keys[i]];
+            const key = keys[i];
+            if (!current[key] || typeof current[key] !== 'object') {
+                current[key] = {};
+            }
+            current = current[key];
         }
+        
         current[keys[keys.length - 1]] = value;
 
         if (path.endsWith('.signature') && value) {
@@ -182,12 +240,11 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
             const signedAtKeys = signedAtPath.split('.');
             try {
                 for (let i = 0; i < signedAtKeys.length - 1; i++) {
+                    if (!signedAtTarget[signedAtKeys[i]]) signedAtTarget[signedAtKeys[i]] = {};
                     signedAtTarget = signedAtTarget[signedAtKeys[i]];
                 }
-                if (signedAtTarget) {
-                    signedAtTarget[signedAtKeys[signedAtKeys.length - 1]] = new Date().toISOString();
-                }
-            } catch (e) { /* ignore */ }
+                signedAtTarget[signedAtKeys[signedAtKeys.length - 1]] = new Date().toISOString();
+            } catch (e) { console.error("Could not set signed_at date", e)}
         }
 
         return { ...prev, payload: newPayload };
@@ -203,184 +260,93 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
       });
   }
 
-  const handleAddStakeholder = () => {
-    setFormData(prev => {
-        const newPayload = JSON.parse(JSON.stringify(prev.payload));
-        if (!newPayload.signoffs.other_stakeholders) newPayload.signoffs.other_stakeholders = [];
-        newPayload.signoffs.other_stakeholders.push({
-            name: '', designation: '', email: '', mobile: '', signature: '', remarks: '', signed_at: ''
-        });
-        return { ...prev, payload: newPayload };
-    });
-  };
-
-  const handleRemoveStakeholder = (index: number) => {
-    setFormData(prev => {
-        const newPayload = JSON.parse(JSON.stringify(prev.payload));
-        newPayload.signoffs.other_stakeholders.splice(index, 1);
-        return { ...prev, payload: newPayload };
-    });
-  };
-  
-  const handleLogStoppage = () => {
-    const newStoppage: PtwStoppage = {
-        ...stoppageFormData,
-        time: new Date().toISOString(),
-        restarted_time: '',
-        signature: '',
-    } as PtwStoppage;
-
-    const updatedFormData = {
-        ...formData,
-        payload: {
-            ...formData.payload,
-            holding_or_stoppage: [...(formData.payload.holding_or_stoppage || []), newStoppage]
-        }
-    };
-    setFormData(updatedFormData);
-    onUpdate(updatedFormData, 'suspend');
-    setStoppageFormData({ reason: '', stopped_by: '', informed_to: '' });
-  };
-  
-  const handleResumeWork = (signature: string) => {
-      const updatedFormData = { ...formData };
-      if (!updatedFormData.payload.holding_or_stoppage) updatedFormData.payload.holding_or_stoppage = [];
-      
-      const lastStoppageIndex = updatedFormData.payload.holding_or_stoppage.length - 1;
-      if (lastStoppageIndex >= 0) {
-          updatedFormData.payload.holding_or_stoppage[lastStoppageIndex].restarted_time = new Date().toISOString();
-          updatedFormData.payload.holding_or_stoppage[lastStoppageIndex].signature = signature;
-      }
-      setFormData(updatedFormData);
-      onUpdate(updatedFormData, 'resume');
-  }
-
-  const handleRequestExtension = () => {
-      const updatedFormData = { ...formData };
-      if (!updatedFormData.payload.extension) {
-          updatedFormData.payload.extension = { is_requested: true, reason: '', days: { from: '', to: '' }, hours: { from: '', to: '' }, requester: { signature: '', signed_at: '' }, client_proponent: { signature: '', signed_at: '' }, client_hs: { signature: '', signed_at: '' } };
-      } else {
-          updatedFormData.payload.extension.is_requested = true;
-      }
-      setFormData(updatedFormData);
-      onUpdate(updatedFormData, 'save');
-  };
-  
-  const validatePtwForAction = (permit: Ptw, action: 'submit' | 'approve_proponent' | 'approve_hse' | 'activate' | 'close'): string | null => {
-    if (action === 'submit') {
-        const { requester, contractor_safety_personnel } = permit.payload;
-        if (!requester.name || !requester.designation || !requester.contractor || !requester.email || !requester.mobile || !requester.signature) {
-            return "Gating failed: Section III - Permit Holder Information must be complete, including signature.";
-        }
-        if (contractor_safety_personnel?.name) {
-            if (!contractor_safety_personnel.email || !contractor_safety_personnel.mobile || !contractor_safety_personnel.signature) {
-                return "Gating failed: Section III - You entered a Contractor Safety Name, so the full details and signature are required.";
-            }
+  const handleTransition = (nextStage: PtwWorkflowStage, actionLabel: string) => {
+    // Basic validation before submission
+    if (nextStage === 'REQUESTED') {
+        const { requester } = formData.payload;
+        if (!requester.signature) {
+            toast.error("Permit Requester must sign in Section III before submitting.");
+            return;
         }
     }
-    // ... existing validation checks ...
-    return null;
-  };
 
-  const handleWorkflowAction = (action: any) => {
-        if (!action) return;
-        if (['submit', 'approve_proponent', 'approve_hse', 'activate', 'close'].includes(action)) {
-            const validationError = validatePtwForAction(formData, action);
-            if (validationError) {
-                toast.error(validationError);
-                alert(validationError);
-                return;
-            }
+    if (!PtwWorkflowEngine.canTransition(ptw.status, nextStage)) {
+      alert(`Invalid transition from ${ptw.status} to ${nextStage}`);
+      return;
+    }
+    
+    const updatedPtw: Ptw = {
+      ...formData,
+      status: nextStage,
+      workflow_log: [
+        ...(formData.workflow_log || []),
+        {
+          stage: nextStage,
+          action: actionLabel,
+          user_id: activeUser?.id || '',
+          timestamp: new Date().toISOString(),
+          comments: comment,
+          signoff_type: 'digital',
         }
-        onUpdate(formData, action);
+      ]
+    };
+    onUpdate(updatedPtw);
+    setComment('');
   };
 
-  // --- RENDER SECTION CONTENT ---
+  // Demo Helper: Auto-fill for testing
+  const demoFillSection = (section: 'III' | 'IV' | 'V') => {
+      if (section === 'III') {
+          handlePayloadChange('requester.signature', activeUser?.name || 'Demo User');
+      } else if (section === 'IV') {
+          handlePayloadChange('signoffs.client_proponent.name', 'John Manager');
+          handlePayloadChange('signoffs.client_proponent.designation', 'Site Lead');
+          handlePayloadChange('signoffs.client_proponent.email', 'john@client.com');
+          handlePayloadChange('signoffs.client_proponent.mobile', '555-0199');
+      } else if (section === 'V') {
+          handlePayloadChange('signoffs.client_hs.name', 'Sarah Safety');
+          handlePayloadChange('signoffs.client_hs.designation', 'HSE Officer');
+          handlePayloadChange('signoffs.client_hs.email', 'sarah@hse.com');
+          handlePayloadChange('signoffs.client_hs.mobile', '555-0200');
+      }
+  };
+
   const renderSectionContent = () => {
     switch(activeSection) {
         case 'I':
             return (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <InfoField label="Permit Type" value={formData.type} />
-                        <InfoField label="Permit Status" value={
-                            <Badge color={
-                                formData.status === 'ACTIVE' ? 'green' : 
-                                formData.status === 'HOLD' ? 'red' :
-                                formData.status === 'APPROVAL' ? 'blue' : 'gray'
-                            }>
-                                {formData.status.replace(/_/g, ' ')}
-                            </Badge>
-                        } />
                         <InfoField label="Permit Number" value={formData.payload.permit_no || 'Draft'} />
                         <InfoField label="Project" value={formData.project_id} />
-                        <InfoField label="Location" value={formData.payload.work.location} />
-                        <InfoField label="Workers" value={formData.payload.work.number_of_workers || 'N/A'} />
+                        <InfoField label="Work Location" value={formData.payload.work.location} />
+                        <InfoField label="Number of Workers" value={formData.payload.work.number_of_workers || 'Not specified'} />
                     </div>
-                    
-                    <div className="mt-4">
+                    <div>
                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Work Description</h4>
-                        <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded border dark:border-dark-border">
+                        <div className="p-3 bg-gray-50 dark:bg-white/5 rounded border dark:border-dark-border text-sm">
                             {formData.payload.work.description}
-                        </p>
+                        </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <InfoField label="Start Time" value={`${formData.payload.work.coverage.start_date} ${formData.payload.work.coverage.start_time}`} />
                         <InfoField label="End Time" value={`${formData.payload.work.coverage.end_date} ${formData.payload.work.coverage.end_time}`} />
                         <InfoField label="Risk Assessment Ref" value={formData.payload.work.risk_assessment_ref || 'Not provided'} />
                         <InfoField label="Emergency Contact" value={formData.payload.work.emergency_contact || 'Not provided'} />
                     </div>
-                    
-                    {formData.payload.global_compliance && (
-                        <div className="mt-6 p-4 border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-900/10">
-                            <h4 className="font-bold text-green-800 dark:text-green-300 mb-3">Global HSE Compliance</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <InfoField label="Compliance Level" value={
-                                    <Badge color={formData.compliance_level === 'FULL' ? 'green' : 'yellow'}>
-                                        {formData.compliance_level}
-                                    </Badge>
-                                } />
-                                <InfoField label="Standards Applied" value={
-                                    <div className="flex flex-wrap gap-1">
-                                        {formData.payload.global_compliance.standards.slice(0, 3).map((std, idx) => (
-                                            <span key={idx} className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                                                {std}
-                                            </span>
-                                        ))}
-                                    </div>
-                                } />
-                            </div>
-                        </div>
-                    )}
                 </div>
             );
         case 'II':
-            const isChecklistDisabled = !isEditable;
             return (
                 <div className="space-y-6">
-                     {/* Dynamic Sections based on Type */}
-                     {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
+                    {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
-                            loadCalc={(formData.payload as PtwLiftingPayload).load_calculation}
+                            loadCalc={formData.payload.load_calculation}
                             onChange={(calc) => handlePayloadChange('load_calculation', calc)}
                             disabled={!isEditable}
                         />
-                     )}
-                     {formData.type === 'Confined Space Entry' && 'gas_tests' in formData.payload && (
-                        <GasTestLogSection 
-                            gasTests={(formData.payload as PtwConfinedSpacePayload).gas_tests}
-                            onChange={(tests) => handlePayloadChange('gas_tests', tests)}
-                            disabled={!isEditable}
-                        />
-                     )}
-                     {formData.type === 'Confined Space Entry' && 'entry_log' in formData.payload && (
-                        <PersonnelEntryLogSection 
-                            entries={(formData.payload as PtwConfinedSpacePayload).entry_log}
-                            onChange={(entries) => handlePayloadChange('entry_log', entries)}
-                            disabled={!isEditable}
-                        />
-                     )}
+                    )}
                     {formData.type === 'Work at Height' && 'access_equipment' in formData.payload && (
                         <WorkAtHeightPermit 
                             payload={formData.payload as PtwWorkAtHeightPayload}
@@ -388,15 +354,15 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                             readOnly={!isEditable}
                         />
                     )}
-                     <div className="border rounded-lg overflow-hidden mt-6">
+                    <div className="border rounded-lg overflow-hidden dark:border-dark-border">
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-100 dark:bg-gray-800">
-                                <tr className="border-b dark:border-dark-border text-gray-700 dark:text-gray-300">
-                                    <th className="p-2 w-8">#</th>
-                                    <th className="p-2 text-left">Requirement</th>
-                                    <th className="p-2 w-16 text-center">Yes</th>
-                                    <th className="p-2 w-16 text-center">No</th>
-                                    <th className="p-2 w-16 text-center">N/A</th>
+                            <thead className="bg-gray-100 dark:bg-white/5">
+                                <tr className="text-left text-gray-600 dark:text-gray-300">
+                                    <th className="p-3 w-10">#</th>
+                                    <th className="p-3">Requirement</th>
+                                    <th className="p-3 w-16 text-center">Yes</th>
+                                    <th className="p-3 w-16 text-center">No</th>
+                                    <th className="p-3 w-16 text-center">N/A</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -406,176 +372,148 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                                         index={index + 1}
                                         item={item}
                                         onChange={handleChecklistChange}
-                                        disabled={isChecklistDisabled}
+                                        disabled={!isEditable}
                                     />
                                 ))}
                             </tbody>
                         </table>
                     </div>
+                    
+                    {/* PPE Requirements */}
+                    <div className="border rounded-lg p-4 dark:border-dark-border">
+                        <h4 className="font-bold mb-3 text-base text-gray-800 dark:text-gray-200">Personal Protective Equipment (PPE)</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {Object.entries(formData.payload.ppe || {}).map(([key, value]) => (
+                                <label key={key} className="flex items-center space-x-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={!!value}
+                                        onChange={(e) => handlePayloadChange(`ppe.${key}`, e.target.checked)}
+                                        disabled={!isEditable}
+                                        className="rounded text-blue-600 focus:ring-blue-500"
+                                    />
+                                    <span className="text-sm capitalize text-gray-700 dark:text-gray-300">{key.replace(/_/g, ' ')}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             );
+
         case 'III':
             return (
                 <div className="space-y-6">
-                    <div className="border rounded-lg p-4">
-                        <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section III — Permit Requester Confirmation</h3>
-                        <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6">
-                            <p className="text-sm italic text-gray-700 dark:text-gray-300">
-                                "I hereby confirm that I have personally inspected the worksite and verified that all required precautionary measures and safety controls described in this permit have been fully implemented."
-                            </p>
-                        </div>
-                        <div className="space-y-6">
-                            <div>
-                                <h4 className="font-bold text-gray-800 dark:text-gray-200 border-b dark:border-dark-border pb-1 mb-3">Permit Holder Information</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    <FormInput label="Permit Holder Name" value={formData.payload.requester.name} 
-                                        onChange={val => handlePayloadChange('requester.name', val)} required disabled={!isEditable} />
-                                    <FormInput label="Designation" value={formData.payload.requester.designation} 
-                                        onChange={val => handlePayloadChange('requester.designation', val)} required disabled={!isEditable} />
-                                    <FormInput label="Contractor Company" value={formData.payload.requester.contractor} 
-                                        onChange={val => handlePayloadChange('requester.contractor', val)} required disabled={!isEditable} />
-                                    <FormInput label="Email" type="email" value={formData.payload.requester.email} 
-                                        onChange={val => handlePayloadChange('requester.email', val)} required disabled={!isEditable} />
-                                    <FormInput label="Mobile No." type="tel" value={formData.payload.requester.mobile} 
-                                        onChange={val => handlePayloadChange('requester.mobile', val)} required disabled={!isEditable} />
-                                    <div className="md:col-span-2">
-                                        <SignatureInput label="Signature" value={formData.payload.requester.signature} 
-                                            onChange={val => handlePayloadChange('requester.signature', val)} disabled={!isEditable} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-gray-800 dark:text-gray-200 border-b dark:border-dark-border pb-1 mb-3">Contractor Safety Personnel (Optional)</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                                    <FormInput label="Safety Personnel Name" value={formData.payload.contractor_safety_personnel?.name} 
-                                        onChange={val => handlePayloadChange('contractor_safety_personnel.name', val)} disabled={!isEditable} />
-                                    <FormInput label="Designation" value={formData.payload.contractor_safety_personnel?.designation} 
-                                        onChange={val => handlePayloadChange('contractor_safety_personnel.designation', val)} disabled={!isEditable} />
-                                    <FormInput label="Mobile No." type="tel" value={formData.payload.contractor_safety_personnel?.mobile} 
-                                        onChange={val => handlePayloadChange('contractor_safety_personnel.mobile', val)} disabled={!isEditable} />
-                                    <FormInput label="Email" type="email" value={formData.payload.contractor_safety_personnel?.email} 
-                                        onChange={val => handlePayloadChange('contractor_safety_personnel.email', val)} disabled={!isEditable} />
-                                    <div className="md:col-span-2">
-                                        <SignatureInput label="Signature" value={formData.payload.contractor_safety_personnel?.signature} 
-                                            onChange={val => handlePayloadChange('contractor_safety_personnel.signature', val)} disabled={!isEditable} />
-                                    </div>
-                                </div>
-                            </div>
+                    <div className="flex justify-between items-center border-b pb-2 dark:border-dark-border">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Permit Requester</h3>
+                        {isEditable && <Button size="sm" variant="ghost" onClick={() => demoFillSection('III')}>Demo Sign</Button>}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput label="Name" value={formData.payload.requester.name} onChange={val => handlePayloadChange('requester.name', val)} disabled={!isEditable} />
+                        <FormInput label="Designation" value={formData.payload.requester.designation} onChange={val => handlePayloadChange('requester.designation', val)} disabled={!isEditable} />
+                        <FormInput label="Company" value={formData.payload.requester.contractor} onChange={val => handlePayloadChange('requester.contractor', val)} disabled={!isEditable} />
+                        <FormInput label="Mobile" value={formData.payload.requester.mobile} onChange={val => handlePayloadChange('requester.mobile', val)} disabled={!isEditable} />
+                        <div className="md:col-span-2">
+                            <SignatureInput label="Signature" value={formData.payload.requester.signature} onChange={val => handlePayloadChange('requester.signature', val)} disabled={!isEditable} />
                         </div>
                     </div>
                 </div>
             );
+
         case 'IV':
-             return (
-                <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Client Proponent / Stakeholder</h3>
-                    <div className="space-y-8">
-                        <div>
-                            <h4 className="font-bold text-gray-800 dark:text-gray-200 border-b dark:border-dark-border pb-1 mb-3">Client Proponent (Primary Reviewer)</h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <FormInput label="Name" value={formData.payload.signoffs?.client_proponent.name} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} required disabled={!isProponentEditable} />
-                                <FormInput label="Designation" value={formData.payload.signoffs?.client_proponent.designation} onChange={val => handlePayloadChange('signoffs.client_proponent.designation', val)} required disabled={!isProponentEditable} />
-                                <FormInput label="Email" type="email" value={formData.payload.signoffs?.client_proponent.email} onChange={val => handlePayloadChange('signoffs.client_proponent.email', val)} required disabled={!isProponentEditable} />
-                                <FormInput label="Mobile No." type="tel" value={formData.payload.signoffs?.client_proponent.mobile} onChange={val => handlePayloadChange('signoffs.client_proponent.mobile', val)} required disabled={!isProponentEditable} />
-                                <div className="col-span-2">
-                                    <FormInput label="Remarks" value={formData.payload.signoffs?.client_proponent.remarks} onChange={val => handlePayloadChange('signoffs.client_proponent.remarks', val)} disabled={!isProponentEditable} />
-                                </div>
-                                <div className="col-span-2">
-                                    <SignatureInput label="Signature" value={formData.payload.signoffs?.client_proponent.signature} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={!isProponentEditable} />
-                                </div>
-                            </div>
+            return (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center border-b pb-2 dark:border-dark-border">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Client Proponent</h3>
+                        {isDraft && <Button size="sm" variant="ghost" onClick={() => demoFillSection('IV')}>Demo Fill Details</Button>}
+                    </div>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg text-sm text-blue-800 dark:text-blue-200 mb-4">
+                        {isDraft ? "Nominate the Client Proponent below. They will sign during the Review stage." : "Client Proponent review and signature."}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput label="Name" value={formData.payload.signoffs?.client_proponent?.name} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} disabled={!canEditProponentDetails} />
+                        <FormInput label="Designation" value={formData.payload.signoffs?.client_proponent?.designation} onChange={val => handlePayloadChange('signoffs.client_proponent.designation', val)} disabled={!canEditProponentDetails} />
+                        <FormInput label="Email" type="email" value={formData.payload.signoffs?.client_proponent?.email} onChange={val => handlePayloadChange('signoffs.client_proponent.email', val)} disabled={!canEditProponentDetails} />
+                        <FormInput label="Mobile No." type="tel" value={formData.payload.signoffs?.client_proponent?.mobile} onChange={val => handlePayloadChange('signoffs.client_proponent.mobile', val)} disabled={!canEditProponentDetails} />
+                        <div className="md:col-span-2">
+                             <FormInput label="Remarks" value={formData.payload.signoffs?.client_proponent?.remarks} onChange={val => handlePayloadChange('signoffs.client_proponent.remarks', val)} disabled={!canSignProponent} />
+                        </div>
+                        <div className="md:col-span-2">
+                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_proponent?.signature} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={!canSignProponent} />
                         </div>
                     </div>
                 </div>
             );
+
         case 'V':
             return (
-                 <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Client HSE Department</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="HSE Representative Name" value={formData.payload.signoffs?.client_hs.name} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} required disabled={!isHseEditable} />
-                        <FormInput label="Designation" value={formData.payload.signoffs?.client_hs.designation} onChange={val => handlePayloadChange('signoffs.client_hs.designation', val)} disabled={!isHseEditable} />
-                        <div className="col-span-2">
-                             <FormInput label="Remarks" value={formData.payload.signoffs?.client_hs.remarks} onChange={val => handlePayloadChange('signoffs.client_hs.remarks', val)} disabled={!isHseEditable} />
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center border-b pb-2 dark:border-dark-border">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">HSE Department</h3>
+                        {isDraft && <Button size="sm" variant="ghost" onClick={() => demoFillSection('V')}>Demo Fill Details</Button>}
+                    </div>
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/10 rounded-lg text-sm text-purple-800 dark:text-purple-200 mb-4">
+                        {isDraft ? "Nominate the HSE Representative below. They will sign during the Approval stage." : "HSE Representative review and signature."}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormInput label="HSE Rep Name" value={formData.payload.signoffs?.client_hs?.name} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} disabled={!canEditHseDetails} />
+                        <FormInput label="Designation" value={formData.payload.signoffs?.client_hs?.designation} onChange={val => handlePayloadChange('signoffs.client_hs.designation', val)} disabled={!canEditHseDetails} />
+                        <div className="md:col-span-2">
+                             <FormInput label="Remarks" value={formData.payload.signoffs?.client_hs?.remarks} onChange={val => handlePayloadChange('signoffs.client_hs.remarks', val)} disabled={!canSignHse} />
                         </div>
-                        <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_hs.signature} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={!isHseEditable} />
+                        <div className="md:col-span-2">
+                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_hs?.signature} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={!canSignHse} />
                         </div>
                     </div>
                 </div>
             );
+
         case 'VI':
             return (
-                <div>
-                    <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Joint Site Inspection</h3>
-                    <div className="space-y-6">
-                        <FormInput label="Joint Inspection Remarks" value={formData.payload.joint_inspection?.remarks} onChange={val => handlePayloadChange('joint_inspection.remarks', val)} disabled={!isInspectionEditable} />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <SignatureInput label="Permit Requester Sign" value={formData.payload.joint_inspection?.requester.signature} onChange={val => handlePayloadChange('joint_inspection.requester.signature', val)} disabled={!isInspectionEditable} />
-                            <SignatureInput label="Client Proponent Sign" value={formData.payload.joint_inspection?.client_proponent.signature} onChange={val => handlePayloadChange('joint_inspection.client_proponent.signature', val)} disabled={!isInspectionEditable} />
-                            <SignatureInput label="Client HSE Sign" value={formData.payload.joint_inspection?.client_hs.signature} onChange={val => handlePayloadChange('joint_inspection.client_hs.signature', val)} disabled={!isInspectionEditable} />
-                        </div>
+                <div className="space-y-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b pb-2 dark:border-dark-border">Joint Site Inspection</h3>
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-800 dark:text-blue-200 mb-4">
+                        Verify that all safety measures are in place before activating the permit.
+                    </div>
+                    <FormInput label="Remarks" value={formData.payload.joint_inspection?.remarks} onChange={val => handlePayloadChange('joint_inspection.remarks', val)} disabled={!isInspectionEditable} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <SignatureInput label="Requester Sign" value={formData.payload.joint_inspection?.requester.signature} onChange={val => handlePayloadChange('joint_inspection.requester.signature', val)} disabled={!isInspectionEditable} />
+                        <SignatureInput label="Proponent Sign" value={formData.payload.joint_inspection?.client_proponent.signature} onChange={val => handlePayloadChange('joint_inspection.client_proponent.signature', val)} disabled={!isInspectionEditable} />
+                        <SignatureInput label="HSE Sign" value={formData.payload.joint_inspection?.client_hs.signature} onChange={val => handlePayloadChange('joint_inspection.client_hs.signature', val)} disabled={!isInspectionEditable} />
                     </div>
                 </div>
             );
+
         case 'VII':
             return (
-                <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Holding / Stoppage of Work</h3>
+                <div className="space-y-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b pb-2 dark:border-dark-border">Section VII – Holding / Stoppage of Work</h3>
                     <div className="space-y-4">
                         {formData.payload.holding_or_stoppage?.map((stoppage, index) => (
                             <div key={index} className="p-4 border rounded-md dark:border-dark-border text-gray-800 dark:text-gray-200">
                                 <p className="font-bold">Stoppage #{index+1} at {new Date(stoppage.time).toLocaleString()}</p>
                                 <p><strong>Reason:</strong> {stoppage.reason}</p>
                                 <p><strong>Stopped By:</strong> {stoppage.stopped_by}</p>
-                                {stoppage.restarted_time ? (
+                                {stoppage.restarted_time && (
                                     <div className="mt-2 pt-2 border-t dark:border-dark-border">
                                         <p className="text-green-600 font-semibold">Resumed at {new Date(stoppage.restarted_time).toLocaleString()}</p>
-                                        <p><strong>Signed by:</strong> {stoppage.signature}</p>
                                     </div>
-                                ) : (
-                                     <div className="mt-4">
-                                        {formData.status === 'HOLD' && (
-                                            <div className="flex items-center space-x-2">
-                                                <input type="text" placeholder="Your Name to Resume" className="flex-1 p-2 border rounded-md text-sm bg-white dark:bg-dark-background dark:border-dark-border dark:text-white" onChange={e => {
-                                                    const updatedStoppage = {...stoppage, signature: e.target.value};
-                                                    const newStoppages = [...(formData.payload.holding_or_stoppage || [])];
-                                                    newStoppages[index] = updatedStoppage;
-                                                    setFormData(prev => ({...prev, payload: {...prev.payload, holding_or_stoppage: newStoppages}}))
-                                                }} />
-                                                <Button size="sm" onClick={() => handleResumeWork(stoppage.signature || '')}>Resume Work</Button>
-                                            </div>
-                                        )}
-                                     </div>
                                 )}
                             </div>
                         ))}
+                        {(formData.payload.holding_or_stoppage?.length ?? 0) === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">No work stoppages have been logged.</p>}
                     </div>
-
-                    {isStoppageEditable && formData.status !== 'HOLD' && (
-                        <div className="mt-6 border-t pt-4 dark:border-dark-border">
-                            <h4 className="font-semibold mb-2 text-gray-800 dark:text-gray-200">Log a New Work Stoppage</h4>
-                             <div className="grid grid-cols-2 gap-4">
-                                <FormSelect label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} options={['Unsafe Condition', 'Unsafe Act', 'Emergency', 'Weather', 'Client Instruction', 'Other']} />
-                                <FormInput label="Stopped By" value={stoppageFormData.stopped_by} onChange={val => setStoppageFormData(p => ({...p, stopped_by: val}))} />
-                                <div className="col-span-2"><FormInput label="Informed To" value={stoppageFormData.informed_to} onChange={val => setStoppageFormData(p => ({...p, informed_to: val}))} /></div>
-                            </div>
-                            <Button className="mt-4" variant="danger" onClick={handleLogStoppage}>Log Stoppage & Suspend Permit</Button>
-                        </div>
-                    )}
                 </div>
             );
+
         case 'VIII':
             return (
-                <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Permit Extension</h3>
-                    {!formData.payload.extension?.is_requested && isExtensionEditable && (
+                <div className="space-y-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b pb-2 dark:border-dark-border">Section VIII – Extension</h3>
+                    {!formData.payload.extension?.is_requested ? (
                         <div className="text-center p-8 border-2 border-dashed rounded-lg dark:border-dark-border">
                             <p className="text-gray-600 dark:text-gray-400">No extension has been requested for this permit.</p>
-                            <Button className="mt-4" onClick={handleRequestExtension}>Request Extension</Button>
                         </div>
-                    )}
-                    {formData.payload.extension?.is_requested && (
+                    ) : (
                         <div className="space-y-6">
                             <FormInput label="Reason for Extension" value={formData.payload.extension.reason} onChange={val => handlePayloadChange('extension.reason', val)} disabled={!isExtensionEditable} />
                             <div className="grid grid-cols-2 gap-4">
@@ -586,82 +524,93 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                     )}
                 </div>
             );
+
         case 'IX':
             return (
-                 <div>
-                    <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Permit Closure</h3>
-                    <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6">
-                        <p className="text-sm italic text-gray-700 dark:text-gray-300">
-                            “We confirm the work is complete, the area is clean and safe, all isolations have been removed, and the permit is now closed.”
-                        </p>
+                <div className="space-y-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b pb-2 dark:border-dark-border">Section IX – Permit Closure</h3>
+                    <div className="p-4 bg-gray-50 dark:bg-white/5 rounded-lg text-sm italic text-gray-600 dark:text-gray-400 mb-4">
+                        "We confirm the work is complete, the area is clean and safe, all isolations have been removed, and the permit is now closed."
                     </div>
                     <FormInput label="Closure Note / Handover" value={formData.payload.closure?.note} onChange={val => handlePayloadChange('closure.note', val)} disabled={!isClosureEditable} />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                         <SignatureInput label="Requester Closure Sign" value={formData.payload.closure?.permit_requester.signature} onChange={val => handlePayloadChange('closure.permit_requester.signature', val)} disabled={!isClosureEditable} />
-                         <SignatureInput label="Proponent Closure Sign" value={formData.payload.closure?.client_proponent.signature} onChange={val => handlePayloadChange('closure.client_proponent.signature', val)} disabled={!isClosureEditable} />
-                         <SignatureInput label="HSE Closure Sign" value={formData.payload.closure?.client_hs.signature} onChange={val => handlePayloadChange('closure.client_hs.signature', val)} disabled={!isClosureEditable} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <SignatureInput label="Requester Closure Sign" value={formData.payload.closure?.permit_requester.signature} onChange={val => handlePayloadChange('closure.permit_requester.signature', val)} disabled={!isClosureEditable} />
+                        <SignatureInput label="Proponent Closure Sign" value={formData.payload.closure?.client_proponent.signature} onChange={val => handlePayloadChange('closure.client_proponent.signature', val)} disabled={!isClosureEditable} />
+                        <SignatureInput label="HSE Closure Sign" value={formData.payload.closure?.client_hs.signature} onChange={val => handlePayloadChange('closure.client_hs.signature', val)} disabled={!isClosureEditable} />
                     </div>
                 </div>
             );
+
         default:
-            return null;
+            return <div className="p-8 text-center text-gray-500">Select a section from the left menu.</div>;
     }
   };
 
-  if (!ptw) return null;
-
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 print:p-0" onClick={onClose}>
-        <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col print:h-auto print:max-w-none print:shadow-none" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-center p-4 print:hidden" onClick={onClose}>
+        <div className="bg-white dark:bg-dark-card rounded-2xl shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+          
           {/* Header */}
-          <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0 print:hidden">
+          <header className="p-5 border-b dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-card shrink-0">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {ptw.type} - {ptw.payload.permit_no || `Draft #${ptw.id.slice(-6)}`}
-                {ptw.payload.global_compliance?.standards && (
-                   <span className="text-xs font-normal bg-green-100 text-green-800 px-2 py-0.5 rounded border border-green-200">Global Standard</span>
-                )}
               </h2>
-              <div className="flex items-center space-x-2 mt-1">
-                <Badge color={
-                    ptw.status === 'ACTIVE' ? 'green' : 
-                    ptw.status === 'HOLD' ? 'red' :
-                    ptw.status.includes('SUBMITTED') || ptw.status === 'APPROVAL' ? 'yellow' : 
-                    'gray'
-                }>
-                    {ptw.status.replace(/_/g, ' ')}
-                </Badge>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge color={ptw.status === 'ACTIVE' ? 'green' : 'gray'}>{ptw.status.replace(/_/g, ' ')}</Badge>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <ActionsBar 
-                onPrint={() => window.print()} 
-                onEmail={() => setIsEmailModalOpen(true)} 
-                downloadOptions={[
-                    { label: 'Download PDF', handler: () => generatePdf('ptw-printable-area', `PTW-${ptw.payload.permit_no || ptw.id}`) }
-                ]} 
-              />
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                <CloseIcon className="w-6 h-6" />
+            <div className="flex items-center gap-3">
+              <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} />
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full">
+                <CloseIcon className="w-6 h-6 text-gray-500" />
               </button>
             </div>
           </header>
 
-          <div className="flex-grow flex overflow-hidden">
+          {/* Workflow Bar */}
+          <div className="bg-slate-50 dark:bg-black/20 border-b dark:border-dark-border p-4 overflow-x-auto shrink-0">
+            <div className="flex items-center min-w-max px-4">
+              {WORKFLOW_STEPS.map((step, index) => {
+                const isCurrent = ptw.status === step.id;
+                const isCompleted = WORKFLOW_STEPS.findIndex(s => s.id === ptw.status) > index;
+                return (
+                  <div key={step.id} className="flex items-center">
+                    <div className={`flex flex-col items-center w-24 ${isCurrent ? 'scale-110' : 'opacity-70'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 transition-all ${
+                        isCurrent ? 'bg-blue-600 text-white ring-4 ring-blue-100 dark:ring-blue-900' : 
+                        isCompleted ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-700 text-gray-500'
+                      }`}>
+                        <step.icon className="w-4 h-4" />
+                      </div>
+                      <span className={`text-[10px] font-bold ${isCurrent ? 'text-blue-700 dark:text-blue-400' : 'text-gray-500'}`}>
+                        {step.label}
+                      </span>
+                    </div>
+                    {index < WORKFLOW_STEPS.length - 1 && (
+                      <div className={`h-0.5 w-12 mx-2 ${isCompleted ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Main Body */}
+          <div className="flex flex-1 overflow-hidden">
             {/* Sidebar Navigation */}
-            <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0 print:hidden">
-              <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">Sections</h3>
+            <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 shrink-0">
+              <h3 className="text-xs font-bold uppercase text-gray-500 mb-3 px-2">Sections</h3>
               <ul className="space-y-1">
                 {sections.map(section => (
                   <li key={section.key}>
                     <button
-                      type="button" 
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setActiveSection(section.key); }}
-                      className={`w-full text-left p-2 rounded-md text-sm font-medium transition-colors ${
+                      onClick={() => setActiveSection(section.key)}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         activeSection === section.key 
-                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' 
-                          : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300'
+                          ? 'bg-white dark:bg-white/10 text-primary-700 dark:text-primary-400 shadow-sm border border-gray-200 dark:border-transparent' 
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
                       }`}
                     >
                       {section.key}. {section.title}
@@ -671,44 +620,63 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
               </ul>
             </nav>
 
-            {/* Main Content Area */}
-            <main className="flex-1 p-6 overflow-y-auto print:p-0 print:overflow-visible">
+            {/* Content Area */}
+            <main className="flex-1 p-8 overflow-y-auto bg-white dark:bg-dark-card">
               {renderSectionContent()}
             </main>
-          </div>
 
-          {/* Footer Actions */}
-          <footer className="p-4 border-t bg-gray-100 dark:bg-black/20 dark:border-dark-border flex justify-end items-center flex-shrink-0 print:hidden">
-            <WorkflowActions onAction={handleWorkflowAction} onSave={() => onUpdate(formData, 'save')} ptw={formData} />
-          </footer>
+            {/* Right Action Panel */}
+            <aside className="w-80 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-6 overflow-y-auto shrink-0">
+                <div className="mb-6">
+                    <h3 className="font-bold text-gray-900 dark:text-white mb-2">Action Required</h3>
+                    <div className="text-sm text-gray-500 mb-4">Current Stage: {ptw.status.replace(/_/g, ' ')}</div>
+                    
+                    {hasPermission.allowed ? (
+                        <div className="space-y-3">
+                            <textarea 
+                                className="w-full p-2 text-sm border rounded-md dark:bg-dark-card dark:border-dark-border" 
+                                rows={3} 
+                                placeholder="Add comments..."
+                                value={comment}
+                                onChange={e => setComment(e.target.value)}
+                            />
+                            <div className="flex flex-col gap-2">
+                                <WorkflowActions onAction={(action) => handleTransition(action, 'Updated')} onSave={() => onUpdate(formData)} ptw={formData} />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-sm rounded-md border border-yellow-200 dark:border-yellow-800">
+                            Waiting for action by <strong>{WORKFLOW_STEPS.find(s => s.id === ptw.status)?.role}</strong>
+                        </div>
+                    )}
+                </div>
+                
+                <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white mb-3">History</h3>
+                    <div className="space-y-4 border-l-2 border-gray-200 dark:border-gray-700 ml-2 pl-4">
+                        {ptw.workflow_log?.slice().reverse().map((log, i) => (
+                            <div key={i} className="relative">
+                                <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-gray-400 dark:bg-gray-600 ring-4 ring-white dark:ring-dark-background"></div>
+                                <p className="text-xs font-semibold text-gray-900 dark:text-white">{log.action}</p>
+                                <p className="text-[10px] text-gray-500">{getName(log.user_id)} • {new Date(log.timestamp).toLocaleTimeString()}</p>
+                                {log.comments && <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 italic">"{log.comments}"</p>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </aside>
+          </div>
         </div>
       </div>
-
       <EmailModal 
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
-        documentTitle={`PTW: ${ptw.payload.permit_no || ptw.id}`}
-        defaultRecipients={[
-            ptw.payload.requester,
-            ...(ptw.payload.signoffs?.other_stakeholders || []),
-        ].filter(Boolean) as any}
+        documentTitle={`PTW: ${ptw.payload.permit_no}`}
+        defaultRecipients={[]}
         documentLink="#"
       />
-
-      <style>{`
-          @media print {
-              body * { visibility: hidden; }
-              #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
-              #ptw-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
-              @page { size: A4; margin: 1cm; }
-          }
-      `}</style>
     </>
   );
 };
 
-const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-);
+const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;

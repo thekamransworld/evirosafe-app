@@ -1,8 +1,6 @@
-
-import React, { useState, useRef, useEffect, Fragment } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { TbtSession, TbtAttendee, User } from '../types';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { ActionsBar } from './ui/ActionsBar';
 import { EmailModal } from './ui/EmailModal';
 
@@ -15,8 +13,8 @@ interface TbtSessionModalProps {
 
 const DetailItem: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
     <div className="py-2">
-        <p className="text-sm font-medium text-gray-500">{label}</p>
-        <div className="text-base text-gray-900 mt-1">{children}</div>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+        <div className="text-base text-gray-900 dark:text-white mt-1">{children}</div>
     </div>
 );
 
@@ -91,7 +89,7 @@ const SignaturePad: React.FC<{ onSave: (dataUrl: string) => void }> = ({ onSave 
     );
 };
 
-export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClose, onUpdate, users }) => {
+export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClose, onUpdate, users = [] }) => {
     const [editedSession, setEditedSession] = useState(session);
     const [newAttendee, setNewAttendee] = useState({ name: '', company: '', role: '' });
     const [isSigning, setIsSigning] = useState(false);
@@ -116,11 +114,12 @@ export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClo
 
     const handlePrint = () => window.print();
 
-    const conductedByUser = users.find(u => u.name === editedSession.conducted_by.name);
+    // Safety check: ensure users is an array before finding
+    const conductedByUser = (users || []).find(u => u.name === editedSession.conducted_by.name);
 
     return (
         <>
-        <div id="printable-tbt" className="hidden print:block p-8">
+        <div id="printable-tbt" className="hidden print:block p-8 bg-white text-black">
             <h1 className="text-2xl font-bold">{editedSession.title}</h1>
             <p><strong>Date:</strong> {editedSession.date} at {editedSession.time}</p>
             <p><strong>Location:</strong> {editedSession.location}</p>
@@ -134,7 +133,7 @@ export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClo
                 </tr></thead>
                 <tbody>
                     {editedSession.attendees.map((att, i) => (
-                        <tr key={i}><td className="border p-2">{att.name}</td><td className="border p-2">{att.company}</td><td className="border p-2"><img src={att.signature} className="h-8"/></td></tr>
+                        <tr key={i}><td className="border p-2">{att.name}</td><td className="border p-2">{att.company}</td><td className="border p-2"><img src={att.signature} className="h-8" alt="sig"/></td></tr>
                     ))}
                 </tbody>
             </table>
@@ -148,49 +147,49 @@ export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClo
         }
       `}</style>
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center p-4 print:hidden" onClick={onClose}>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <header className="p-4 border-b flex justify-between items-center">
+            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <header className="p-4 border-b dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-card sticky top-0 z-10">
                     <div>
-                        <h2 className="text-xl font-bold">{session.title}</h2>
-                        <p className="text-sm text-gray-500">Toolbox Talk Record</p>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{session.title}</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Toolbox Talk Record</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <ActionsBar onPrint={handlePrint} onDownloadPdf={handlePrint} onEmail={() => setIsEmailModalOpen(true)} />
-                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon/></button>
+                        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6"/></button>
                     </div>
                 </header>
                 <div className="flex-grow flex overflow-hidden">
-                    <main className="flex-1 p-6 overflow-y-auto space-y-6">
+                    <main className="flex-1 p-6 overflow-y-auto space-y-6 bg-white dark:bg-dark-card">
                         <DetailItem label="Summary">{editedSession.summary}</DetailItem>
-                        <DetailItem label="Hazards Discussed"><ul className="list-disc list-inside">{editedSession.hazards_discussed.map((h,i) => <li key={i}>{h}</li>)}</ul></DetailItem>
-                        <DetailItem label="Controls Discussed"><ul className="list-disc list-inside">{editedSession.controls_discussed.map((c,i) => <li key={i}>{c}</li>)}</ul></DetailItem>
-                        {editedSession.discussion_points && <DetailItem label="Discussion Points"><ul className="list-disc list-inside">{editedSession.discussion_points.map((q,i) => <li key={i}>{q}</li>)}</ul></DetailItem>}
+                        <DetailItem label="Hazards Discussed"><ul className="list-disc list-inside text-gray-700 dark:text-gray-300">{editedSession.hazards_discussed.map((h,i) => <li key={i}>{h}</li>)}</ul></DetailItem>
+                        <DetailItem label="Controls Discussed"><ul className="list-disc list-inside text-gray-700 dark:text-gray-300">{editedSession.controls_discussed.map((c,i) => <li key={i}>{c}</li>)}</ul></DetailItem>
+                        {editedSession.discussion_points && <DetailItem label="Discussion Points"><ul className="list-disc list-inside text-gray-700 dark:text-gray-300">{editedSession.discussion_points.map((q,i) => <li key={i}>{q}</li>)}</ul></DetailItem>}
                     </main>
-                    <aside className="w-96 bg-gray-50 border-l p-4 overflow-y-auto">
-                        <h3 className="font-bold text-lg mb-4">Attendance</h3>
+                    <aside className="w-96 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-4 overflow-y-auto">
+                        <h3 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">Attendance</h3>
                         <div className="space-y-2">
                            {editedSession.attendees.map((att, index) => (
-                               <div key={index} className="p-2 border rounded-md bg-white flex items-center">
+                               <div key={index} className="p-2 border dark:border-dark-border rounded-md bg-white dark:bg-dark-card flex items-center">
                                    <div className="flex-grow">
-                                       <p className="font-semibold text-sm">{att.name}</p>
-                                       <p className="text-xs text-gray-500">{att.company}</p>
+                                       <p className="font-semibold text-sm text-gray-900 dark:text-white">{att.name}</p>
+                                       <p className="text-xs text-gray-500 dark:text-gray-400">{att.company}</p>
                                    </div>
-                                   <img src={att.signature} alt="signature" className="h-8 w-20 object-contain"/>
+                                   <img src={att.signature} alt="signature" className="h-8 w-20 object-contain bg-white rounded"/>
                                </div>
                            ))}
                         </div>
                          {!isViewMode && (
-                            <div className="mt-4 border-t pt-4">
+                            <div className="mt-4 border-t dark:border-dark-border pt-4">
                                 {isSigning ? (
                                     <div className="space-y-2">
-                                        <h4 className="font-semibold">Sign In</h4>
+                                        <h4 className="font-semibold text-gray-900 dark:text-white">Sign In</h4>
                                         <SignaturePad onSave={handleAddAttendee}/>
                                     </div>
                                 ) : (
                                     <div className="space-y-3">
-                                        <h4 className="font-semibold">Add Attendee</h4>
-                                        <input value={newAttendee.name} onChange={e => setNewAttendee(p => ({...p, name: e.target.value}))} placeholder="Name" className="w-full p-2 border rounded-md text-sm"/>
-                                        <input value={newAttendee.company} onChange={e => setNewAttendee(p => ({...p, company: e.target.value}))} placeholder="Company" className="w-full p-2 border rounded-md text-sm"/>
+                                        <h4 className="font-semibold text-gray-900 dark:text-white">Add Attendee</h4>
+                                        <input value={newAttendee.name} onChange={e => setNewAttendee(p => ({...p, name: e.target.value}))} placeholder="Name" className="w-full p-2 border dark:border-dark-border rounded-md text-sm bg-white dark:bg-dark-card text-gray-900 dark:text-white"/>
+                                        <input value={newAttendee.company} onChange={e => setNewAttendee(p => ({...p, company: e.target.value}))} placeholder="Company" className="w-full p-2 border dark:border-dark-border rounded-md text-sm bg-white dark:bg-dark-card text-gray-900 dark:text-white"/>
                                         <Button onClick={() => setIsSigning(true)} disabled={!newAttendee.name || !newAttendee.company} className="w-full">Proceed to Sign</Button>
                                     </div>
                                 )}
@@ -199,7 +198,7 @@ export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClo
                     </aside>
                 </div>
                  {!isViewMode && (
-                     <footer className="p-4 border-t bg-gray-100 flex justify-end">
+                     <footer className="p-4 border-t bg-gray-100 dark:bg-dark-background dark:border-dark-border flex justify-end sticky bottom-0 z-10">
                         <Button onClick={handleFinalize}>Finalize & Deliver Session</Button>
                     </footer>
                  )}
@@ -216,4 +215,4 @@ export const TbtSessionModal: React.FC<TbtSessionModalProps> = ({ session, onClo
     );
 };
 
-const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;

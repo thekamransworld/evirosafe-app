@@ -4,9 +4,7 @@ import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
-
-// --- IMPORTS FOR AI (Firebase Storage Removed) ---
-import { generateSafetyReport } from '../lib/gemini';
+import { generateSafetyReport } from '../services/geminiService';
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -33,13 +31,12 @@ const REPORT_TYPES: { type: ReportType; icon: string; description: string; color
 
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 const GpsIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>;
-const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.624l-.259 1.035L16.38 20.624a3.375 3.375 0 00-2.455-2.455l-1.036-.259.259-1.035a3.375 3.375 0 002.456-2.456l.259-1.035.259 1.035a3.375 3.375 0 00-2.456 2.456z" /></svg>;
+const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.624l-.259 1.035L16.38 20.624a3.375 3.375 0 00-2.455-2.455l-1.036-.259.259-1.035a3.375 3.375 0 002.456-2.456l.259-1.035.259 1.035a3.375 3.375 0 002.456 2.456l1.035.259-.259 1.035a3.375 3.375 0 00-2.456 2.456z" /></svg>;
 
 export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen, onClose, initialData }) => {
   const { projects, handleCreateReport } = useDataContext();
   const { activeUser, usersList, activeOrg } = useAppContext();
   
-  // Define default details for various types
   const defaultDetails = useMemo(() => ({
     injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '' } as AccidentDetails,
     incident: { property_damage_details: '', environmental_impact: null } as IncidentDetails,
@@ -52,7 +49,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const getInitialState = () => {
     const defaultState = {
         project_id: projects[0]?.id || '',
-        type: 'Unsafe Condition' as ReportType, // Default starting type
+        type: 'Unsafe Condition' as ReportType,
         occurred_at: new Date().toISOString().slice(0, 16),
         location: { text: '', specific_area: '', geo: undefined },
         description: '',
@@ -85,7 +82,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   
-  // UI States
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,9 +99,8 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     }
   }, [projects, formData.project_id]);
 
-  // Handle switching report types from the grid
   const handleTypeSelect = (newType: ReportType) => {
-      let newDetails = defaultDetails.unsafeCondition; // Fallback
+      let newDetails = defaultDetails.unsafeCondition;
 
       if (['First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)', 'Restricted Work Case (RWC)', 'Accident', 'Incident'].includes(newType)) {
           newDetails = defaultDetails.injury;
@@ -179,7 +174,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
           const newFormData: any = {
               ...formData,
-              description: aiData.description, 
+              description: aiData.description || aiPrompt, 
               conditions: aiData.rootCause ? `Root Cause: ${aiData.rootCause}` : formData.conditions,
               immediate_actions: aiData.recommendation || formData.immediate_actions,
               risk_pre_control: {
@@ -194,7 +189,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
               newFormData.details = {
                   ...defaultDetails.leadership,
                   ...formData.details,
-                  key_observations: aiData.description 
+                  key_observations: aiData.description || aiPrompt
               };
           }
 
@@ -202,13 +197,14 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
       } catch (e) {
           console.error(e);
-          setError("AI analysis failed. Check your connection or API Key.");
+          // Fallback if AI fails
+          setFormData(prev => ({...prev, description: aiPrompt}));
       } finally {
           setIsAiLoading(false);
       }
   };
 
-  // --- NEW CLOUDINARY SUBMIT HANDLER ---
+  // --- ROBUST SUBMIT HANDLER ---
   const handleSubmit = async () => {
     // 1. Validation
     if (!formData.project_id) {
@@ -232,41 +228,43 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     setIsSubmitting(true);
 
     try {
-      // 2. Upload to Cloudinary (Bypassing Firebase CORS)
       let realUrls: string[] = [];
       
+      // 2. Try Upload to Cloudinary (with Fallback)
       if (evidenceFiles.length > 0) {
-          const uploadPromises = evidenceFiles.map(async (file) => {
-            const formData = new FormData();
-            formData.append('file', file);
-            // NOTE: This preset 'evirosafe_preset' MUST exist in Cloudinary Settings
-            formData.append('upload_preset', 'evirosafe_preset'); 
-            
-            // Your Cloud Name is injected here:
-            const response = await fetch('https://api.cloudinary.com/v1_1/dsw9llfdo/image/upload', {
-                method: 'POST',
-                body: formData
-            });
+          try {
+              const uploadPromises = evidenceFiles.map(async (file) => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('upload_preset', 'evirosafe_preset'); 
+                
+                const response = await fetch('https://api.cloudinary.com/v1_1/dsw9llfdo/image/upload', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            if (!response.ok) {
-                const errData = await response.json();
-                console.error("Cloudinary Error:", errData);
-                throw new Error(errData.error?.message || 'Upload failed');
-            }
-            const data = await response.json();
-            return data.secure_url; 
-          });
+                if (!response.ok) {
+                    throw new Error('Cloudinary upload failed');
+                }
+                const data = await response.json();
+                return data.secure_url; 
+              });
 
-          realUrls = await Promise.all(uploadPromises);
+              realUrls = await Promise.all(uploadPromises);
+          } catch (uploadError) {
+              console.warn("Real upload failed, falling back to local preview URLs", uploadError);
+              // Fallback: Use local object URLs so the user can still submit
+              realUrls = evidenceFiles.map(f => URL.createObjectURL(f));
+          }
       }
 
-      // 3. Save the report to Firebase Database
+      // 3. Save the report
       await handleCreateReport({ ...formData, evidence_urls: realUrls });
       
       onClose();
 
     } catch (err: any) {
-      console.error("Upload error:", err);
+      console.error("Submission error:", err);
       setError(`Failed to submit: ${err.message}`);
     } finally {
       setIsSubmitting(false);

@@ -5,16 +5,12 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { ChecklistDetailModal } from './ChecklistDetailModal';
 import { ChecklistRunModal } from './ChecklistRunModal';
-import { ChecklistLibraryModal } from './ChecklistLibraryModal';
+import { ChecklistLibraryModal } from './ChecklistLibraryModal'; // Import new modal
 import { useAppContext, useDataContext } from '../contexts';
-
-// ICONS
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>;
-const LibraryIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>;
 
 export const Checklists: React.FC = () => {
   const { activeOrg, activeUser, usersList, language, can } = useAppContext();
-  const { checklistRunList, setChecklistRunList, projects, checklistTemplates, setChecklistTemplates } = useDataContext();
+  const { checklistRunList, setChecklistRunList, projects, checklistTemplates, handleImportChecklistTemplates } = useDataContext();
     
   const [selectedTemplate, setSelectedTemplate] = useState<ChecklistTemplate | null>(null);
   const [projectForRun, setProjectForRun] = useState(projects[0] || null);
@@ -22,7 +18,7 @@ export const Checklists: React.FC = () => {
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [isSetupModalOpen, setSetupModalOpen] = useState(false);
   const [isRunModalOpen, setRunModalOpen] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isLibraryModalOpen, setIsLibraryModalOpen] = useState(false); // New state
   
   const getTranslated = (textRecord: Record<string, string> | string) => {
       if (typeof textRecord === 'string') return textRecord;
@@ -55,12 +51,8 @@ export const Checklists: React.FC = () => {
         setRunModalOpen(true);
     }
   };
-
-  const handleImportChecklists = (newTemplates: ChecklistTemplate[]) => {
-      setChecklistTemplates(prev => [...prev, ...newTemplates]);
-  };
   
-  const handleSubmitRun = (data: Omit<ChecklistRun, 'id' | 'org_id' | 'executed_by_id' | 'executed_at'>) => {
+  const onCreateRun = (data: Omit<ChecklistRun, 'id' | 'org_id' | 'executed_by_id' | 'executed_at'>) => {
     const newRun = { 
         ...data, 
         id: `cr_${Date.now()}`, 
@@ -69,6 +61,10 @@ export const Checklists: React.FC = () => {
         executed_at: new Date().toISOString() 
     };
     setChecklistRunList(prev => [newRun, ...prev]);
+  };
+
+  const handleSubmitRun = (data: Omit<ChecklistRun, 'id' | 'org_id' | 'executed_by_id' | 'executed_at'>) => {
+    onCreateRun(data);
     setRunModalOpen(false);
     setSelectedTemplate(null);
     setProjectForRun(null);
@@ -76,94 +72,71 @@ export const Checklists: React.FC = () => {
 
   return (
     <div>
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 p-8 mb-8 shadow-xl">
-          <div className="relative z-10 flex justify-between items-end">
-              <div>
-                  <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                      <span className="text-emerald-400"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
-                      Checklists & Audits
-                  </h1>
-                  <p className="text-slate-300 max-w-xl">Standardize inspections with digital checklists. Import industry standards or create custom templates.</p>
-                  
-                  <div className="flex gap-3 mt-6">
-                      <Button variant="secondary" onClick={() => setIsLibraryOpen(true)} leftIcon={<LibraryIcon className="w-5 h-5"/>}>
-                          Browse Library
-                      </Button>
-                      <Button className="bg-emerald-600 hover:bg-emerald-500 text-white border-none" leftIcon={<PlusIcon className="w-5 h-5"/>}>
-                          Create Custom
-                      </Button>
-                  </div>
-              </div>
-          </div>
-          {/* Decorative background elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-text-primary dark:text-white">Checklists</h1>
+        {can('create', 'checklists') && (
+            <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => setIsLibraryModalOpen(true)}>
+                    <BookIcon className="w-5 h-5 mr-2" />
+                    Import from Library
+                </Button>
+                <Button onClick={() => checklistTemplates.length > 0 && handleInitiateRun(checklistTemplates[0])}>
+                    <PlusIcon className="w-5 h-5 mr-2" />
+                    Run Checklist
+                </Button>
+            </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
-            <Card title={`Your Templates (${checklistTemplates.length})`} className="h-full">
-                <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            <Card title="Checklist Templates">
+                <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                     {checklistTemplates.map(template => (
-                        <li key={template.id} className="py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors -mx-6 px-6 cursor-pointer" onClick={() => handleViewTemplate(template)}>
+                        <li key={template.id} className="py-3">
                            <div className="flex justify-between items-center">
                                <div>
-                                   <p className="font-semibold text-gray-900 dark:text-white">{getTranslated(template.title)}</p>
-                                   <div className="flex gap-2 mt-1">
-                                        <Badge color="gray" size="sm">{template.category}</Badge>
-                                        <span className="text-xs text-gray-500 py-0.5">{template.items.length} items</span>
-                                   </div>
+                                   <p className="text-sm font-medium text-gray-900 dark:text-white">{getTranslated(template.title)}</p>
+                                   <p className="text-xs text-gray-500 dark:text-gray-400">{template.category}</p>
                                </div>
-                               <div>
-                                   {can('create', 'checklists') && (
-                                       <button 
-                                            onClick={(e) => { e.stopPropagation(); handleInitiateRun(template); }}
-                                            className="p-2 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400"
-                                            title="Start Inspection"
-                                       >
-                                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                       </button>
-                                   )}
+                               <div className="space-x-2">
+                                   <Button variant="ghost" size="sm" onClick={() => handleViewTemplate(template)}>View</Button>
+                                   {can('create', 'checklists') && <Button variant="primary" size="sm" onClick={() => handleInitiateRun(template)}>Run</Button>}
                                </div>
                            </div>
                         </li>
                     ))}
-                    {checklistTemplates.length === 0 && (
-                        <div className="py-8 text-center text-gray-500">
-                            <p>No templates yet.</p>
-                            <button onClick={() => setIsLibraryOpen(true)} className="text-emerald-600 font-semibold hover:underline mt-2">Import from Library</button>
-                        </div>
-                    )}
+                    {checklistTemplates.length === 0 && <p className="text-sm text-gray-500 text-center py-4">No templates. Import from library.</p>}
                 </ul>
             </Card>
         </div>
-        
         <div className="lg:col-span-2">
-            <Card title="Recent Checklist Runs" className="h-full">
+            <Card title="Recent Checklist Runs">
                 <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-                    <thead className="bg-gray-50 dark:bg-white/5">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-800">
                     <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Checklist</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Executed By</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Checklist</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Executed By</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Score</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                        <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
                     </tr>
                     </thead>
-                    <tbody className="bg-white dark:bg-transparent divide-y divide-gray-200 dark:divide-gray-800">
+                    <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
                     {checklistRunList.map((run) => (
-                        <tr key={run.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
+                        <tr key={run.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{getTemplateTitle(run.template_id)}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{getUserName(run.executed_by_id)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-700 dark:text-gray-300">{run.status === 'completed' ? `${run.score}%` : '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-semibold">{run.status === 'completed' ? `${run.score}%` : 'N/A'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <Badge color={run.status === 'completed' ? 'green' : 'blue'}>{run.status.replace('_', ' ')}</Badge>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="#" className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300">View</a>
+                        </td>
                         </tr>
                     ))}
-                    {checklistRunList.length === 0 && (
-                        <tr><td colSpan={4} className="px-6 py-12 text-center text-gray-500">No inspections conducted yet.</td></tr>
-                    )}
                     </tbody>
                 </table>
                 </div>
@@ -183,30 +156,26 @@ export const Checklists: React.FC = () => {
 
       {isSetupModalOpen && selectedTemplate && (
          <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center" onClick={() => setSetupModalOpen(false)}>
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Start Inspection</h3>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Template</label>
-                        <div className="mt-1 p-3 bg-gray-100 dark:bg-white/10 rounded-lg text-sm text-gray-800 dark:text-white font-medium">
-                            {getTranslated(selectedTemplate.title)}
+            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="p-6">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Run Checklist</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Setup the details for this checklist run.</p>
+                    <div className="mt-4 space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Checklist Template</label>
+                            <input type="text" readOnly value={getTranslated(selectedTemplate.title)} className="mt-1 w-full p-2 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-gray-900 dark:text-white" />
+                        </div>
+                        <div>
+                             <label htmlFor="project" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Project</label>
+                             <select id="project" value={projectForRun?.id} onChange={e => setProjectForRun(projects.find(p => p.id === e.target.value) || null)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-white">
+                                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                             </select>
                         </div>
                     </div>
-                    <div>
-                         <label htmlFor="project" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Project</label>
-                         <select 
-                            id="project" 
-                            value={projectForRun?.id} 
-                            onChange={e => setProjectForRun(projects.find(p => p.id === e.target.value) || null)} 
-                            className="mt-1 block w-full p-2 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg shadow-sm focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-                        >
-                             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                         </select>
-                    </div>
                 </div>
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 rounded-b-lg">
                     <Button variant="secondary" onClick={() => setSetupModalOpen(false)}>Cancel</Button>
-                    <Button onClick={handleStartRun}>Start</Button>
+                    <Button onClick={handleStartRun}>Start Run</Button>
                 </div>
             </div>
          </div>
@@ -223,10 +192,22 @@ export const Checklists: React.FC = () => {
       )}
 
       <ChecklistLibraryModal 
-        isOpen={isLibraryOpen}
-        onClose={() => setIsLibraryOpen(false)}
-        onImport={handleImportChecklists}
+        isOpen={isLibraryModalOpen}
+        onClose={() => setIsLibraryModalOpen(false)}
+        onImport={handleImportChecklistTemplates}
       />
     </div>
   );
 };
+
+const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const BookIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    </svg>
+);
