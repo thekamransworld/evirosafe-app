@@ -1,154 +1,248 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Access API Key from environment variables
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// Initialize API
-const genAI = new GoogleGenerativeAI(API_KEY);
+// --- MOCK DATA GENERATORS (Used when no API Key is present) ---
+const getMockSafetyReport = (prompt: string) => {
+  return `## 🤖 AI Safety Assessment (Simulation)
+  
+**Subject:** ${prompt}
 
-// --- MOCK DATA GENERATORS (Fallback) ---
+**Analysis:**
+Based on the description provided, this situation presents a **Moderate Risk**. The primary concerns are potential personnel injury and lack of procedural compliance.
+
+**Recommended Actions:**
+1. **Immediate:** Stop work and secure the area.
+2. **Short-term:** Conduct a toolbox talk regarding "${prompt}".
+3. **Long-term:** Review the RAMS for this specific activity.
+
+*Note: This is a simulated response because no API Key was provided.*`;
+};
+
 const getMockRiskForecast = () => ({
-    risk_level: 'Medium',
-    summary: 'Moderate risk detected due to high temperatures and ongoing lifting operations (Mock Data).',
-    recommendations: ['Enforce hydration breaks', 'Check lifting gear certification', 'Monitor wind speeds']
+  risk_level: "Medium",
+  summary: "Simulated Analysis: Weather conditions (38°C) and high activity levels suggest elevated fatigue risks.",
+  recommendations: [
+    "Increase hydration breaks to every 45 minutes.",
+    "Ensure shade is available for all static posts.",
+    "Verify all lifting equipment certifications before use."
+  ]
 });
 
-const getMockSafetyReport = (prompt: string) => `## AI Safety Assessment (Mock)\n\n**Subject:** ${prompt}\n\n**Analysis:**\nBased on standard safety protocols, the situation described involves potential hazards related to site operations.\n\n**Recommendations:**\n1. Isolate the area.\n2. Verify permits.\n3. Conduct a TBT.`;
-
-const getMockRams = (prompt: string) => ({
-    overview: `Method Statement for: ${prompt}\n\n1. Ensure work area is barricaded.\n2. Verify all permits are active.\n3. Conduct TBT before start.`,
-    competence: "All personnel must hold valid cards and specific training for this task.",
-    sequence_of_operations: [
-        {
-            step_no: 1,
-            description: "Site Preparation",
-            hazards: [{ id: "h1", description: "Slips, Trips, Falls" }],
-            controls: [{ id: "c1", description: "Good housekeeping", hierarchy: "administrative" }],
-            risk_before: { severity: 3, likelihood: 3 },
-            risk_after: { severity: 3, likelihood: 1 }
-        }
-    ],
-    emergency_arrangements: "In case of emergency, stop work immediately and proceed to assembly point A."
+const getMockRams = (activity: string) => ({
+  overview: `Method Statement for: ${activity}\n\n1. Barricade the work area.\n2. Verify permits.\n3. Don appropriate PPE.`,
+  competence: "All personnel must be certified and inducted.",
+  sequence_of_operations: [
+    {
+      step_no: 1,
+      description: "Site Preparation and barricading",
+      hazards: [{ id: "h1", description: "Unauthorized entry" }],
+      controls: [{ id: "c1", description: "Install hard barricades and signage", hierarchy: "engineering" }],
+      risk_before: { severity: 3, likelihood: 3 },
+      risk_after: { severity: 3, likelihood: 1 }
+    },
+    {
+      step_no: 2,
+      description: "Execution of ${activity}",
+      hazards: [{ id: "h2", description: "Manual handling injury" }],
+      controls: [{ id: "c2", description: "Use mechanical aids where possible", hierarchy: "engineering" }],
+      risk_before: { severity: 4, likelihood: 3 },
+      risk_after: { severity: 2, likelihood: 2 }
+    }
+  ],
+  emergency_arrangements: "Contact Site Security on Channel 1. Muster at Point B."
 });
 
 const getMockTbt = (title: string) => ({
-    summary: `Today we are discussing ${title}. Key safety points include hazard identification and control measures.`,
-    hazards: ["Unexpected movement", "Falling objects", "Pinch points"],
-    controls: ["Stay within walkways", "Wear helmet and gloves", "Maintain eye contact"],
-    questions: ["What is the main hazard?", "Who is the supervisor?"]
+  summary: `Today's talk focuses on ${title}. Ensure all workers understand the specific risks involved.`,
+  hazards: ["Slips, trips, and falls", "Moving machinery", "Heat stress"],
+  controls: ["Keep walkways clear", "Wear high-visibility vests", "Drink water frequently"],
+  questions: ["What do you do if you see a hazard?", "Where is the nearest fire extinguisher?"]
 });
 
 const getMockCourse = (title: string) => ({
-    syllabus: `# Course: ${title}\n\n## Module 1: Introduction\n- Overview\n- Regulations\n\n## Module 2: Safety\n- Risk Controls\n- PPE`,
-    learning_objectives: ["Understand risks", "Apply controls", "Emergency response"]
+  syllabus: `# Course: ${title}\n\n## Module 1: Basics\n- Introduction to ${title}\n- Safety Standards\n\n## Module 2: Hazards\n- Identification\n- Mitigation\n\n## Module 3: Assessment\n- Practical Exam`,
+  learning_objectives: ["Identify key hazards", "Apply control measures", "Understand legal duties"]
 });
 
-// --- API FUNCTIONS ---
-
-export const generateAiRiskForecast = async () => {
-    if (!API_KEY) return getMockRiskForecast();
-    
-    try {
-        // Use 'gemini-pro' as it is generally available
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" }); 
-        const prompt = "Analyze construction site risks for today: 38C temperature, 62 workers, lifting operations. Return JSON with risk_level (Low/Medium/High), summary, and recommendations array.";
-        
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        
-        // Attempt to parse JSON from AI response
-        try {
-            // Clean up markdown code blocks if present
-            const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
-            return JSON.parse(jsonStr);
-        } catch (e) {
-            console.warn("AI JSON parse failed, using mock", e);
-            return getMockRiskForecast();
-        }
-    } catch (error) {
-        console.error("AI Service Error (Risk Forecast):", error);
-        return getMockRiskForecast();
-    }
-};
+// --- REAL API CALLS ---
 
 export const generateSafetyReport = async (prompt: string) => {
-    if (!API_KEY) return getMockSafetyReport(prompt);
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(`Generate a safety report for: ${prompt}`);
-        return result.response.text();
-    } catch (error) {
-        console.error("AI Service Error (Safety Report):", error);
-        return getMockSafetyReport(prompt);
-    }
+  if (!API_KEY) {
+    console.warn("No API Key found. Using Mock Data.");
+    await new Promise(r => setTimeout(r, 1500)); // Fake delay
+    return getMockSafetyReport(prompt);
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    // UPDATED MODEL HERE
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`
+      Act as a HSE Expert. Write a brief safety assessment report for: "${prompt}".
+      Include Analysis and 3 bullet points for Recommendations. Use Markdown formatting.
+    `);
+    return result.response.text();
+  } catch (error) {
+    console.error("AI Error:", error);
+    return getMockSafetyReport(prompt); // Fallback to mock on error
+  }
 };
 
-export const generateRamsContent = async (prompt: string) => {
-    if (!API_KEY) return getMockRams(prompt);
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(`Generate RAMS content JSON for: ${prompt}. Fields: overview, competence, sequence_of_operations (array of steps with hazards/controls), emergency_arrangements.`);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(text);
-    } catch (error) {
-        console.error("AI Service Error (RAMS):", error);
-        return getMockRams(prompt);
-    }
+export const generateAiRiskForecast = async () => {
+  if (!API_KEY) {
+    return getMockRiskForecast();
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    // UPDATED MODEL HERE
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`
+      Analyze construction site risk for today. 
+      Return ONLY valid JSON with this structure: 
+      { "risk_level": "Low"|"Medium"|"High", "summary": "string", "recommendations": ["string"] }
+    `);
+    const text = result.response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("AI Error:", error);
+    return getMockRiskForecast();
+  }
+};
+
+export const generateRamsContent = async (activity: string) => {
+  if (!API_KEY) {
+    await new Promise(r => setTimeout(r, 2000));
+    return getMockRams(activity);
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    // UPDATED MODEL HERE
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `
+      Create a RAMS (Risk Assessment Method Statement) for: "${activity}".
+      Return ONLY valid JSON with this structure:
+      {
+        "overview": "string",
+        "competence": "string",
+        "sequence_of_operations": [
+          { 
+            "step_no": 1, 
+            "description": "string", 
+            "hazards": [{"id": "h1", "description": "string"}], 
+            "controls": [{"id": "c1", "description": "string", "hierarchy": "engineering"}],
+            "risk_before": {"severity": 3, "likelihood": 3},
+            "risk_after": {"severity": 2, "likelihood": 1}
+          }
+        ],
+        "emergency_arrangements": "string"
+      }
+    `;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+  } catch (error) {
+    console.error("AI Error:", error);
+    return getMockRams(activity);
+  }
 };
 
 export const generateTbtContent = async (title: string) => {
-    if (!API_KEY) return getMockTbt(title);
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(`Generate Toolbox Talk JSON for '${title}'. Fields: summary, hazards (array), controls (array), questions (array).`);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(text);
-    } catch (error) {
-        console.error("AI Service Error (TBT):", error);
-        return getMockTbt(title);
-    }
+  if (!API_KEY) {
+    await new Promise(r => setTimeout(r, 1500));
+    return getMockTbt(title);
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    // UPDATED MODEL HERE
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `
+      Create a Toolbox Talk for: "${title}".
+      Return ONLY valid JSON:
+      { "summary": "string", "hazards": ["string"], "controls": ["string"], "questions": ["string"] }
+    `;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+  } catch (error) {
+    return getMockTbt(title);
+  }
 };
 
 export const generateCourseContent = async (title: string) => {
-    if (!API_KEY) return getMockCourse(title);
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(`Generate training course JSON for '${title}'. Fields: syllabus (markdown string), learning_objectives (array).`);
-        const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(text);
-    } catch (error) {
-        console.error("AI Service Error (Course):", error);
-        return getMockCourse(title);
-    }
+  if (!API_KEY) {
+    await new Promise(r => setTimeout(r, 2000));
+    return getMockCourse(title);
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    // UPDATED MODEL HERE
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `
+      Create a training course outline for: "${title}".
+      Return ONLY valid JSON:
+      { "syllabus": "markdown string", "learning_objectives": ["string"] }
+    `;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+  } catch (error) {
+    return getMockCourse(title);
+  }
 };
 
 export const generateReportSummary = async (json: string) => {
-    if (!API_KEY) return "AI Summary: Incident details recorded. Investigation pending.";
+    if (!API_KEY) return "Simulated Summary: Incident involved minor property damage. Immediate controls applied.";
+    
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(`Summarize this safety report JSON in 2 sentences: ${json}`);
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        // UPDATED MODEL HERE
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(`Summarize this safety report in 2 sentences: ${json}`);
         return result.response.text();
-    } catch (error) {
-        return "AI Summary: Incident details recorded. Investigation pending.";
+    } catch (e) {
+        return "Summary unavailable (AI Error).";
     }
 };
 
 export const generateCertificationInsight = async (profile: any) => {
-    // Mock only for now as this is complex logic
-    return {
+    if (!API_KEY) return {
         nextLevelRecommendation: "Focus on leading more safety inspections to reach the 'Advanced' level.",
         missingItems: ["Lead 5 TBTs", "Complete 'Advanced Risk Assessment' course"]
     };
+
+    try {
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        // UPDATED MODEL HERE
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(`
+            Analyze this HSE profile: ${JSON.stringify(profile)}.
+            Return JSON: { "nextLevelRecommendation": "string", "missingItems": ["string"] }
+        `);
+        const text = result.response.text().replace(/```json|```/g, '').trim();
+        return JSON.parse(text);
+    } catch (e) {
+        return {
+            nextLevelRecommendation: "Continue gaining experience.",
+            missingItems: []
+        };
+    }
 };
 
 export const translateText = async (text: string, lang: string) => {
-    if (!API_KEY) return `[${lang}] ${text}`;
+    if (!API_KEY) return `[Simulated Translation to ${lang}]: ${text}`;
+    
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateContent(`Translate to ${lang}: ${text}`);
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        // UPDATED MODEL HERE
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(`Translate this to ${lang}: "${text}"`);
         return result.response.text();
-    } catch (error) {
-        return `[${lang}] ${text}`;
+    } catch (e) {
+        return text;
     }
 };

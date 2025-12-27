@@ -5,7 +5,7 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import ReactMarkdown from 'react-markdown';
 import { generateReportSummary } from '../services/geminiService';
-import { getRiskLevel } from './Reports';
+import { getRiskLevel } from '../utils/riskUtils'; // Imported from utils
 import { RiskMatrixDisplay } from './RiskMatrixDisplay';
 import { AuditTrail } from './AuditTrail';
 import { useAppContext } from '../contexts';
@@ -48,7 +48,6 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('details');
   
-  // EXTRA SAFETY: If report is null/undefined, don't render
   if (!report) return null;
 
   const canApprove = can('approve', 'reports');
@@ -62,7 +61,6 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
     setIsLoadingSummary(false);
   };
 
-  // SAFETY: Handle case where users list is empty or undefined
   const getUser = (userId: string) => {
       if (!users || !userId) return { name: 'Unknown User' };
       return users.find(u => u.id === userId) || { name: 'Unknown User' };
@@ -198,7 +196,6 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
                         </Section>
                     )}
                     
-                    {/* SAFE GUARD: Check for Evidence Photos */}
                     {report.evidence_urls && report.evidence_urls.length > 0 && (
                         <Section title="Evidence Photos" fullWidth>
                             <div className="flex gap-2 flex-wrap">
@@ -310,5 +307,4 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
   );
 };
 
-// Icons
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;

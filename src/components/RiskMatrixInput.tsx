@@ -1,7 +1,6 @@
-
 import React from 'react';
 import type { RiskMatrix, Severity, Likelihood } from '../types';
-import { getRiskLevel } from './Reports';
+import { getRiskLevel } from '../utils/riskUtils'; // Imported from utils
 
 interface RiskMatrixInputProps {
   value: RiskMatrix;
