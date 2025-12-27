@@ -2,15 +2,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
 import { roles } from '../config';
 import { useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
-// REMOVED BADGE IMPORT TO BE SAFE (It wasn't being used anyway)
+import { OrganizationSettings } from './OrganizationSettings'; // <--- IMPORTED
 
 interface SettingsProps {}
 
 type Tab =
   | 'Profile'
+  | 'Organization' // <--- NEW TAB
   | 'Preferences'
   | 'Security'
   | 'Notifications'
@@ -112,6 +114,7 @@ export const Settings: React.FC<SettingsProps> = () => {
   };
 
   const userRole = roles.find((r) => r.key === editedUser.role);
+  const isAdmin = activeUser.role === 'ADMIN' || activeUser.role === 'ORG_ADMIN';
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -122,6 +125,7 @@ export const Settings: React.FC<SettingsProps> = () => {
 
       <div className="flex space-x-2 border-b border-gray-200 dark:border-white/10 mb-6 overflow-x-auto pb-px">
         <TabButton label="Profile" activeTab={activeTab} onClick={setActiveTab} />
+        {isAdmin && <TabButton label="Organization" activeTab={activeTab} onClick={setActiveTab} />}
         <TabButton label="Preferences" activeTab={activeTab} onClick={setActiveTab} />
         <TabButton label="Security" activeTab={activeTab} onClick={setActiveTab} />
         <TabButton label="Notifications" activeTab={activeTab} onClick={setActiveTab} />
@@ -220,16 +224,77 @@ export const Settings: React.FC<SettingsProps> = () => {
                 className="w-full p-2 border border-gray-300 dark:border-white/10 bg-transparent rounded-md dark:text-white"
               />
             </FormField>
+            
+            <div className="flex justify-end mt-4">
+                <Button type="button" onClick={handleSave}>
+                Save Profile
+                </Button>
+            </div>
+          </Section>
+        )}
+
+        {/* NEW ORGANIZATION TAB */}
+        {activeTab === 'Organization' && isAdmin && (
+            <OrganizationSettings />
+        )}
+
+        {activeTab === 'Preferences' && (
+          <Section
+            title="Preferences & Display"
+            description="Customize how EviroSafe looks and feels for you."
+          >
+            <FormField label="Language">
+              <select
+                value={editedUser.preferences.language}
+                onChange={(e) =>
+                  setEditedUser({
+                    ...editedUser,
+                    preferences: {
+                      ...editedUser.preferences,
+                      language: e.target.value as 'en' | 'ar',
+                    },
+                  })
+                }
+                className="w-full p-2 border bg-transparent rounded-md dark:border-white/10 dark:text-white"
+              >
+                <option value="en">English</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </FormField>
+
+            <FormField label="Default Home Screen">
+              <select
+                value={editedUser.preferences.default_view}
+                onChange={(e) =>
+                  setEditedUser({
+                    ...editedUser,
+                    preferences: {
+                      ...editedUser.preferences,
+                      default_view:
+                        e.target.value as User['preferences']['default_view'],
+                    },
+                  })
+                }
+                className="w-full p-2 border bg-transparent rounded-md dark:border-white/10 dark:text-white"
+              >
+                <option value="dashboard">Dashboard</option>
+                <option value="reports">Reporting</option>
+                <option value="ptw">Permit to Work</option>
+                <option value="inspections">Inspections</option>
+                <option value="tbt">Toolbox Talks</option>
+                <option value="trainings">Trainings</option>
+              </select>
+            </FormField>
+            
+            <div className="flex justify-end mt-4">
+                <Button type="button" onClick={handleSave}>
+                Save Preferences
+                </Button>
+            </div>
           </Section>
         )}
 
         {/* ... (Other tabs remain similar) ... */}
-      </div>
-
-      <div className="flex justify-end mt-8">
-        <Button type="button" onClick={handleSave}>
-          Save Changes
-        </Button>
       </div>
     </div>
   );

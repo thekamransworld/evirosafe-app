@@ -1,274 +1,383 @@
-import React, { useState } from 'react';
-import type { Organization } from '../types';
+import React, { useState, useMemo } from 'react';
+import type { Organization, Project, User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
+import { FormField } from './ui/FormField';
 import { 
-  Building2, Shield, TrendingUp, TrendingDown, 
-  Search, Grid, List, Download, Plus, MapPin, Calendar,
-  Briefcase, Users2, Truck, ArrowRight, Globe, MoreVertical
+  Building, 
+  MapPin, 
+  Users, 
+  Activity, 
+  AlertTriangle, 
+  ShieldCheck, 
+  ArrowLeft, 
+  MoreVertical,
+  Plus,
+  Search,
+  Mail
 } from 'lucide-react';
-import { OrganizationDetails } from './OrganizationDetails';
 
-// --- Organization Creation Modal ---
-interface OrganizationCreationModalProps {
+// --- TYPES ---
+type ViewMode = 'list' | 'org-details' | 'project-details';
+type ProjectTab = 'Overview' | 'Team' | 'Activities' | 'Safety' | 'Documents';
+
+// --- MODALS ---
+
+interface InviteMemberModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  orgId: string;
+  projectId?: string;
+  projectName?: string;
 }
 
-const OrganizationCreationModal: React.FC<OrganizationCreationModalProps> = ({ isOpen, onClose, onSubmit }) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        industry: 'Construction',
-        country: 'United Arab Emirates',
-        primaryColor: '#3B82F6'
-    });
+const InviteMemberModal: React.FC<InviteMemberModalProps> = ({ isOpen, onClose, orgId, projectId, projectName }) => {
+    const { handleInviteUser } = useAppContext();
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState('WORKER');
+    const [name, setName] = useState('');
 
     const handleSubmit = () => {
-        if (!formData.name) return;
-        onSubmit({
-            ...formData,
-            domain: `${formData.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.safetypro.com`,
-            timezone: 'GMT+4',
-            branding: {
-                logoUrl: `https://ui-avatars.com/api/?name=${formData.name}&background=${formData.primaryColor.replace('#', '')}&color=fff`,
-                primaryColor: formData.primaryColor
-            }
+        if (!email || !name) return;
+        handleInviteUser({
+            email,
+            name,
+            role,
+            org_id: orgId,
+            project_ids: projectId ? [projectId] : []
         });
+        onClose();
+        setEmail('');
+        setName('');
     };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Building2 className="w-5 h-5" />
-                        Create Organization
-                    </h3>
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite to {projectName || 'Organization'}</h3>
+                    <p className="text-sm text-gray-500 mt-1">Send an invitation to join the team.</p>
                 </div>
                 <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Industry</label>
-                        <select value={formData.industry} onChange={e => setFormData(p => ({...p, industry: e.target.value}))} className="w-full p-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white">
-                            <option>Construction</option><option>Oil & Gas</option><option>Manufacturing</option>
+                    <FormField label="Full Name">
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent dark:text-white" placeholder="John Doe" />
+                    </FormField>
+                    <FormField label="Email Address">
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent dark:text-white" placeholder="john@company.com" />
+                    </FormField>
+                    <FormField label="Role">
+                        <select value={role} onChange={e => setRole(e.target.value)} className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent dark:text-white">
+                            <option value="WORKER">Worker</option>
+                            <option value="SUPERVISOR">Supervisor</option>
+                            <option value="HSE_OFFICER">HSE Officer</option>
+                            <option value="INSPECTOR">Inspector</option>
                         </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Country</label>
-                        <select value={formData.country} onChange={e => setFormData(p => ({...p, country: e.target.value}))} className="w-full p-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white">
-                            <option>United Arab Emirates</option><option>Saudi Arabia</option><option>Qatar</option>
-                        </select>
-                    </div>
+                    </FormField>
                 </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end gap-3 border-t dark:border-dark-border">
+                <div className="p-4 bg-gray-50 dark:bg-slate-800/50 flex justify-end gap-3">
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Create</Button>
+                    <Button onClick={handleSubmit}>Send Invitation</Button>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Quick Stats Component ---
-const QuickStats: React.FC<{ title: string; value: number | string; icon: React.ReactNode; change?: number; color?: string; }> = ({ title, value, icon, change, color = 'blue' }) => {
-    const colorClasses: any = {
-        blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-600',
-        green: 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-800 text-green-600',
-        purple: 'bg-purple-50 dark:bg-purple-900/20 border-purple-100 dark:border-purple-800 text-purple-600',
-        amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-600',
-    };
+// --- SUB-COMPONENTS ---
+
+const StatCard: React.FC<{ title: string; value: string | number; change?: string; icon: React.ReactNode; color?: string }> = ({ title, value, change, icon, color = "text-blue-500" }) => (
+    <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 flex items-start justify-between shadow-sm">
+        <div>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</p>
+            <h4 className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{value}</h4>
+            {change && <p className="text-xs text-emerald-500 font-medium mt-1">{change}</p>}
+        </div>
+        <div className={`p-3 rounded-lg bg-gray-50 dark:bg-slate-800 ${color}`}>
+            {icon}
+        </div>
+    </div>
+);
+
+const ProjectDetailView: React.FC<{ 
+    project: Project; 
+    org: Organization; 
+    onBack: () => void; 
+    users: User[];
+}> = ({ project, org, onBack, users }) => {
+    const [activeTab, setActiveTab] = useState<ProjectTab>('Overview');
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+
+    // Filter users for this project (mock logic: if they are in the org, we assume they can be assigned)
+    const projectTeam = users.filter(u => u.org_id === org.id); 
 
     return (
-        <Card className={`p-4 border ${colorClasses[color].split(' ')[2]}`}>
-            <div className="flex justify-between items-center">
-                <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value}</p>
-                    {change !== undefined && (
-                        <div className="flex items-center mt-1">
-                            {change >= 0 ? <TrendingUp className="w-3 h-3 text-green-500 mr-1" /> : <TrendingDown className="w-3 h-3 text-red-500 mr-1" />}
-                            <span className={`text-xs font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>{Math.abs(change)}%</span>
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex items-center gap-4">
+                        <Button variant="secondary" size="sm" onClick={onBack} className="!p-2 rounded-full">
+                            <ArrowLeft size={20} />
+                        </Button>
+                        <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-blue-500/20">
+                            {project.name.charAt(0)}
                         </div>
-                    )}
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{project.name}</h1>
+                                <Badge color="green">ACTIVE</Badge>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                <span className="bg-gray-100 dark:bg-slate-800 px-2 py-0.5 rounded text-xs font-mono">{project.code || 'PRJ-001'}</span>
+                                <span className="flex items-center gap-1"><MapPin size={14}/> {project.location}</span>
+                                <span className="flex items-center gap-1"><Users size={14}/> {projectTeam.length} members</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="secondary" size="sm">Edit Project</Button>
+                        <Button size="sm" onClick={() => setIsInviteModalOpen(true)}>
+                            <Plus size={16} className="mr-2" />
+                            Invite Member
+                        </Button>
+                    </div>
                 </div>
-                <div className={`p-3 rounded-lg ${colorClasses[color].split(' ')[0]} ${colorClasses[color].split(' ')[4]}`}>
-                    {icon}
+
+                {/* Tabs */}
+                <div className="flex gap-6 mt-8 border-b border-gray-200 dark:border-gray-800">
+                    {['Overview', 'Team', 'Activities', 'Safety', 'Documents'].map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab as ProjectTab)}
+                            className={`pb-3 text-sm font-medium transition-all relative ${
+                                activeTab === tab 
+                                ? 'text-blue-600 dark:text-blue-400' 
+                                : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            {tab}
+                            {activeTab === tab && (
+                                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />
+                            )}
+                        </button>
+                    ))}
                 </div>
             </div>
-        </Card>
+
+            {/* Tab Content */}
+            {activeTab === 'Overview' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatCard title="Team Members" value={projectTeam.length} change="+8% from last month" icon={<Users size={24} />} color="text-blue-500" />
+                    <StatCard title="Total Activities" value="124" change="+15% from last month" icon={<Activity size={24} />} color="text-purple-500" />
+                    <StatCard title="Open Issues" value="3" change="-2 from last week" icon={<AlertTriangle size={24} />} color="text-amber-500" />
+                    <StatCard title="Safety Score" value="92%" change="+3% from last month" icon={<ShieldCheck size={24} />} color="text-emerald-500" />
+                    
+                    {/* Recent Activity Section */}
+                    <div className="md:col-span-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+                        <h3 className="font-bold text-gray-900 dark:text-white mb-4">Recent Team Activities</h3>
+                        <div className="space-y-4">
+                            {[1,2,3].map(i => (
+                                <div key={i} className="flex gap-3 items-start pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                                    <div className="h-8 w-8 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-xs">User</div>
+                                    <div>
+                                        <p className="text-sm text-gray-800 dark:text-gray-200"><strong>John Doe</strong> submitted a new safety report.</p>
+                                        <p className="text-xs text-gray-500">2 hours ago</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'Team' && (
+                <Card>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Project Team</h3>
+                        <div className="flex gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input type="text" placeholder="Search members..." className="pl-9 pr-4 py-2 text-sm border rounded-lg bg-transparent dark:border-gray-700" />
+                            </div>
+                            <Button onClick={() => setIsInviteModalOpen(true)}>
+                                <Plus size={16} className="mr-2" />
+                                Add Member
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 uppercase font-medium">
+                                <tr>
+                                    <th className="px-4 py-3">Name</th>
+                                    <th className="px-4 py-3">Role</th>
+                                    <th className="px-4 py-3">Email</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+                                {projectTeam.map(user => (
+                                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30">
+                                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-white flex items-center gap-3">
+                                            <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}`} className="h-8 w-8 rounded-full" alt="" />
+                                            {user.name}
+                                        </td>
+                                        <td className="px-4 py-3"><Badge color="blue">{user.role.replace('_', ' ')}</Badge></td>
+                                        <td className="px-4 py-3 text-gray-500">{user.email}</td>
+                                        <td className="px-4 py-3"><Badge color={user.status === 'active' ? 'green' : 'yellow'}>{user.status}</Badge></td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button className="text-gray-400 hover:text-gray-600 dark:hover:text-white"><MoreVertical size={16} /></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            )}
+
+            <InviteMemberModal 
+                isOpen={isInviteModalOpen} 
+                onClose={() => setIsInviteModalOpen(false)} 
+                orgId={org.id}
+                projectId={project.id}
+                projectName={project.name}
+            />
+        </div>
     );
 };
 
+// --- MAIN COMPONENT ---
+
 export const Organizations: React.FC = () => {
-  const { organizations, usersList, activeUser, handleCreateOrganization, setActiveOrg } = useAppContext();
-  const { projects, reportList } = useDataContext();
+  const { organizations, usersList, activeUser, handleCreateOrganization } = useAppContext();
+  const { projects, handleCreateProject } = useDataContext();
   
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedOrgDetails, setSelectedOrgDetails] = useState<Organization | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
 
-  const filteredOrgs = organizations.filter(org => 
-    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.industry.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const overallStats = {
-    totalOrgs: organizations.length,
-    totalProjects: projects.length,
-    totalUsers: usersList.length,
-    activeIncidents: reportList.filter(r => r.status !== 'closed').length,
+  // Handlers
+  const handleOrgClick = (org: Organization) => {
+      setSelectedOrg(org);
+      setViewMode('org-details');
   };
 
-  const handleOpenDetails = (org: Organization) => {
-      setActiveOrg(org);
-      setSelectedOrgDetails(org);
+  const handleProjectClick = (project: Project) => {
+      setSelectedProject(project);
+      setViewMode('project-details');
   };
 
-  // --- CONDITIONAL RENDER: Show Details if selected ---
-  if (selectedOrgDetails) {
-      return <OrganizationDetails org={selectedOrgDetails} onBack={() => setSelectedOrgDetails(null)} />;
+  const handleBackToOrgs = () => {
+      setSelectedOrg(null);
+      setViewMode('list');
+  };
+
+  const handleBackToOrgDetails = () => {
+      setSelectedProject(null);
+      setViewMode('org-details');
+  };
+
+  const handleCreateOrgSubmit = (data: any) => {
+      handleCreateOrganization({ ...data, domain: 'example.com', timezone: 'GMT' });
+      setIsOrgModalOpen(false);
+  };
+
+  // --- RENDER: LIST VIEW ---
+  if (viewMode === 'list') {
+      return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
+                    <p className="text-text-secondary">Manage your organizations and workspaces.</p>
+                </div>
+                {activeUser.role === 'ADMIN' && (
+                    <Button onClick={() => setIsOrgModalOpen(true)}>
+                        <Plus className="w-5 h-5 mr-2" /> New Organization
+                    </Button>
+                )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {organizations.map(org => (
+                    <Card key={org.id} className="hover:border-blue-500 transition-colors cursor-pointer" onClick={() => handleOrgClick(org)}>
+                        <div className="flex items-center gap-4 mb-4">
+                            <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+                                <Building className="text-blue-600" size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-900 dark:text-white">{org.name}</h3>
+                                <p className="text-xs text-gray-500">{org.industry} • {org.country}</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-between text-sm text-gray-500 border-t border-gray-100 dark:border-gray-800 pt-4">
+                            <span>{projects.filter(p => p.org_id === org.id).length} Projects</span>
+                            <span>{usersList.filter(u => u.org_id === org.id).length} Members</span>
+                        </div>
+                    </Card>
+                ))}
+            </div>
+            {/* Org Creation Modal Placeholder - Reuse existing logic if needed */}
+        </div>
+      );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
-          <p className="text-text-secondary dark:text-gray-400 mt-1">Manage your enterprise hierarchy</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline"><Download className="w-4 h-4 mr-2" /> Export</Button>
-          {activeUser?.role === 'ADMIN' && (
-            <Button onClick={() => setIsModalOpen(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600">
-              <Plus className="w-5 h-5 mr-2" /> New Organization
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <QuickStats title="Total Organizations" value={overallStats.totalOrgs} icon={<Building2 className="w-6 h-6" />} change={8} color="blue" />
-        <QuickStats title="Active Projects" value={overallStats.totalProjects} icon={<Briefcase className="w-6 h-6" />} change={12} color="green" />
-        <QuickStats title="Total Users" value={overallStats.totalUsers} icon={<Users2 className="w-6 h-6" />} change={5} color="purple" />
-        <QuickStats title="Active Incidents" value={overallStats.activeIncidents} icon={<Shield className="w-6 h-6" />} change={-2} color="amber" />
-      </div>
-
-      <Card>
-        <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search organizations..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg dark:bg-dark-background dark:border-dark-border dark:text-white"
-            />
-          </div>
-          <div className="flex border rounded-lg dark:border-dark-border">
-            <button onClick={() => setViewMode('grid')} className={`p-2 ${viewMode === 'grid' ? 'bg-gray-100 dark:bg-white/10' : ''}`}><Grid className="w-4 h-4" /></button>
-            <button onClick={() => setViewMode('list')} className={`p-2 ${viewMode === 'list' ? 'bg-gray-100 dark:bg-white/10' : ''}`}><List className="w-4 h-4" /></button>
-          </div>
-        </div>
-      </Card>
-
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredOrgs.map(org => {
-            const pCount = projects.filter(p => p.org_id === org.id).length;
-            const uCount = usersList.filter(u => u.org_id === org.id).length;
-            return (
-              <Card 
-                key={org.id} 
-                className="flex flex-col hover:shadow-xl transition-all duration-300 group cursor-pointer hover:-translate-y-1"
-                onClick={() => handleOpenDetails(org)} // Added onClick to Card
-              >
-                <div className="flex-1 p-5">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-bold text-white shadow-lg">
-                        {org.branding?.logoUrl && org.branding.logoUrl.length > 50 ? <img src={org.branding.logoUrl} className="h-full w-full object-cover rounded-xl"/> : org.name.charAt(0)}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-text-primary dark:text-white group-hover:text-blue-600 transition-colors">{org.name}</h3>
-                        <div className="flex items-center gap-2 text-sm text-text-secondary dark:text-gray-400 mt-1">
-                          <Globe className="w-3 h-3" /> {org.domain}
-                        </div>
-                      </div>
-                    </div>
-                    <Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status}</Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 py-3 border-y dark:border-gray-700">
-                    <div className="text-center"><div className="text-lg font-bold dark:text-white">{pCount}</div><div className="text-xs text-gray-500">Projects</div></div>
-                    <div className="text-center"><div className="text-lg font-bold dark:text-white">{uCount}</div><div className="text-xs text-gray-500">Users</div></div>
-                    <div className="text-center"><div className="text-lg font-bold dark:text-white">98%</div><div className="text-xs text-gray-500">Safety</div></div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-gray-500 pt-4">
-                    <div className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {org.country}</div>
-                    <div className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {new Date().getFullYear()}</div>
-                  </div>
-                </div>
-                <div className="p-4 border-t dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-white/5">
-                  <span className="text-xs text-gray-500">ID: {org.id}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-blue-600 hover:text-blue-800"
-                    onClick={(e) => {
-                        e.stopPropagation(); // Prevent double firing
-                        handleOpenDetails(org);
-                    }}
-                  >
-                    Manage <ArrowRight className="w-4 h-4 ml-2" />
+  // --- RENDER: ORG DETAILS (PROJECT LIST) ---
+  if (viewMode === 'org-details' && selectedOrg) {
+      const orgProjects = projects.filter(p => p.org_id === selectedOrg.id);
+      return (
+          <div className="space-y-6">
+              <div className="flex items-center gap-4 mb-6">
+                  <Button variant="secondary" size="sm" onClick={handleBackToOrgs} className="!p-2 rounded-full">
+                      <ArrowLeft size={20} />
                   </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <Card noPadding>
-            <table className="w-full text-sm">
-                <thead className="bg-gray-50 dark:bg-white/5 text-gray-500">
-                    <tr><th className="p-4 text-left">Organization</th><th className="p-4 text-left">Industry</th><th className="p-4 text-left">Projects</th><th className="p-4 text-left">Users</th><th className="p-4 text-left">Status</th><th className="p-4 text-left">Actions</th></tr>
-                </thead>
-                <tbody className="divide-y dark:divide-gray-800">
-                    {filteredOrgs.map(org => (
-                        <tr key={org.id} className="hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer" onClick={() => handleOpenDetails(org)}>
-                            <td className="p-4 font-medium dark:text-white">{org.name}</td>
-                            <td className="p-4"><Badge color="blue">{org.industry}</Badge></td>
-                            <td className="p-4">{projects.filter(p => p.org_id === org.id).length}</td>
-                            <td className="p-4">{usersList.filter(u => u.org_id === org.id).length}</td>
-                            <td className="p-4"><Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status}</Badge></td>
-                            <td className="p-4">
-                                <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleOpenDetails(org);
-                                    }}
-                                >
-                                    View
-                                </Button>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </Card>
-      )}
+                  <div>
+                      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{selectedOrg.name}</h1>
+                      <p className="text-gray-500">Organization Dashboard</p>
+                  </div>
+              </div>
 
-      <OrganizationCreationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={(data) => { handleCreateOrganization(data); setIsModalOpen(false); }} />
-    </div>
-  );
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {orgProjects.map(proj => (
+                      <Card key={proj.id} className="cursor-pointer hover:shadow-lg transition-all" onClick={() => handleProjectClick(proj)}>
+                          <div className="flex justify-between items-start mb-2">
+                              <Badge color={proj.status === 'active' ? 'green' : 'gray'}>{proj.status}</Badge>
+                              <MoreVertical size={16} className="text-gray-400" />
+                          </div>
+                          <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1">{proj.name}</h3>
+                          <p className="text-sm text-gray-500 mb-4">{proj.location}</p>
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <Users size={14} />
+                              <span>{usersList.filter(u => u.org_id === selectedOrg.id).length} Team Members</span>
+                          </div>
+                      </Card>
+                  ))}
+                  <button className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl flex flex-col items-center justify-center p-6 text-gray-500 hover:border-blue-500 hover:text-blue-500 transition-colors min-h-[160px]">
+                      <Plus size={32} className="mb-2" />
+                      <span className="font-medium">Create New Project</span>
+                  </button>
+              </div>
+          </div>
+      );
+  }
+
+  // --- RENDER: PROJECT DETAILS (THE SCREENSHOT VIEW) ---
+  if (viewMode === 'project-details' && selectedProject && selectedOrg) {
+      return (
+          <ProjectDetailView 
+            project={selectedProject} 
+            org={selectedOrg} 
+            onBack={handleBackToOrgDetails} 
+            users={usersList}
+          />
+      );
+  }
+
+  return null;
 };
