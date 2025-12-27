@@ -3,36 +3,20 @@ import {
   organizations as initialOrganizations, 
   users as initialUsers
 } from './data';
-import { translations, supportedLanguages, roles } from './config';
+import { translations, supportedLanguages, roles, planTemplates } from './config'; // Added planTemplates import
 import type { 
   Organization, User, Report, ReportStatus, CapaAction, Notification, 
   ChecklistRun, Inspection, Plan as PlanType, PlanStatus, 
-  Rams as RamsType, RamsStatus, TbtSession, 
+  PlanType as PlanTypeName, Rams as RamsType, RamsStatus, TbtSession, 
   TrainingCourse, TrainingRecord, TrainingSession, Project, View, 
-  Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem,
-  Equipment, Training, Subcontractor
+  Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem 
 } from './types';
 import { useToast } from './components/ui/Toast';
 
 // --- MOCK DATA ---
 const MOCK_PROJECTS: Project[] = [
-  { id: 'p1', name: 'Downtown Construction', status: 'Active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction', budget: 5000000, budget_spent: 2500000, progress: 50, safe_man_hours: 12000, safety_score: 95, quality_score: 90, environmental_score: 88, currency: 'USD' },
-  { id: 'p2', name: 'Refinery Maintenance', status: 'Active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance', budget: 2000000, budget_spent: 500000, progress: 25, safe_man_hours: 5000, safety_score: 88, quality_score: 85, environmental_score: 92, currency: 'USD' }
-];
-
-const MOCK_EQUIPMENT: Equipment[] = [
-    { id: 'eq1', project_id: 'p1', name: 'Mobile Crane 50T', type: 'Crane', serial_number: 'CR-50-01', status: 'operational', last_inspection_date: '2023-10-01', next_inspection_date: '2024-04-01', condition: 'good', last_inspected_by: 'user_3' },
-    { id: 'eq2', project_id: 'p1', name: 'Excavator CAT 320', type: 'Earthmoving', serial_number: 'EX-320-05', status: 'maintenance', last_inspection_date: '2023-09-15', next_inspection_date: '2023-12-15', condition: 'fair', last_inspected_by: 'user_3' }
-];
-
-const MOCK_TRAINING: Training[] = [
-    { id: 'tr1', project_id: 'p1', title: 'Work at Height', description: 'Mandatory for all scaffolders', date: '2023-11-01', status: 'completed', instructor_id: 'user_2', attendees_count: 15 },
-    { id: 'tr2', project_id: 'p1', title: 'Confined Space Entry', description: 'For tank entry team', date: '2023-11-05', status: 'scheduled', instructor_id: 'user_2', attendees_count: 8 }
-];
-
-const MOCK_SUBCONTRACTORS: Subcontractor[] = [
-    { id: 'sub1', org_id: 'org1', name: 'Alpha Scaffolding', specialization: 'Scaffolding', status: 'active', workers_count: 25, compliance_score: 95 },
-    { id: 'sub2', org_id: 'org1', name: 'Beta Electrical', specialization: 'Electrical', status: 'active', workers_count: 12, compliance_score: 88 }
+  { id: 'p1', name: 'Downtown Construction', status: 'active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction' },
+  { id: 'p2', name: 'Refinery Maintenance', status: 'active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance' }
 ];
 
 const MOCK_INSPECTIONS: Inspection[] = [];
@@ -55,7 +39,7 @@ const MOCK_TEMPLATES: ChecklistTemplate[] = [
 ];
 
 // --- APP CONTEXT ---
-type InvitedUser = { name: string; email: string; role: User['role']; org_id: string; project_id?: string };
+type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
   currentView: View;
@@ -237,9 +221,6 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
-  equipmentList: Equipment[];
-  trainingList: Training[];
-  subcontractors: Subcontractor[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -290,11 +271,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [ptwList, setPtwList] = useState<Ptw[]>(MOCK_PTWS);
     const [signs, setSigns] = useState<Sign[]>([]);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
-    
-    // New Data States
-    const [equipmentList, setEquipmentList] = useState<Equipment[]>(MOCK_EQUIPMENT);
-    const [trainingList, setTrainingList] = useState<Training[]>(MOCK_TRAINING);
-    const [subcontractors, setSubcontractors] = useState<Subcontractor[]>(MOCK_SUBCONTRACTORS);
+
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
     const handleCreateReport = async (reportData: any) => {
@@ -394,7 +371,44 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleUpdateInspection = (i: any) => setInspectionList(prev => prev.map(x => x.id === i.id ? i : x));
     const handleCreatePtw = (d: any) => setPtwList(prev => [{ ...d, id: `ptw_${Date.now()}`, status: 'DRAFT' }, ...prev]);
     const handleUpdatePtw = (d: any) => setPtwList(prev => prev.map(p => p.id === d.id ? d : p));
-    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
+    
+    // --- FIXED: Handle Plan Creation with Templates ---
+    const handleCreatePlan = (data: any) => {
+        const templateSections = planTemplates[data.type as PlanTypeName] || [];
+        const newPlan: PlanType = {
+            id: `plan_${Date.now()}`,
+            org_id: activeOrg.id,
+            project_id: data.project_id,
+            type: data.type,
+            title: data.title,
+            version: 'v0.1',
+            status: 'draft',
+            people: { 
+                prepared_by: { 
+                    name: activeUser?.name || 'Unknown', 
+                    email: activeUser?.email || '' 
+                } 
+            },
+            dates: { 
+                created_at: new Date().toISOString(), 
+                updated_at: new Date().toISOString(), 
+                next_review_at: new Date(Date.now() + 365*24*60*60*1000).toISOString() 
+            },
+            content: { 
+                body_json: templateSections, // Load sections from config
+                attachments: [] 
+            },
+            meta: { tags: [], change_note: 'Initial Draft' },
+            audit_trail: [{
+                user_id: activeUser?.id || 'system',
+                timestamp: new Date().toISOString(),
+                action: 'Plan Created'
+            }]
+        };
+        setPlanList(prev => [newPlan, ...prev]);
+        toast.success("Plan created successfully.");
+    };
+
     const handleUpdatePlan = (d: any) => setPlanList(prev => prev.map(p => p.id === d.id ? d : p));
     const handlePlanStatusChange = (id: string, s: any) => setPlanList(prev => prev.map(p => p.id === id ? { ...p, status: s } : p));
     const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
@@ -411,7 +425,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
         actionItems,
-        equipmentList, trainingList, subcontractors,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
