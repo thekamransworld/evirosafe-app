@@ -2,10 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge'; // <--- ADDED THIS IMPORT
 import { roles } from '../config';
 import { useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
+// REMOVED BADGE IMPORT TO BE SAFE (It wasn't being used anyway)
 
 interface SettingsProps {}
 

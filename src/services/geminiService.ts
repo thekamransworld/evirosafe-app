@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// --- MOCK DATA GENERATORS (Used when no API Key is present) ---
+// --- MOCK DATA GENERATORS (Fallback) ---
 const getMockSafetyReport = (prompt: string) => {
   return `## 🤖 AI Safety Assessment (Simulation)
   
@@ -16,7 +16,7 @@ Based on the description provided, this situation presents a **Moderate Risk**. 
 2. **Short-term:** Conduct a toolbox talk regarding "${prompt}".
 3. **Long-term:** Review the RAMS for this specific activity.
 
-*Note: This is a simulated response because no API Key was provided.*`;
+*Note: This is a simulated response because the AI Service is currently unavailable.*`;
 };
 
 const getMockRiskForecast = () => ({
@@ -43,7 +43,7 @@ const getMockRams = (activity: string) => ({
     },
     {
       step_no: 2,
-      description: "Execution of ${activity}",
+      description: `Execution of ${activity}`,
       hazards: [{ id: "h2", description: "Manual handling injury" }],
       controls: [{ id: "c2", description: "Use mechanical aids where possible", hierarchy: "engineering" }],
       risk_before: { severity: 4, likelihood: 3 },
@@ -65,38 +65,43 @@ const getMockCourse = (title: string) => ({
   learning_objectives: ["Identify key hazards", "Apply control measures", "Understand legal duties"]
 });
 
-// --- REAL API CALLS ---
-
-export const generateSafetyReport = async (prompt: string) => {
+// --- SAFE API HANDLER ---
+// This function tries the API, and if it fails (404, 400, etc.), it returns the mock data.
+async function safeGenerate<T>(
+  apiCall: () => Promise<T>, 
+  fallback: T
+): Promise<T> {
   if (!API_KEY) {
-    console.warn("No API Key found. Using Mock Data.");
-    await new Promise(r => setTimeout(r, 1500)); // Fake delay
-    return getMockSafetyReport(prompt);
+    console.warn("Gemini Service: No API Key provided. Using mock data.");
+    await new Promise(r => setTimeout(r, 1000)); // Simulate network delay
+    return fallback;
   }
 
   try {
+    return await apiCall();
+  } catch (error: any) {
+    console.error("Gemini Service Error (Falling back to mock):", error.message);
+    return fallback;
+  }
+}
+
+// --- EXPORTED FUNCTIONS ---
+
+export const generateSafetyReport = async (prompt: string) => {
+  return safeGenerate(async () => {
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // UPDATED MODEL HERE
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(`
       Act as a HSE Expert. Write a brief safety assessment report for: "${prompt}".
       Include Analysis and 3 bullet points for Recommendations. Use Markdown formatting.
     `);
     return result.response.text();
-  } catch (error) {
-    console.error("AI Error:", error);
-    return getMockSafetyReport(prompt); // Fallback to mock on error
-  }
+  }, getMockSafetyReport(prompt));
 };
 
 export const generateAiRiskForecast = async () => {
-  if (!API_KEY) {
-    return getMockRiskForecast();
-  }
-
-  try {
+  return safeGenerate(async () => {
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // UPDATED MODEL HERE
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(`
       Analyze construction site risk for today. 
@@ -105,21 +110,12 @@ export const generateAiRiskForecast = async () => {
     `);
     const text = result.response.text().replace(/```json|```/g, '').trim();
     return JSON.parse(text);
-  } catch (error) {
-    console.error("AI Error:", error);
-    return getMockRiskForecast();
-  }
+  }, getMockRiskForecast());
 };
 
 export const generateRamsContent = async (activity: string) => {
-  if (!API_KEY) {
-    await new Promise(r => setTimeout(r, 2000));
-    return getMockRams(activity);
-  }
-
-  try {
+  return safeGenerate(async () => {
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // UPDATED MODEL HERE
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `
       Create a RAMS (Risk Assessment Method Statement) for: "${activity}".
@@ -143,21 +139,12 @@ export const generateRamsContent = async (activity: string) => {
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json|```/g, '').trim();
     return JSON.parse(text);
-  } catch (error) {
-    console.error("AI Error:", error);
-    return getMockRams(activity);
-  }
+  }, getMockRams(activity));
 };
 
 export const generateTbtContent = async (title: string) => {
-  if (!API_KEY) {
-    await new Promise(r => setTimeout(r, 1500));
-    return getMockTbt(title);
-  }
-
-  try {
+  return safeGenerate(async () => {
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // UPDATED MODEL HERE
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `
       Create a Toolbox Talk for: "${title}".
@@ -167,20 +154,12 @@ export const generateTbtContent = async (title: string) => {
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json|```/g, '').trim();
     return JSON.parse(text);
-  } catch (error) {
-    return getMockTbt(title);
-  }
+  }, getMockTbt(title));
 };
 
 export const generateCourseContent = async (title: string) => {
-  if (!API_KEY) {
-    await new Promise(r => setTimeout(r, 2000));
-    return getMockCourse(title);
-  }
-
-  try {
+  return safeGenerate(async () => {
     const genAI = new GoogleGenerativeAI(API_KEY);
-    // UPDATED MODEL HERE
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = `
       Create a training course outline for: "${title}".
@@ -190,59 +169,39 @@ export const generateCourseContent = async (title: string) => {
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json|```/g, '').trim();
     return JSON.parse(text);
-  } catch (error) {
-    return getMockCourse(title);
-  }
+  }, getMockCourse(title));
 };
 
 export const generateReportSummary = async (json: string) => {
-    if (!API_KEY) return "Simulated Summary: Incident involved minor property damage. Immediate controls applied.";
-    
-    try {
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        // UPDATED MODEL HERE
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(`Summarize this safety report in 2 sentences: ${json}`);
-        return result.response.text();
-    } catch (e) {
-        return "Summary unavailable (AI Error).";
-    }
+  return safeGenerate(async () => {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`Summarize this safety report in 2 sentences: ${json}`);
+    return result.response.text();
+  }, "Simulated Summary: Incident involved minor property damage. Immediate controls applied.");
 };
 
 export const generateCertificationInsight = async (profile: any) => {
-    if (!API_KEY) return {
-        nextLevelRecommendation: "Focus on leading more safety inspections to reach the 'Advanced' level.",
-        missingItems: ["Lead 5 TBTs", "Complete 'Advanced Risk Assessment' course"]
-    };
-
-    try {
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        // UPDATED MODEL HERE
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(`
-            Analyze this HSE profile: ${JSON.stringify(profile)}.
-            Return JSON: { "nextLevelRecommendation": "string", "missingItems": ["string"] }
-        `);
-        const text = result.response.text().replace(/```json|```/g, '').trim();
-        return JSON.parse(text);
-    } catch (e) {
-        return {
-            nextLevelRecommendation: "Continue gaining experience.",
-            missingItems: []
-        };
-    }
+  return safeGenerate(async () => {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`
+        Analyze this HSE profile: ${JSON.stringify(profile)}.
+        Return JSON: { "nextLevelRecommendation": "string", "missingItems": ["string"] }
+    `);
+    const text = result.response.text().replace(/```json|```/g, '').trim();
+    return JSON.parse(text);
+  }, {
+    nextLevelRecommendation: "Focus on leading more safety inspections to reach the 'Advanced' level.",
+    missingItems: ["Lead 5 TBTs", "Complete 'Advanced Risk Assessment' course"]
+  });
 };
 
 export const translateText = async (text: string, lang: string) => {
-    if (!API_KEY) return `[Simulated Translation to ${lang}]: ${text}`;
-    
-    try {
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        // UPDATED MODEL HERE
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const result = await model.generateContent(`Translate this to ${lang}: "${text}"`);
-        return result.response.text();
-    } catch (e) {
-        return text;
-    }
+  return safeGenerate(async () => {
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(`Translate this to ${lang}: "${text}"`);
+    return result.response.text();
+  }, `[Simulated Translation to ${lang}]: ${text}`);
 };
