@@ -248,9 +248,6 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
-  
-  // NEW: Add Checklist Template
-  handleAddChecklistTemplate: (template: ChecklistTemplate) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -274,6 +271,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [ptwList, setPtwList] = useState<Ptw[]>(MOCK_PTWS);
     const [signs, setSigns] = useState<Sign[]>([]);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
+
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
     const handleCreateReport = async (reportData: any) => {
@@ -323,12 +321,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setStandaloneActions(prev => [newAction, ...prev]);
         toast.success("Action created.");
-    };
-
-    // NEW: Handle Adding Checklist Template
-    const handleAddChecklistTemplate = (template: ChecklistTemplate) => {
-        setChecklistTemplates(prev => [template, ...prev]);
-        toast.success("Checklist template imported.");
     };
     
     const actionItems = useMemo<ActionItem[]>(() => {
@@ -403,8 +395,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus,
         handleCreateInspection,       
-        handleCreateStandaloneAction,
-        handleAddChecklistTemplate // Added to context
+        handleCreateStandaloneAction 
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
