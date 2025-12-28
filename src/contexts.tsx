@@ -13,7 +13,7 @@ import type {
 } from './types';
 import { useToast } from './components/ui/Toast';
 
-// --- MOCK DATA ---
+// --- MOCK DATA DEFINITIONS ---
 const MOCK_PROJECTS: Project[] = [
   { id: 'p1', name: 'Downtown Construction', status: 'active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction' },
   { id: 'p2', name: 'Refinery Maintenance', status: 'active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance' }
@@ -246,6 +246,8 @@ interface DataContextType {
   handleScheduleSession: (data: any) => void;
   handleCloseSession: (id: string, attendance: any) => void;
   handleUpdateActionStatus: (origin: any, status: any) => void;
+  
+  // Updated for modern inspection & standalone actions
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
 }
@@ -272,6 +274,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>([]);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
 
+    // Standalone Actions State
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
     const handleCreateReport = async (reportData: any) => {
@@ -289,19 +292,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.success("Report saved.");
     };
 
+    // --- NEW: Universal Inspection Creation Logic ---
     const handleCreateInspection = (data: any) => {
+        // We use spread ...data to ensure we capture all the new modern fields
+        // like hse_compliance, ppe_requirements, pre_inspection_briefing etc.
         const newInspection = {
             ...data,
             id: `insp_${Date.now()}`,
             org_id: activeOrg.id,
             findings: [],
-            status: 'Ongoing',
+            // Ensure status defaults if not provided
+            status: data.status || 'Ongoing',
             audit_trail: [{ 
                 user_id: activeUser?.id || 'system', 
                 timestamp: new Date().toISOString(), 
                 action: 'Inspection Created' 
             }]
         };
+        
+        // This 'any' cast ensures we don't break if types.ts hasn't been updated yet
         setInspectionList(prev => [newInspection as Inspection, ...prev]);
         toast.success("Inspection created successfully.");
     };
@@ -313,7 +322,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             owner_id: data.owner_id,
             due_date: data.due_date,
             status: 'Open',
-            // @ts-ignore
+            // @ts-ignore - 'priority' is optional in ActionItem type or handled in enhancedActions
             priority: data.priority,
             project_id: data.project_id,
             source: { type: 'Standalone' as any, id: '-', description: 'Direct Entry' },
@@ -411,6 +420,7 @@ interface ModalContextType {
   isReportCreationModalOpen: boolean; setIsReportCreationModalOpen: (isOpen: boolean) => void;
   reportInitialData: Partial<Report> | null; setReportInitialData: (data: Partial<Report> | null) => void;
   
+  // NEW PROPS FOR ACTION MODAL
   isActionCreationModalOpen: boolean; 
   setIsActionCreationModalOpen: (isOpen: boolean) => void;
   openActionCreationModal: (options?: { initialData?: any; mode?: 'create' | 'edit' }) => void;
@@ -442,8 +452,10 @@ export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isReportCreationModalOpen, setIsReportCreationModalOpen] = useState(false);
   const [reportInitialData, setReportInitialData] = useState<Partial<Report> | null>(null);
 
+  // NEW STATES
   const [isActionCreationModalOpen, setIsActionCreationModalOpen] = useState(false);
 
+  // NEW FUNCTIONS
   const openActionCreationModal = (options?: { initialData?: any; mode?: 'create' | 'edit' }) => {
       setIsActionCreationModalOpen(true);
   };
@@ -474,6 +486,7 @@ export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isReportCreationModalOpen, setIsReportCreationModalOpen,
     reportInitialData, setReportInitialData,
     
+    // NEW VALUES
     isActionCreationModalOpen, setIsActionCreationModalOpen,
     openActionCreationModal, openActionDetailModal,
 
