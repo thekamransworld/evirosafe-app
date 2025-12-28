@@ -1,4 +1,4 @@
-import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, ChecklistItem, PtwType, Sign, PtwSafetyRequirement, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory } from './types';
+import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory, PtwSafetyRequirement, PtwType } from './types';
 
 // Neon Gradient Shield Logo (ES Monogram)
 export const logoSrc = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMwMGYzZmYiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iIzM0ZDM5OSIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2Y0NzJiNiIvPjwvbGluZWFyR3JhZGllbnQ+PGZpbHRlciBpZD0iZiI+PGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjAiIHN0ZERldmlhdGlvbj0iMTAiIGZsb29kLWNvbG9yPSIjMDBmM2ZmIiBmbG9vZC1vcGFjaXR5PSIwLjUiLz48L2ZpbHRlcj48L2RlZnM+PHBhdGggZD0iTTI1NiAzMkMxNjAgMzIgNjQgODAgNjQgMTkydjExMmMwIDE0NCAxOTIgMTkyIDE5MiAxOTJzMTkyLTQ4IDE5Mi0xOTJWMTkyYzAtMTEyLTk2LTE2MC0xOTItMTYweiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2cpIiBzdHJva2Utd2lkdGg9IjI4IiBmaWx0ZXI9InVybCgjZikiLz48dGV4dCB4PSI1MCUiIHk9IjUyJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0idXJsKCNnKSIgZmlsdGVyPSJ1cmwoI2YpIj5FUzwvdGV4dD48L3N2Zz4=';
@@ -57,34 +57,12 @@ export const translations: Record<string, Record<string, string>> = {
     'sidebar.roles': 'الأدوار والصلاحيات',
     'sidebar.settings': 'الإعدادات والسجلات',
   },
-  ur: {
-    'sidebar.dashboard': 'ڈیش بورڈ',
-    'sidebar.ai_insights': 'AI بصیرتیں۔',
-    'sidebar.reporting': 'رپورٹنگ',
-    'sidebar.inspections': 'معائنے',
-    'sidebar.ptw': 'کام کا اجازت نامہ',
-    'sidebar.checklists': 'چیک لسٹس',
-    'sidebar.plans': 'منصوبے',
-    'sidebar.rams': 'RAMS',
-    'sidebar.signage': 'سائنیج',
-    'sidebar.tbt': 'ٹول باکس مذاکرات',
-    'sidebar.training': 'تربیت',
-    'sidebar.housekeeping': 'ہاؤس کیپنگ',
-    'sidebar.actions': 'ایکشن ٹریکر',
-    'sidebar.site_map': 'سائٹ کا نقشہ',
-    'sidebar.certification': 'میرا سرٹیفکیٹ',
-    'sidebar.organizations': 'تنظیمیں',
-    'sidebar.projects': 'پروجیکٹس',
-    'sidebar.people': 'لوگ اور رسائی',
-    'sidebar.roles': 'کردار اور اجازتیں',
-    'sidebar.settings': 'ترتیبات اور نوشتہ جات',
-  },
 };
 
 const allActions: Action[] = ['read', 'create', 'update', 'approve', 'delete', 'export', 'assign'];
 const readCreateUpdate: Action[] = ['read', 'create', 'update'];
-const readOnly: Action[] = ['read'];
 
+// --- THIS WAS MISSING IN YOUR FILE ---
 export const allPossiblePermissions: { resource: Resource; actions: Action[]; scopes: Scope[] }[] = [
     { resource: 'dashboard', actions: ['read'], scopes: ['org'] },
     { resource: 'reports', actions: allActions, scopes: ['org', 'project', 'own'] },
@@ -119,14 +97,10 @@ export const roles: Role[] = [
   { 
     org_id: null, key: 'ORG_ADMIN', label: 'Organization Admin', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'dashboard', actions: ['read'] as Action[], scope: 'org' },
       { resource: 'projects', actions: readCreateUpdate, scope: 'org' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'people', actions: ['read', 'create', 'update', 'delete'] as Action[], scope: 'org' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'roles', actions: ['read', 'create', 'update'] as Action[], scope: 'org' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'org' },
       ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'plans', 'rams', 'signage', 'tbt', 'training', 'actions', 'site-map', 'certification'].map(r => ({
           resource: r as Resource, actions: allActions, scope: 'org' as Scope
@@ -136,16 +110,11 @@ export const roles: Role[] = [
   { 
     org_id: null, key: 'HSE_MANAGER', label: 'HSE Manager', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'dashboard', actions: ['read'] as Action[], scope: 'org' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'projects', actions: ['read'] as Action[], scope: 'org' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'people', actions: ['read'] as Action[], scope: 'org' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
        ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'plans', 'rams', 'signage', 'tbt', 'training', 'actions', 'site-map', 'certification'].map(r => ({
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
           resource: r as Resource, actions: ['read', 'create', 'update', 'approve', 'export', 'assign'] as Action[], scope: 'org' as Scope
       }))
     ]
@@ -153,19 +122,14 @@ export const roles: Role[] = [
   {
     org_id: null, key: 'SUPERVISOR', label: 'Supervisor', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
       { resource: 'projects', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'people', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
       ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'tbt', 'actions', 'site-map', 'certification'].map(r => ({
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
           resource: r as Resource, actions: ['read', 'create', 'update', 'assign'] as Action[], scope: 'project' as Scope
       })),
        ...['plans', 'rams', 'signage', 'training'].map(r => ({
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
           resource: r as Resource, actions: ['read'] as Action[], scope: 'project' as Scope
       })),
     ]
@@ -173,18 +137,13 @@ export const roles: Role[] = [
   {
     org_id: null, key: 'HSE_OFFICER', label: 'HSE Officer', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'people', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
       ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'tbt', 'actions', 'site-map', 'certification'].map(r => ({
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
           resource: r as Resource, actions: ['read', 'create', 'update'] as Action[], scope: 'project' as Scope
       })),
        ...['plans', 'rams', 'signage', 'training'].map(r => ({
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
           resource: r as Resource, actions: ['read'] as Action[], scope: 'project' as Scope
       })),
     ]
@@ -192,19 +151,12 @@ export const roles: Role[] = [
   {
     org_id: null, key: 'INSPECTOR', label: 'Inspector', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'inspections', actions: ['read', 'create', 'update'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'checklists', actions: ['read', 'create'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'reports', actions: ['read', 'create'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'actions', actions: ['read', 'update'] as Action[], scope: 'own' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'site-map', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
       { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
       { resource: 'certification', actions: ['read', 'update'], scope: 'own' },
     ]
@@ -212,17 +164,11 @@ export const roles: Role[] = [
   {
     org_id: null, key: 'WORKER', label: 'Worker', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'dashboard', actions: ['read'] as Action[], scope: 'own' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'reports', actions: ['read', 'create'] as Action[], scope: 'own' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'tbt', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'training', actions: ['read'] as Action[], scope: 'own' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'actions', actions: ['read', 'update'] as Action[], scope: 'own' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
         { resource: 'certification', actions: ['read', 'update'], scope: 'own' },
     ]
@@ -230,34 +176,19 @@ export const roles: Role[] = [
   {
     org_id: null, key: 'CLIENT_VIEWER', label: 'Client Viewer', is_system: true,
     permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'reports', actions: ['read', 'export'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'inspections', actions: ['read', 'export'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'ptw', actions: ['read'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'plans', actions: ['read', 'approve'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'rams', actions: ['read', 'approve'] as Action[], scope: 'project' },
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
         { resource: 'site-map', actions: ['read'] as Action[], scope: 'project' },
     ]
-  },
-   {
-    org_id: 'org_1', key: 'CUSTOM_SITE_LEAD', label: 'Custom Site Lead', is_system: false,
-    permissions: [
-// FIX: Explicitly cast inline arrays to Action[] to satisfy the Permission type.
-      { resource: 'reports', actions: ['read', 'create', 'approve'] as Action[], scope: 'project' },
-    ]
-  },
+  }
 ];
 
 export const planTypes: PlanType[] = ['HSEMP', 'Lifting', 'Work at Height', 'Confined Space', 'Fire', 'ERP', 'EMP', 'Waste'];
 
-const defaultPlanSection: PlanContentSection = { title: '', content: '', is_complete: false };
 export const planTemplates: Record<PlanType, PlanContentSection[]> = {
     'HSEMP': [
         { title: '1. Purpose', content: 'Define the objectives of this plan...', is_complete: false },
@@ -338,8 +269,6 @@ export const ramsTemplate: Omit<RamsType, 'id'|'org_id'|'project_id'|'activity'|
     linked_ptw_types: [],
 };
 
-
-// --- PTW CONFIG v2 ---
 export const ptwTypeDetails: Record<PtwType, { icon: string; description: string; color: string; hex: string; }> = {
     'General Work': { icon: '🔹', description: 'Baseline, low-risk work', color: 'blue-500', hex: '#3B82F6' },
     'Hot Work': { icon: '🔥', description: 'Welding, cutting, sparks', color: 'red-500', hex: '#EF4444' },
@@ -432,15 +361,12 @@ export const emptySignature: PtwSignature = { signature: '', signed_at: '' };
 export const emptyExtension: PtwExtension = { is_requested: false, reason: '', days: { from: '', to: '' }, hours: { from: '', to: '' }, requester: emptySignature, client_proponent: emptySignature, client_hs: emptySignature };
 export const emptyClosure: PtwClosure = { note: '', permit_requester: emptySignature, client_proponent: emptySignature, client_hs: emptySignature };
 
-
-// --- SIGNAGE CONFIG ---
-
 export const signageConfig: Record<SignCategory, {
   shape: 'circle' | 'triangle' | 'rectangle';
-  bgColor: string; // Tailwind class
-  textColor: string; // Tailwind class
-  symbolColor?: string; // Tailwind class
-  borderColor?: string; // Tailwind class
+  bgColor: string;
+  textColor: string;
+  symbolColor?: string;
+  borderColor?: string;
   hasSlash?: boolean;
 }> = {
     'Prohibition': { shape: 'circle', bgColor: 'bg-white', textColor: 'text-black', borderColor: 'border-red-600', hasSlash: true },

@@ -2,156 +2,156 @@ import React, { useState, useMemo } from 'react';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { MASTER_CHECKLIST_LIBRARY } from '../data/checklistLibrary';
-import { Search, Plus, Check } from 'lucide-react';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
+import type { ChecklistTemplate } from '../types';
+
+// Icons
+const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>;
+const PlusIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>;
+const CheckIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>;
+const XIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 
 interface ChecklistLibraryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onImport: (templateIds: string[]) => void;
 }
 
-export const ChecklistLibraryModal: React.FC<ChecklistLibraryModalProps> = ({ isOpen, onClose, onImport }) => {
+export const ChecklistLibraryModal: React.FC<ChecklistLibraryModalProps> = ({ isOpen, onClose }) => {
   const { activeOrg } = useAppContext();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { checklistTemplates, setChecklistTemplates } = useDataContext();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   const categories = useMemo(() => {
-    const cats = new Set(MASTER_CHECKLIST_LIBRARY.map(t => t.category));
+    const cats = new Set(MASTER_CHECKLIST_LIBRARY.map(c => c.category));
     return ['All', ...Array.from(cats)];
   }, []);
 
   const filteredTemplates = useMemo(() => {
     return MASTER_CHECKLIST_LIBRARY.filter(t => {
-      const title = (t.title as any)['en'] || '';
-      const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
+      // Safe access to title.en
+      const titleStr = (t.title as any)['en'] || 'Untitled';
+      const matchesSearch = titleStr.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'All' || t.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [searchQuery, selectedCategory]);
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+  const isImported = (template: ChecklistTemplate) => {
+     // Check by title to avoid ID conflicts since IDs in library are static
+     const titleStr = (template.title as any)['en'];
+     return checklistTemplates.some(t => {
+         const tTitle = (t.title as any)['en'] || t.title;
+         return tTitle === titleStr;
+     });
   };
 
-  const handleImport = () => {
-    onImport(selectedIds);
-    onClose();
-    setSelectedIds([]);
+  const handleImport = (template: ChecklistTemplate) => {
+    if (isImported(template)) return;
+
+    const newTemplate = {
+      ...template,
+      id: `ct_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      org_id: activeOrg.id
+    };
+
+    setChecklistTemplates(prev => [newTemplate, ...prev]);
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="p-6 border-b dark:border-gray-800 flex justify-between items-center">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Checklist Library</h2>
-            <p className="text-gray-500 dark:text-gray-400">Browse 50+ industry standard HSE checklists</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Global Checklist Library</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Browse and import industry-standard HSE checklists.</p>
           </div>
-          <div className="flex gap-3">
-             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input 
-                    type="text" 
-                    placeholder="Search library..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm w-64 focus:ring-2 focus:ring-emerald-500 outline-none"
-                />
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">
+            <XIcon />
+          </button>
+        </div>
+
+        {/* Controls */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col md:flex-row gap-4 bg-gray-50 dark:bg-slate-800/50 shrink-0">
+          <div className="relative flex-1">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <SearchIcon />
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            <input 
+              type="text" 
+              placeholder="Search templates..." 
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
           </div>
+          <select 
+            className="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none"
+            value={selectedCategory}
+            onChange={e => setSelectedCategory(e.target.value)}
+          >
+            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
 
-        {/* Body */}
-        <div className="flex flex-1 overflow-hidden">
-            {/* Sidebar Categories */}
-            <div className="w-64 bg-gray-50 dark:bg-gray-800/50 border-r dark:border-gray-800 p-4 overflow-y-auto">
-                <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 px-2">Categories</h3>
-                <div className="space-y-1">
-                    {categories.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                selectedCategory === cat 
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                            }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
+        {/* Grid */}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredTemplates.map(t => {
+              const imported = isImported(t);
+              const title = (t.title as any)['en'];
+              
+              return (
+                <div key={t.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-5 hover:shadow-lg transition-all bg-white dark:bg-slate-800 flex flex-col h-full">
+                  <div className="flex justify-between items-start mb-3">
+                    <Badge color="blue">{t.category}</Badge>
+                    {imported && <Badge color="green">Imported</Badge>}
+                  </div>
+                  
+                  <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2">{title}</h3>
+                  
+                  <div className="flex-1">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        {t.items.length} checkpoints included
+                      </p>
+                      <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1 mb-4">
+                          {t.items.slice(0, 3).map((i, idx) => (
+                              <li key={idx} className="truncate">• {(i.text as any)['en']}</li>
+                          ))}
+                          {t.items.length > 3 && <li>+ {t.items.length - 3} more...</li>}
+                      </ul>
+                  </div>
+                  
+                  <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <Button 
+                      className="w-full justify-center" 
+                      variant={imported ? "secondary" : "primary"}
+                      disabled={imported}
+                      onClick={() => handleImport(t)}
+                    >
+                      {imported ? (
+                        <><CheckIcon /> <span className="ml-2">Added</span></>
+                      ) : (
+                        <><PlusIcon /> <span className="ml-2">Import Template</span></>
+                      )}
+                    </Button>
+                  </div>
                 </div>
-            </div>
-
-            {/* Grid */}
-            <div className="flex-1 p-6 overflow-y-auto bg-gray-100 dark:bg-black/20">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredTemplates.map(tpl => {
-                        const isSelected = selectedIds.includes(tpl.id);
-                        return (
-                            <div 
-                                key={tpl.id} 
-                                onClick={() => toggleSelection(tpl.id)}
-                                className={`
-                                    relative p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 group
-                                    ${isSelected 
-                                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' 
-                                        : 'border-transparent bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 shadow-sm hover:shadow-md'
-                                    }
-                                `}
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <Badge color={isSelected ? 'green' : 'gray'}>{tpl.category}</Badge>
-                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-gray-300'}`}>
-                                        {isSelected && <Check className="w-4 h-4 text-white" />}
-                                    </div>
-                                </div>
-                                <h3 className="font-bold text-gray-900 dark:text-white mb-1">{(tpl.title as any)['en']}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{tpl.items.length} Checkpoints</p>
-                                
-                                {/* Preview Items */}
-                                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                                    <p className="text-xs text-gray-400 uppercase font-bold mb-2">Preview:</p>
-                                    <ul className="space-y-1">
-                                        {tpl.items.slice(0, 3).map((item, i) => (
-                                            <li key={i} className="text-xs text-gray-600 dark:text-gray-300 flex items-start">
-                                                <span className="mr-1.5">•</span>
-                                                <span className="truncate">{(item.text as any)['en']}</span>
-                                            </li>
-                                        ))}
-                                        {tpl.items.length > 3 && <li className="text-xs text-gray-400 italic">+ {tpl.items.length - 3} more</li>}
-                                    </ul>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+              );
+            })}
+          </div>
+          
+          {filteredTemplates.length === 0 && (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                  No templates found matching your search.
+              </div>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-5 border-t dark:border-gray-800 bg-white dark:bg-gray-900 flex justify-between items-center">
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedIds.length} checklists selected
-            </div>
-            <div className="flex gap-3">
-                <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                <Button onClick={handleImport} disabled={selectedIds.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                    Import Selected ({selectedIds.length})
-                </Button>
-            </div>
-        </div>
       </div>
     </div>
   );

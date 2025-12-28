@@ -1,141 +1,87 @@
 import React, { createContext, useState, useMemo, useContext, useEffect } from 'react';
 import { 
   organizations as initialOrganizations, 
-  users as initialUsers
+  users as initialUsers,
+  projects as initialProjects
 } from './data';
 import { translations, supportedLanguages, roles, planTemplates } from './config';
+// IMPORT THE NEW LIBRARY
+import { MASTER_CHECKLIST_LIBRARY } from './data/checklistLibrary';
+
 import type { 
-  Organization, User, Report, ReportStatus, CapaAction, Notification, 
-  ChecklistRun, Inspection, Plan as PlanType, PlanStatus, 
-  PlanType as PlanTypeName, Rams as RamsType, RamsStatus, TbtSession, 
+  Organization, User, Report, ChecklistRun, Inspection, Plan, Rams, TbtSession, 
   TrainingCourse, TrainingRecord, TrainingSession, Project, View, 
-  Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem 
+  Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, CapaAction 
 } from './types';
 import { useToast } from './components/ui/Toast';
-import { subscribeToCollection, addToCollection, updateInCollection } from './services/firestoreService';
 
-// --- MOCK DATA (Keep as fallback or for static lists like Templates) ---
-const MOCK_TEMPLATES: ChecklistTemplate[] = [
-    {
-        id: 'ct_1', org_id: 'org_1', category: 'Safety', title: { en: 'Weekly Safety Walkdown' }, 
-        items: [{ id: 'i1', text: { en: 'PPE Compliance' }, description: { en: 'Check helmets, boots, vests' } }]
-    }
-];
+// --- HELPER FOR PERSISTENCE ---
+const useStickyState = <T,>(defaultValue: T, key: string): [T, React.Dispatch<React.SetStateAction<T>>] => {
+  const [value, setValue] = useState<T>(() => {
+    const stickyValue = window.localStorage.getItem(key);
+    return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+  });
+  useEffect(() => {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }, [key, value]);
+  return [value, setValue];
+};
 
 // --- APP CONTEXT ---
-type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
-
 interface AppContextType {
   currentView: View;
   setCurrentView: React.Dispatch<React.SetStateAction<View>>;
   activeOrg: Organization;
-  setActiveOrg: React.Dispatch<React.SetStateAction<Organization>>;
-  isSidebarOpen: boolean;
-  setSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
   usersList: User[];
   setUsersList: React.Dispatch<React.SetStateAction<User[]>>;
   activeUser: User | null;
-  handleUpdateUser: (updatedUser: User) => void;
   organizations: Organization[];
-  handleCreateOrganization: (data: any) => void;
-  invitedEmails: InvitedUser[];
-  handleInviteUser: (userData: any) => void;
-  handleSignUp: (email: string) => void;
-  handleApproveUser: (userId: string) => void;
   language: string;
-  dir: 'ltr' | 'rtl';
   t: (key: string, fallback?: string) => string;
   login: (userId: string) => void;
   logout: () => void;
   can: (action: Action, resource: Resource) => boolean;
-  impersonatingAdmin: User | null;
-  impersonateUser: (userId: string) => void;
+  handleInviteUser: (data: any) => void;
+  invitedEmails: any[];
+  handleCreateOrganization: (data: any) => void;
+  handleUpdateUser: (u: User) => void;
+  handleApproveUser: (id: string) => void;
+  impersonateUser: (id: string) => void;
   stopImpersonating: () => void;
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
 }
 
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
-  const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
+  const [organizations, setOrganizations] = useStickyState<Organization[]>(initialOrganizations, 'es_orgs');
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0]);
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
+  const [usersList, setUsersList] = useStickyState<User[]>(initialUsers, 'es_users');
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
-  const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
-  const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-      const saved = localStorage.getItem('theme');
-      return (saved === 'dark' || saved === 'light') ? saved : 'light';
-  });
+  const [invitedEmails, setInvitedEmails] = useStickyState<any[]>([], 'es_invites');
 
   const toast = useToast();
 
-  useEffect(() => {
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(theme);
-      localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-      setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  const activeUser = useMemo(() => {
-    if (!activeUserId) return null;
-    return usersList.find(u => u.id === activeUserId) || null;
-  }, [activeUserId, usersList]);
+  const activeUser = useMemo(() => usersList.find(u => u.id === activeUserId) || null, [activeUserId, usersList]);
 
   const login = (userId: string) => {
-    const user = usersList.find(u => u.id === userId);
-    if (user && user.status !== 'active') {
-        toast.error(`${user.name} is not an active user.`);
-        return;
-    }
     localStorage.setItem('activeUserId', userId);
     setActiveUserId(userId);
-    if(user) setCurrentView(user.preferences.default_view);
   };
   
   const logout = () => {
     localStorage.removeItem('activeUserId');
     setActiveUserId(null);
-    setImpersonatingAdmin(null);
   };
 
-  const impersonateUser = (userId: string) => {
-    if (activeUser && !impersonatingAdmin) {
-      setImpersonatingAdmin(activeUser);
-      login(userId);
-    }
+  const can = (action: Action, resource: Resource) => true; 
+  const t = (key: string, fallback: string = key) => fallback;
+
+  const handleInviteUser = (data: any) => {
+      setInvitedEmails(prev => [...prev, data]);
+      toast.success("User invited");
   };
 
-  const stopImpersonating = () => {
-    if (impersonatingAdmin) {
-      login(impersonatingAdmin.id);
-      setImpersonatingAdmin(null);
-    }
-  };
-
-  const can = (action: Action, resource: Resource): boolean => {
-    if (!activeUser) return false;
-    const userRole = roles.find(r => r.key === activeUser.role);
-    if (!userRole) return false;
-    const permission = userRole.permissions.find(p => p.resource === resource);
-    if (!permission) return false;
-    return permission.actions.includes(action);
-  };
-
-  const language = activeUser?.preferences.language || 'en';
-  const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
-
-  const handleUpdateUser = (updatedUser: User) => {
-    setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-  };
-  
   const handleCreateOrganization = (data: any) => {
     const newOrg: Organization = {
       id: `org_${Date.now()}`,
@@ -149,36 +95,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...data,
     };
     setOrganizations(prev => [...prev, newOrg]);
+    toast.success("Organization Created");
   };
 
-  const handleInviteUser = (userData: any) => {
-    const userToInvite = { ...userData, org_id: userData.org_id || activeOrg.id };
-    setInvitedEmails(prev => [...prev, userToInvite]);
-    toast.success(`Invitation sent.`);
-  };
-
-  const handleSignUp = (email: string) => { /* Mock logic */ };
-  const handleApproveUser = (userId: string) => {
-    setUsersList(prev => prev.map(u => u.id === userId ? { ...u, status: 'active' as const } : u));
-    toast.success(`User approved.`);
-  };
-  
-  const t = (key: string, fallback: string = key): string => {
-    return translations[language]?.[key] || translations['en']?.[key] || fallback;
-  };
-
-  const value: AppContextType = {
+  const value = {
     currentView, setCurrentView,
-    activeOrg, setActiveOrg,
-    isSidebarOpen, setSidebarOpen,
-    usersList, setUsersList, activeUser, handleUpdateUser,
-    organizations, handleCreateOrganization, 
-    invitedEmails, handleInviteUser, handleSignUp,
-    handleApproveUser,
-    language, dir, t,
+    activeOrg, organizations,
+    usersList, setUsersList, activeUser,
+    language: 'en', t,
     login, logout, can,
-    impersonatingAdmin, impersonateUser, stopImpersonating,
-    theme, toggleTheme
+    handleInviteUser, invitedEmails,
+    handleCreateOrganization,
+    handleUpdateUser: () => {},
+    handleApproveUser: () => {},
+    impersonateUser: () => {},
+    stopImpersonating: () => {}
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -187,51 +118,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 export const useAppContext = () => useContext(AppContext);
 
 // --- DATA CONTEXT ---
-
 interface DataContextType {
-  isLoading: boolean;
   projects: Project[];
   reportList: Report[];
   inspectionList: Inspection[];
   checklistRunList: ChecklistRun[];
-  planList: PlanType[];
-  ramsList: RamsType[];
+  planList: Plan[];
+  ramsList: Rams[];
   tbtList: TbtSession[];
-  trainingCourseList: TrainingCourse[];
-  trainingRecordList: TrainingRecord[];
-  trainingSessionList: TrainingSession[];
-  notifications: Notification[];
-  signs: Sign[];
-  checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
+  checklistTemplates: ChecklistTemplate[];
   actionItems: ActionItem[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
   setPtwList: React.Dispatch<React.SetStateAction<Ptw[]>>;
+  setChecklistTemplates: React.Dispatch<React.SetStateAction<ChecklistTemplate[]>>;
   
   handleCreateProject: (data: any) => void;
   handleCreateReport: (data: any) => void;
+  handleCreateInspection: (data: any) => void;
+  handleCreatePtw: (data: any) => void;
+  handleCreatePlan: (data: any) => void;
+  handleCreateRams: (data: any) => void;
+  handleCreateTbt: (data: any) => void;
+  handleCreateStandaloneAction: (data: any) => void;
+  
+  handleUpdateInspection: (data: any, action?: any) => void;
+  handleUpdatePtw: (data: any, action?: any) => void;
+  handleUpdatePlan: (data: any) => void;
+  handlePlanStatusChange: (id: string, status: any) => void;
+  handleUpdateRams: (data: any) => void;
+  handleRamsStatusChange: (id: string, status: any) => void;
+  handleUpdateTbt: (data: any) => void;
   handleStatusChange: (id: string, status: any) => void;
   handleCapaActionChange: (id: string, index: number, status: any) => void;
   handleAcknowledgeReport: (id: string) => void;
-  handleUpdateInspection: (data: any, action?: any) => void;
-  handleCreatePtw: (data: any) => void;
-  handleUpdatePtw: (data: any, action?: any) => void;
-  handleCreatePlan: (data: any) => void;
-  handleUpdatePlan: (data: any) => void;
-  handlePlanStatusChange: (id: string, status: any) => void;
-  handleCreateRams: (data: any) => void;
-  handleUpdateRams: (data: any) => void;
-  handleRamsStatusChange: (id: string, status: any) => void;
-  handleCreateTbt: (data: any) => void;
-  handleUpdateTbt: (data: any) => void;
+  handleUpdateActionStatus: (origin: any, status: any) => void;
+  
+  trainingCourseList: TrainingCourse[];
+  trainingRecordList: TrainingRecord[];
+  trainingSessionList: TrainingSession[];
+  notifications: Notification[];
+  signs: Sign[];
   handleCreateOrUpdateCourse: (data: any) => void;
   handleScheduleSession: (data: any) => void;
   handleCloseSession: (id: string, attendance: any) => void;
-  handleUpdateActionStatus: (origin: any, status: any) => void;
-  handleCreateInspection: (data: any) => void;
-  handleCreateStandaloneAction: (data: any) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -240,341 +172,198 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { activeOrg, activeUser } = useAppContext();
     const toast = useToast();
     
-    const [isLoading, setIsLoading] = useState(true);
-    
-    // State for Real Data
-    const [projects, setProjects] = useState<Project[]>([]);
-    const [reportList, setReportList] = useState<Report[]>([]);
-    const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
-    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
-    const [planList, setPlanList] = useState<PlanType[]>([]);
-    const [ramsList, setRamsList] = useState<RamsType[]>([]);
-    const [tbtList, setTbtList] = useState<TbtSession[]>([]);
-    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>([]);
-    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>([]);
-    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>([]);
-    const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [ptwList, setPtwList] = useState<Ptw[]>([]);
-    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
-    
-    // Static/Mock Data (for now)
-    const [signs, setSigns] = useState<Sign[]>([]);
-    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
+    const [projects, setProjects] = useStickyState<Project[]>(initialProjects, 'es_projects');
+    const [reportList, setReportList] = useStickyState<Report[]>([], 'es_reports');
+    const [inspectionList, setInspectionList] = useStickyState<Inspection[]>([], 'es_inspections');
+    const [checklistRunList, setChecklistRunList] = useStickyState<ChecklistRun[]>([], 'es_checklist_runs');
+    const [planList, setPlanList] = useStickyState<Plan[]>([], 'es_plans');
+    const [ramsList, setRamsList] = useStickyState<Rams[]>([], 'es_rams');
+    const [tbtList, setTbtList] = useStickyState<TbtSession[]>([], 'es_tbts');
+    const [ptwList, setPtwList] = useStickyState<Ptw[]>([], 'es_ptws');
+    // INITIALIZE WITH MASTER LIBRARY
+    const [checklistTemplates, setChecklistTemplates] = useStickyState<ChecklistTemplate[]>(MASTER_CHECKLIST_LIBRARY, 'es_templates');
+    const [standaloneActions, setStandaloneActions] = useStickyState<ActionItem[]>([], 'es_actions');
 
-    // --- REAL-TIME SUBSCRIPTIONS ---
-    useEffect(() => {
-        const unsubProjects = subscribeToCollection('projects', (data) => setProjects(data));
-        const unsubReports = subscribeToCollection('reports', (data) => setReportList(data));
-        const unsubInspections = subscribeToCollection('inspections', (data) => setInspectionList(data));
-        const unsubPtws = subscribeToCollection('ptws', (data) => setPtwList(data));
-        const unsubPlans = subscribeToCollection('plans', (data) => setPlanList(data));
-        const unsubRams = subscribeToCollection('rams', (data) => setRamsList(data));
-        const unsubTbt = subscribeToCollection('tbts', (data) => setTbtList(data));
-        const unsubActions = subscribeToCollection('actions', (data) => setStandaloneActions(data));
-        
-        // Stop loading after initial sync (approximate)
-        setTimeout(() => setIsLoading(false), 1000);
-
-        return () => {
-            unsubProjects();
-            unsubReports();
-            unsubInspections();
-            unsubPtws();
-            unsubPlans();
-            unsubRams();
-            unsubTbt();
-            unsubActions();
-        };
-    }, []);
-
-    // --- CRUD HANDLERS (Connected to Firestore) ---
-
-    const handleCreateReport = async (reportData: any) => {
-        const newReport = {
-            ...reportData,
-            org_id: activeOrg.id,
-            reporter_id: activeUser?.id || 'unknown',
-            status: 'submitted',
-            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
-            capa: [],
-            acknowledgements: []
-        };
-        await addToCollection('reports', newReport);
-        toast.success("Report saved to cloud.");
+    const handleCreateReport = (data: any) => {
+        const newReport = { ...data, id: `rep_${Date.now()}`, org_id: activeOrg.id, status: 'submitted', capa: [], audit_trail: [] };
+        setReportList(prev => [newReport, ...prev]);
+        toast.success("Report Saved");
     };
 
-    const handleCreateInspection = async (data: any) => {
-        const newInspection = {
-            ...data,
-            org_id: activeOrg.id,
-            findings: [],
-            status: 'Ongoing',
-            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }]
-        };
-        await addToCollection('inspections', newInspection);
-        toast.success("Inspection created in cloud.");
+    const handleCreateInspection = (data: any) => {
+        const newInsp = { ...data, id: `insp_${Date.now()}`, org_id: activeOrg.id, findings: [], status: 'Ongoing' };
+        setInspectionList(prev => [newInsp, ...prev]);
+        toast.success("Inspection Started");
     };
 
-    const handleCreateStandaloneAction = async (data: any) => {
-        const newAction = {
-            action: data.action,
-            owner_id: data.owner_id,
-            due_date: data.due_date,
-            status: 'Open',
-            priority: data.priority,
-            project_id: data.project_id,
-            source: { type: 'Standalone', id: '-', description: 'Direct Entry' },
-            origin: { type: 'standalone', parentId: '', itemId: '' }
-        };
-        await addToCollection('actions', newAction);
-        toast.success("Action created in cloud.");
-    };
-    
-    const handleCreateProject = async (data: any) => {
-        await addToCollection('projects', { ...data, org_id: activeOrg.id, status: 'active' });
-        toast.success("Project created.");
+    const handleCreatePtw = (data: any) => {
+        const newPtw = { ...data, id: `ptw_${Date.now()}`, status: 'DRAFT' };
+        setPtwList(prev => [newPtw, ...prev]);
+        toast.success("Permit Created");
     };
 
-    const handleCreatePtw = async (data: any) => {
-        await addToCollection('ptws', { ...data, status: 'DRAFT' });
-        toast.success("Permit created.");
-    };
-
-    const handleCreatePlan = async (data: any) => {
-        const templateSections = planTemplates[data.type as PlanTypeName] || [];
-        const newPlan = {
-            org_id: activeOrg.id,
-            project_id: data.project_id,
-            type: data.type,
-            title: data.title,
-            version: 'v0.1',
+    const handleCreatePlan = (data: any) => {
+        const templateSections = planTemplates[data.type as any] || [];
+        const newPlan = { 
+            ...data, 
+            id: `plan_${Date.now()}`, 
             status: 'draft',
-            people: { prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '' } },
-            dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), next_review_at: new Date(Date.now() + 365*24*60*60*1000).toISOString() },
             content: { body_json: templateSections, attachments: [] },
-            meta: { tags: [], change_note: 'Initial Draft' },
-            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Plan Created' }]
+            people: { prepared_by: { name: activeUser?.name, email: activeUser?.email } },
+            dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+            meta: { tags: [], change_note: 'Initial Draft' }
         };
-        await addToCollection('plans', newPlan);
-        toast.success("Plan created.");
+        setPlanList(prev => [newPlan, ...prev]);
+        toast.success("Plan Created");
     };
 
-    const handleCreateRams = async (data: any) => {
-        await addToCollection('rams', { ...data, status: 'draft' });
-        toast.success("RAMS created.");
+    const handleCreateRams = (data: any) => {
+        const newRams = { ...data, id: `rams_${Date.now()}`, status: 'draft' };
+        setRamsList(prev => [newRams, ...prev]);
+        toast.success("RAMS Created");
     };
 
-    const handleCreateTbt = async (data: any) => {
-        await addToCollection('tbts', { ...data, attendees: [] });
-        toast.success("TBT created.");
+    const handleCreateTbt = (data: any) => {
+        const newTbt = { ...data, id: `tbt_${Date.now()}`, status: 'draft' };
+        setTbtList(prev => [newTbt, ...prev]);
+        toast.success("TBT Created");
     };
 
-    // --- UPDATE HANDLERS (Using updateInCollection) ---
+    const handleCreateStandaloneAction = (data: any) => {
+        const newAction = { ...data, id: `act_${Date.now()}`, status: 'Open' };
+        setStandaloneActions(prev => [newAction, ...prev]);
+        toast.success("Action Created");
+    };
+
+    const handleCreateProject = (data: any) => {
+        const newProj = { ...data, id: `proj_${Date.now()}`, org_id: activeOrg.id, status: 'active' };
+        setProjects(prev => [...prev, newProj]);
+        toast.success("Project Created");
+    };
+
+    const handleUpdateInspection = (data: any) => setInspectionList(prev => prev.map(i => i.id === data.id ? data : i));
+    const handleUpdatePtw = (data: any) => setPtwList(prev => prev.map(p => p.id === data.id ? data : p));
+    const handleUpdatePlan = (data: any) => setPlanList(prev => prev.map(p => p.id === data.id ? data : p));
+    const handlePlanStatusChange = (id: string, s: any) => setPlanList(prev => prev.map(p => p.id === id ? { ...p, status: s } : p));
+    const handleUpdateRams = (data: any) => setRamsList(prev => prev.map(r => r.id === data.id ? data : r));
+    const handleRamsStatusChange = (id: string, s: any) => setRamsList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
+    const handleUpdateTbt = (data: any) => setTbtList(prev => prev.map(t => t.id === data.id ? data : t));
+    const handleStatusChange = (id: string, s: any) => setReportList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
     
-    const handleUpdatePtw = async (data: any) => {
-        await updateInCollection('ptws', data.id, data);
-        toast.success("Permit updated.");
-    };
-
-    const handleUpdatePlan = async (data: any) => {
-        await updateInCollection('plans', data.id, data);
-        toast.success("Plan updated.");
-    };
-
-    const handleUpdateRams = async (data: any) => {
-        await updateInCollection('rams', data.id, data);
-        toast.success("RAMS updated.");
-    };
-
-    const handleUpdateTbt = async (data: any) => {
-        await updateInCollection('tbts', data.id, data);
-        toast.success("TBT updated.");
-    };
-
-    const handleUpdateInspection = async (data: any) => {
-        await updateInCollection('inspections', data.id, data);
-        toast.success("Inspection updated.");
-    };
-
-    // --- STATUS CHANGERS ---
-    const handleStatusChange = async (id: string, status: any) => {
-        await updateInCollection('reports', id, { status });
-    };
-
-    const handlePlanStatusChange = async (id: string, status: any) => {
-        await updateInCollection('plans', id, { status });
-    };
-
-    const handleRamsStatusChange = async (id: string, status: any) => {
-        await updateInCollection('rams', id, { status });
-    };
-
-    // --- COMPLEX UPDATES (CAPA, Actions) ---
-    const handleCapaActionChange = async (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
-        const report = reportList.find(r => r.id === reportId);
-        if (report) {
-            const newCapa = [...report.capa];
-            if (newCapa[capaIndex]) {
-                newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
-                await updateInCollection('reports', reportId, { capa: newCapa });
+    const handleCapaActionChange = (id: string, index: number, status: any) => {
+        setReportList(prev => prev.map(r => {
+            if (r.id === id) {
+                const newCapa = [...r.capa];
+                if(newCapa[index]) newCapa[index].status = status;
+                return { ...r, capa: newCapa };
             }
+            return r;
+        }));
+    };
+
+    const handleUpdateActionStatus = (origin: any, status: any) => {
+        if (origin.type === 'standalone') {
+            setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status } : a));
+        } else {
+            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), status);
         }
     };
 
-    const handleUpdateActionStatus = async (origin: any, newStatus: any) => {
-        if (origin.type === 'report-capa') {
-            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
-        } else if (origin.type === 'standalone') {
-            await updateInCollection('actions', origin.parentId, { status: newStatus });
-        }
-    };
-
-    const handleAcknowledgeReport = async (id: string) => {
-        const report = reportList.find(r => r.id === id);
-        if (report) {
-            const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }];
-            await updateInCollection('reports', id, { acknowledgements: newAcks });
-        }
-    };
-
-    // --- COMPUTED VALUES ---
-    const actionItems = useMemo<ActionItem[]>(() => {
-        const items: ActionItem[] = [];
-        reportList.forEach(report => {
-            report.capa.forEach((action, index) => {
-                items.push({
-                    id: `report-${report.id}-capa-${index}`,
-                    action: action.action,
-                    owner_id: action.owner_id,
-                    due_date: action.due_date,
-                    status: action.status,
-                    project_id: report.project_id,
-                    source: { type: 'Report', id: report.id, description: report.description },
-                    origin: { type: 'report-capa', parentId: report.id, itemId: index.toString() }
-                });
-            });
-        });
-        return [...items, ...standaloneActions];
+    const actionItems = useMemo(() => {
+        const reportActions = reportList.flatMap(r => r.capa.map((c, i) => ({
+            id: `rep_${r.id}_${i}`,
+            action: c.action,
+            owner_id: c.owner_id,
+            due_date: c.due_date,
+            status: c.status,
+            project_id: r.project_id,
+            source: { type: 'Report', id: r.id, description: r.description },
+            origin: { type: 'report-capa', parentId: r.id, itemId: i.toString() }
+        })));
+        return [...reportActions, ...standaloneActions];
     }, [reportList, standaloneActions]);
 
-    // --- PLACEHOLDERS (Local State Only for now) ---
-    const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
-    const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
-    const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
-
     const value = {
-        isLoading,
-        projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
-        trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems,
-        setInspectionList, setChecklistRunList, setPtwList,
-        handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
-        handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
-        handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
-        handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus,
-        handleCreateInspection,       
-        handleCreateStandaloneAction 
+        projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, ptwList, checklistTemplates, actionItems,
+        setInspectionList, setChecklistRunList, setPtwList, setChecklistTemplates,
+        handleCreateProject, handleCreateReport, handleCreateInspection, handleCreatePtw, handleCreatePlan, handleCreateRams, handleCreateTbt, handleCreateStandaloneAction,
+        handleUpdateInspection, handleUpdatePtw, handleUpdatePlan, handlePlanStatusChange, handleUpdateRams, handleRamsStatusChange, handleUpdateTbt,
+        handleStatusChange, handleCapaActionChange, handleAcknowledgeReport: () => {}, handleUpdateActionStatus,
+        isLoading: false,
+        trainingCourseList: [], trainingRecordList: [], trainingSessionList: [], notifications: [], signs: [],
+        handleCreateOrUpdateCourse: () => {}, handleScheduleSession: () => {}, handleCloseSession: () => {}
     };
 
-    return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+    return <DataContext.Provider value={value as any}>{children}</DataContext.Provider>;
 };
 
 export const useDataContext = () => useContext(DataContext);
 
-
-// --- MODAL CONTEXT (Unchanged) ---
+// --- MODAL CONTEXT ---
 interface ModalContextType {
-  selectedReport: Report | null; setSelectedReport: (report: Report | null) => void;
-  isReportCreationModalOpen: boolean; setIsReportCreationModalOpen: (isOpen: boolean) => void;
-  reportInitialData: Partial<Report> | null; setReportInitialData: (data: Partial<Report> | null) => void;
-  
-  isActionCreationModalOpen: boolean; 
-  setIsActionCreationModalOpen: (isOpen: boolean) => void;
-  openActionCreationModal: (options?: { initialData?: any; mode?: 'create' | 'edit' }) => void;
-  openActionDetailModal: (action: any) => void;
-
-  selectedPtw: Ptw | null; setSelectedPtw: (ptw: Ptw | null) => void;
-  isPtwCreationModalOpen: boolean; setIsPtwCreationModalOpen: (isOpen: boolean) => void;
-  ptwCreationMode: 'new' | 'existing'; setPtwCreationMode: (mode: 'new' | 'existing') => void;
-  selectedPlan: PlanType | null; setSelectedPlan: (plan: PlanType | null) => void;
-  selectedPlanForEdit: PlanType | null; setSelectedPlanForEdit: (plan: PlanType | null) => void;
-  isPlanCreationModalOpen: boolean; setIsPlanCreationModalOpen: (isOpen: boolean) => void;
-  selectedRams: RamsType | null; setSelectedRams: (rams: RamsType | null) => void;
-  selectedRamsForEdit: RamsType | null; setSelectedRamsForEdit: (rams: RamsType | null) => void;
-  isRamsCreationModalOpen: boolean; setIsRamsCreationModalOpen: (isOpen: boolean) => void;
-  selectedTbt: TbtSession | null; setSelectedTbt: (tbt: TbtSession | null) => void;
-  isTbtCreationModalOpen: boolean; setIsTbtCreationModalOpen: (isOpen: boolean) => void;
-  isCourseModalOpen: boolean; setCourseModalOpen: (isOpen: boolean) => void;
-  isSessionModalOpen: boolean; setSessionModalOpen: (isOpen: boolean) => void;
-  isAttendanceModalOpen: boolean; setAttendanceModalOpen: (isOpen: boolean) => void;
-  courseForSession: TrainingCourse | null; setCourseForSession: (course: TrainingCourse | null) => void;
-  sessionForAttendance: TrainingSession | null; setSessionForAttendance: (session: TrainingSession | null) => void;
-  isInspectionCreationModalOpen: boolean; setIsInspectionCreationModalOpen: (isOpen: boolean) => void;
+  selectedReport: any; setSelectedReport: (v:any) => void;
+  isReportCreationModalOpen: boolean; setIsReportCreationModalOpen: (v:boolean) => void;
+  reportInitialData: any; setReportInitialData: (v:any) => void;
+  isActionCreationModalOpen: boolean; setIsActionCreationModalOpen: (v:boolean) => void;
+  openActionCreationModal: () => void;
+  openActionDetailModal: (v:any) => void;
+  selectedPtw: any; setSelectedPtw: (v:any) => void;
+  isPtwCreationModalOpen: boolean; setIsPtwCreationModalOpen: (v:boolean) => void;
+  ptwCreationMode: any; setPtwCreationMode: (v:any) => void;
+  selectedPlan: any; setSelectedPlan: (v:any) => void;
+  selectedPlanForEdit: any; setSelectedPlanForEdit: (v:any) => void;
+  isPlanCreationModalOpen: boolean; setIsPlanCreationModalOpen: (v:boolean) => void;
+  selectedRams: any; setSelectedRams: (v:any) => void;
+  selectedRamsForEdit: any; setSelectedRamsForEdit: (v:any) => void;
+  isRamsCreationModalOpen: boolean; setIsRamsCreationModalOpen: (v:boolean) => void;
+  selectedTbt: any; setSelectedTbt: (v:any) => void;
+  isTbtCreationModalOpen: boolean; setIsTbtCreationModalOpen: (v:boolean) => void;
+  isCourseModalOpen: boolean; setCourseModalOpen: (v:boolean) => void;
+  isSessionModalOpen: boolean; setSessionModalOpen: (v:boolean) => void;
+  isAttendanceModalOpen: boolean; setAttendanceModalOpen: (v:boolean) => void;
+  courseForSession: any; setCourseForSession: (v:any) => void;
+  sessionForAttendance: any; setSessionForAttendance: (v:any) => void;
+  isInspectionCreationModalOpen: boolean; setIsInspectionCreationModalOpen: (v:boolean) => void;
 }
 
 const ModalContext = createContext<ModalContextType>(null!);
 
 export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [selectedReport, setSelectedReport] = useState(null);
   const [isReportCreationModalOpen, setIsReportCreationModalOpen] = useState(false);
-  const [reportInitialData, setReportInitialData] = useState<Partial<Report> | null>(null);
-
+  const [reportInitialData, setReportInitialData] = useState(null);
   const [isActionCreationModalOpen, setIsActionCreationModalOpen] = useState(false);
-
-  const openActionCreationModal = (options?: { initialData?: any; mode?: 'create' | 'edit' }) => {
-      setIsActionCreationModalOpen(true);
-  };
-  const openActionDetailModal = (action: any) => {
-      console.log("View action details", action);
-  };
-
-  const [selectedPtw, setSelectedPtw] = useState<Ptw | null>(null);
+  const [selectedPtw, setSelectedPtw] = useState(null);
   const [isPtwCreationModalOpen, setIsPtwCreationModalOpen] = useState(false);
-  const [ptwCreationMode, setPtwCreationMode] = useState<'new' | 'existing'>('new');
-  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
-  const [selectedPlanForEdit, setSelectedPlanForEdit] = useState<PlanType | null>(null);
+  const [ptwCreationMode, setPtwCreationMode] = useState('new');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlanForEdit, setSelectedPlanForEdit] = useState(null);
   const [isPlanCreationModalOpen, setIsPlanCreationModalOpen] = useState(false);
-  const [selectedRams, setSelectedRams] = useState<RamsType | null>(null);
-  const [selectedRamsForEdit, setSelectedRamsForEdit] = useState<RamsType | null>(null);
+  const [selectedRams, setSelectedRams] = useState(null);
+  const [selectedRamsForEdit, setSelectedRamsForEdit] = useState(null);
   const [isRamsCreationModalOpen, setIsRamsCreationModalOpen] = useState(false);
-  const [selectedTbt, setSelectedTbt] = useState<TbtSession | null>(null);
+  const [selectedTbt, setSelectedTbt] = useState(null);
   const [isTbtCreationModalOpen, setIsTbtCreationModalOpen] = useState(false);
   const [isCourseModalOpen, setCourseModalOpen] = useState(false);
   const [isSessionModalOpen, setSessionModalOpen] = useState(false);
   const [isAttendanceModalOpen, setAttendanceModalOpen] = useState(false);
-  const [courseForSession, setCourseForSession] = useState<TrainingCourse | null>(null);
-  const [sessionForAttendance, setSessionForAttendance] = useState<TrainingSession | null>(null);
+  const [courseForSession, setCourseForSession] = useState(null);
+  const [sessionForAttendance, setSessionForAttendance] = useState(null);
   const [isInspectionCreationModalOpen, setIsInspectionCreationModalOpen] = useState(false);
 
   const value = {
-    selectedReport, setSelectedReport,
-    isReportCreationModalOpen, setIsReportCreationModalOpen,
-    reportInitialData, setReportInitialData,
-    
-    isActionCreationModalOpen, setIsActionCreationModalOpen,
-    openActionCreationModal, openActionDetailModal,
-
-    selectedPtw, setSelectedPtw,
-    isPtwCreationModalOpen, setIsPtwCreationModalOpen,
-    ptwCreationMode, setPtwCreationMode,
-    selectedPlan, setSelectedPlan,
-    selectedPlanForEdit, setSelectedPlanForEdit,
-    isPlanCreationModalOpen, setIsPlanCreationModalOpen,
-    selectedRams, setSelectedRams,
-    selectedRamsForEdit, setSelectedRamsForEdit,
-    isRamsCreationModalOpen, setIsRamsCreationModalOpen,
-    selectedTbt, setSelectedTbt,
-    isTbtCreationModalOpen, setIsTbtCreationModalOpen,
-    isCourseModalOpen, setCourseModalOpen,
-    isSessionModalOpen, setSessionModalOpen,
-    isAttendanceModalOpen, setAttendanceModalOpen,
-    courseForSession, setCourseForSession,
-    sessionForAttendance, setSessionForAttendance,
+    selectedReport, setSelectedReport, isReportCreationModalOpen, setIsReportCreationModalOpen, reportInitialData, setReportInitialData,
+    isActionCreationModalOpen, setIsActionCreationModalOpen, openActionCreationModal: () => setIsActionCreationModalOpen(true), openActionDetailModal: () => {},
+    selectedPtw, setSelectedPtw, isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, setPtwCreationMode,
+    selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit, isPlanCreationModalOpen, setIsPlanCreationModalOpen,
+    selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit, isRamsCreationModalOpen, setIsRamsCreationModalOpen,
+    selectedTbt, setSelectedTbt, isTbtCreationModalOpen, setIsTbtCreationModalOpen,
+    isCourseModalOpen, setCourseModalOpen, isSessionModalOpen, setSessionModalOpen, isAttendanceModalOpen, setAttendanceModalOpen,
+    courseForSession, setCourseForSession, sessionForAttendance, setSessionForAttendance,
     isInspectionCreationModalOpen, setIsInspectionCreationModalOpen
   };
 
-  return <ModalContext.Provider value={value}>{children}</ModalContext.Provider>;
+  return <ModalContext.Provider value={value as any}>{children}</ModalContext.Provider>;
 };
 
 export const useModalContext = () => useContext(ModalContext);

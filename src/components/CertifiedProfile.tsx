@@ -167,13 +167,13 @@ const ProgressBar: React.FC<{ current: number; target: number; label: string }> 
   const percentage = Math.min(100, Math.max(0, (current / target) * 100));
   return (
     <div className="w-full">
-      <div className="flex justify-between text-xs mb-1 text-gray-500 dark:text-gray-400">
+      <div className="flex justify-between text-xs mb-1 text-gray-400">
         <span>{label}</span>
         <span>{current} / {target}</span>
       </div>
-      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div className="w-full bg-gray-700 rounded-full h-2.5">
         <div
-          className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+          className="bg-neon-green h-2.5 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -182,7 +182,7 @@ const ProgressBar: React.FC<{ current: number; target: number; label: string }> 
 };
 
 // ================================
-// CERTIFICATE VISUALS (Golden Seal, Watermarks)
+// CERTIFICATE VISUALS
 // ================================
 
 const SecurityPattern = () => (
@@ -212,20 +212,19 @@ const Barcode: React.FC<{ value: string }> = ({ value }) => (
             {value.split('').map((char, i) => (
                 <div key={i} className={`w-[2px] ${i % 3 === 0 || i % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} style={{ height: '100%' }}></div>
             ))}
-            {/* Simulated decorative bars */}
             <div className="w-[3px] bg-black h-full"></div>
             <div className="w-[1px] bg-white h-full"></div>
             <div className="w-[4px] bg-black h-full"></div>
             <div className="w-[2px] bg-white h-full"></div>
             <div className="w-[1px] bg-black h-full"></div>
             <div className="w-[3px] bg-black h-full"></div>
+            <div className="w-[2px] bg-white h-full"></div>
             <div className="w-[5px] bg-black h-full"></div>
         </div>
         <div className="text-[8px] font-mono mt-1 tracking-widest">{value}</div>
     </div>
 );
 
-// --- NEW GOLDEN SEAL COMPONENT ---
 const GoldenSeal: React.FC = () => {
   return (
     <div className="relative w-32 h-32 flex items-center justify-center drop-shadow-lg">
@@ -239,35 +238,26 @@ const GoldenSeal: React.FC = () => {
             <stop offset="100%" stopColor="#F1D87E" />
           </linearGradient>
         </defs>
-        
-        {/* Starburst Edge */}
         <polygon 
           points="100,10 115,35 140,30 145,55 170,60 160,85 185,100 160,115 170,140 145,145 140,170 115,165 100,190 85,165 60,170 55,145 30,140 40,115 15,100 40,85 30,60 55,55 60,30 85,35"
           fill="url(#goldGradient)"
           stroke="#AA6C39"
           strokeWidth="2"
         />
-
-        {/* Inner Rings */}
         <circle cx="100" cy="100" r="70" fill="none" stroke="#AA6C39" strokeWidth="2" />
         <circle cx="100" cy="100" r="65" fill="none" stroke="#F1D87E" strokeWidth="1" />
-
-        {/* Text Paths */}
         <path id="textCurveTop" d="M 50,100 A 50,50 0 1,1 150,100" fill="none" />
         <text fontSize="13" fontWeight="bold" fill="#5C3A1E" letterSpacing="1">
             <textPath xlinkHref="#textCurveTop" startOffset="50%" textAnchor="middle">
                  EVIROSAFE CERTIFIED
             </textPath>
         </text>
-
         <path id="textCurveBottom" d="M 45,100 A 55,55 0 0,0 155,100" fill="none" />
         <text fontSize="10" fontWeight="bold" fill="#5C3A1E" letterSpacing="1">
             <textPath xlinkHref="#textCurveBottom" startOffset="50%" textAnchor="middle">
                  OFFICIAL STANDARD
             </textPath>
         </text>
-
-        {/* Center Icon */}
         <path 
             transform="translate(85, 80) scale(1.2)"
             d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" 
@@ -280,7 +270,6 @@ const GoldenSeal: React.FC = () => {
     </div>
   );
 };
-
 
 const InternationalCertificate: React.FC<{
   profile: CertificationProfile;
@@ -422,7 +411,6 @@ export const CertifiedProfile: React.FC = () => {
   const [app, setApp] = useState<CertificateApplication>(DEFAULT_APP);
   const [reviewNote, setReviewNote] = useState('');
 
-  // Load / Save Application State
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -446,7 +434,6 @@ export const CertifiedProfile: React.FC = () => {
     run();
   }, [profile]);
 
-  // Validation Logic
   const eligibility = useMemo(() => {
     const issues: string[] = [];
     const serviceMonths = app.joinedEviroSafeDate ? monthsBetween(app.joinedEviroSafeDate, new Date().toISOString()) : 0;
@@ -477,7 +464,6 @@ export const CertifiedProfile: React.FC = () => {
 
   const canSubmit = app.status === 'draft' && eligibility.isEligible;
 
-  // Handlers
   const handleSubmit = () => {
     if (!canSubmit) return;
     setApp(prev => ({ ...prev, status: 'submitted', submittedAt: new Date().toISOString() }));
@@ -523,7 +509,6 @@ export const CertifiedProfile: React.FC = () => {
 
   if (!activeUser) return <div className="p-8 text-center"><p className="text-gray-400">Please sign in.</p></div>;
 
-  // -- HELPER FOR TERMS LIST --
   const termsList = [
     { key: 'acceptedTerms', label: 'I accept the EviroSafe Certification Terms & Conditions' },
     { key: 'acceptedPrivacy', label: 'I accept the Privacy Policy and consent to verification' },
@@ -536,8 +521,8 @@ export const CertifiedProfile: React.FC = () => {
     <div className="max-w-7xl mx-auto p-6">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">My Certification Profile</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">International-level rules • evidence • approval • controlled certificate</p>
+          <h1 className="text-3xl font-bold text-gray-100">My Certification Profile</h1>
+          <p className="text-gray-400 mt-1">International-level rules • evidence • approval • controlled certificate</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => setActiveTab('requirements')}>View Requirements</Button>
@@ -545,9 +530,9 @@ export const CertifiedProfile: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+      <div className="flex border-b border-gray-700 mb-6">
         {[{ key: 'overview', label: 'Overview' }, { key: 'requirements', label: 'Requirements' }, { key: 'evidence', label: 'Apply & Evidence' }, { key: 'certificate', label: 'Certificate' }].map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key as any)} className={`px-4 py-3 font-semibold -mb-px border-b-2 ${activeTab === t.key ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}>{t.label}</button>
+          <button key={t.key} onClick={() => setActiveTab(t.key as any)} className={`px-4 py-3 font-semibold -mb-px border-b-2 ${activeTab === t.key ? 'border-neon-green text-neon-green' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>{t.label}</button>
         ))}
       </div>
 
@@ -556,19 +541,19 @@ export const CertifiedProfile: React.FC = () => {
           <Card title="Certification Status" className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
-                <img src={activeUser.avatar_url || 'https://i.pravatar.cc/150'} className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700" alt="avatar" />
+                <img src={activeUser.avatar_url || 'https://i.pravatar.cc/150'} className="w-14 h-14 rounded-full border border-gray-700" alt="avatar" />
                 <div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{activeUser.name}</div>
-                  <div className="text-gray-500 dark:text-gray-400">{profile.role_title}</div>
+                  <div className="text-2xl font-bold text-gray-100">{activeUser.name}</div>
+                  <div className="text-gray-400">{profile.role_title}</div>
                 </div>
               </div>
               <div className="text-right">
                 <Badge color={statusColor(app.status)}>{app.status.toUpperCase().replace('_', ' ')}</Badge>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">Engagement: <span className="font-bold text-gray-900 dark:text-gray-200">{eligibility.serviceMonths}</span> months</div>
+                <div className="text-xs text-gray-400 mt-2">Engagement: <span className="font-bold text-gray-200">{eligibility.serviceMonths}</span> months</div>
               </div>
             </div>
             {!eligibility.serviceOk && (
-              <div className="p-4 rounded-xl border border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200 mb-4">
+              <div className="p-4 rounded-xl border border-red-400/40 bg-red-500/10 text-red-200 mb-4">
                 <div className="font-bold mb-1">Not Eligible</div>
                 <div className="text-sm">Minimum engagement required: {GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} months.</div>
               </div>
@@ -579,9 +564,9 @@ export const CertifiedProfile: React.FC = () => {
               <ProgressBar current={eligibility.serviceMonths} target={GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} label="Engagement Months" />
             </div>
             {eligibility.issues.length > 0 && (
-              <div className="mt-6 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                <div className="font-bold mb-2">Pending Items</div>
-                <ul className="text-sm space-y-1">
+              <div className="mt-6 p-4 rounded-xl border border-amber-400/30 bg-amber-500/10">
+                <div className="font-bold text-amber-200 mb-2">Pending Items</div>
+                <ul className="text-sm text-amber-100 space-y-1">
                   {eligibility.issues.map((x, i) => <li key={i}>• {x}</li>)}
                 </ul>
                 <div className="mt-3"><Button variant="outline" onClick={() => setActiveTab('evidence')}>Go to Application</Button></div>
@@ -591,21 +576,21 @@ export const CertifiedProfile: React.FC = () => {
 
           <div className="space-y-6">
             <Card title="AI Recommendation" edgeColor="purple" variant="glass">
-              {loadingInsight ? <p className="text-gray-500 dark:text-gray-400">Analyzing...</p> : aiInsight ? (
+              {loadingInsight ? <p className="text-gray-400">Analyzing...</p> : aiInsight ? (
                 <div className="space-y-3">
-                  <p className="text-gray-700 dark:text-gray-200 italic">"{aiInsight.nextLevelRecommendation}"</p>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                  <p className="text-gray-200 italic">"{aiInsight.nextLevelRecommendation}"</p>
+                  <div className="text-sm text-gray-300">
                     <div className="font-bold mb-1">Suggested Actions</div>
                     <ul className="space-y-1">{aiInsight.missingItems.map((m, i) => <li key={i}>• {m}</li>)}</ul>
                   </div>
                 </div>
-              ) : <p className="text-gray-500 dark:text-gray-400">No insight available.</p>}
+              ) : <p className="text-gray-400">No insight available.</p>}
             </Card>
 
             {isAdmin && (
               <Card title="Reviewer Panel" edgeColor="red" variant="glass">
                 <div className="space-y-3">
-                  <textarea value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} className="w-full rounded-xl bg-white dark:bg-black/30 border border-gray-300 dark:border-gray-700 p-3 text-gray-900 dark:text-gray-100 text-sm" placeholder="Reviewer notes" rows={3} />
+                  <textarea value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} className="w-full rounded-xl bg-black/30 border border-gray-700 p-3 text-gray-100 text-sm" placeholder="Reviewer notes" rows={3} />
                   <div className="flex gap-2">
                     <Button onClick={handleApprove} disabled={app.status === 'approved'}>Approve</Button>
                     <Button variant="danger" onClick={handleReject} disabled={app.status === 'draft'}>Reject</Button>
@@ -619,7 +604,7 @@ export const CertifiedProfile: React.FC = () => {
 
       {activeTab === 'requirements' && (
         <Card title="Global Certification Rules">
-          <div className="space-y-6 text-gray-700 dark:text-gray-200">
+          <div className="space-y-6 text-gray-200">
             <p>1. Minimum {GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} months engagement on EviroSafe platform.</p>
             <p>2. Valid National ID and Secondary Education (or higher) required.</p>
             <p>3. Proven competence in Risk Assessment and Incident Investigation.</p>
@@ -630,17 +615,16 @@ export const CertifiedProfile: React.FC = () => {
       {activeTab === 'evidence' && (
         <Card title="Application Form" actions={<Badge color={statusColor(app.status)}>{app.status}</Badge>}>
             <div className="space-y-8">
-                {/* SECTION A */}
                 <div className="space-y-4">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">A) Eligibility & Education</h3>
+                    <h3 className="font-bold text-gray-100 border-b border-gray-700 pb-2">A) Eligibility & Education</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Joined Date</label>
-                            <input type="date" value={app.joinedEviroSafeDate} onChange={e => setApp(p => ({...p, joinedEviroSafeDate: e.target.value, status: 'draft'}))} className="w-full bg-white dark:bg-black/20 border border-gray-300 dark:border-gray-700 rounded-lg p-2 text-gray-900 dark:text-white" />
+                            <label className="block text-sm text-gray-400 mb-1">Joined Date</label>
+                            <input type="date" value={app.joinedEviroSafeDate} onChange={e => setApp(p => ({...p, joinedEviroSafeDate: e.target.value, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white" />
                         </div>
                         <div>
-                            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Education Level</label>
-                            <select value={app.educationLevel} onChange={e => setApp(p => ({...p, educationLevel: e.target.value as any, status: 'draft'}))} className="w-full bg-white dark:bg-black/20 border border-gray-300 dark:border-gray-700 rounded-lg p-2 text-gray-900 dark:text-white">
+                            <label className="block text-sm text-gray-400 mb-1">Education Level</label>
+                            <select value={app.educationLevel} onChange={e => setApp(p => ({...p, educationLevel: e.target.value as any, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white">
                                 <option value="Secondary">Secondary</option>
                                 <option value="Diploma">Diploma</option>
                                 <option value="Bachelor">Bachelor</option>
@@ -650,36 +634,34 @@ export const CertifiedProfile: React.FC = () => {
                     </div>
                 </div>
 
-                {/* SECTION B - ID RESTRICTED */}
                 <div className="space-y-4">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">B) Identity (National ID Only)</h3>
+                    <h3 className="font-bold text-gray-100 border-b border-gray-700 pb-2">B) Identity (National ID Only)</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">ID Type</label>
-                            <input type="text" value="National ID" disabled className="w-full bg-gray-100 dark:bg-black/40 border border-gray-300 dark:border-gray-700 rounded-lg p-2 text-gray-500 cursor-not-allowed" />
+                            <label className="block text-sm text-gray-400 mb-1">ID Type</label>
+                            <input type="text" value="National ID" disabled className="w-full bg-black/40 border border-gray-700 rounded-lg p-2 text-gray-500 cursor-not-allowed" />
                         </div>
                         <div>
-                            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">ID Number</label>
-                            <input type="text" value={app.idNumber} onChange={e => setApp(p => ({...p, idNumber: e.target.value, status: 'draft'}))} className="w-full bg-white dark:bg-black/20 border border-gray-300 dark:border-gray-700 rounded-lg p-2 text-gray-900 dark:text-white" placeholder="ID Number" />
+                            <label className="block text-sm text-gray-400 mb-1">ID Number</label>
+                            <input type="text" value={app.idNumber} onChange={e => setApp(p => ({...p, idNumber: e.target.value, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white" placeholder="ID Number" />
                         </div>
                         <div>
-                            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Issuing Country</label>
-                            <input type="text" value={app.idIssuingCountry} onChange={e => setApp(p => ({...p, idIssuingCountry: e.target.value, status: 'draft'}))} className="w-full bg-white dark:bg-black/20 border border-gray-300 dark:border-gray-700 rounded-lg p-2 text-gray-900 dark:text-white" placeholder="Country Code" />
+                            <label className="block text-sm text-gray-400 mb-1">Issuing Country</label>
+                            <input type="text" value={app.idIssuingCountry} onChange={e => setApp(p => ({...p, idIssuingCountry: e.target.value, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white" placeholder="Country Code" />
                         </div>
                     </div>
                 </div>
 
-                {/* SECTION F - TERMS */}
                 <div className="space-y-4">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700 pb-2">F) Terms & Conditions</h3>
-                    <div className="space-y-3 bg-gray-50 dark:bg-black/20 p-4 rounded-lg">
+                    <h3 className="font-bold text-gray-100 border-b border-gray-700 pb-2">F) Terms & Conditions</h3>
+                    <div className="space-y-3 bg-black/20 p-4 rounded-lg">
                         {termsList.map((t) => (
-                            <label key={t.key} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <label key={t.key} className="flex items-start gap-3 text-sm text-gray-300 cursor-pointer">
                                 <input 
                                     type="checkbox" 
                                     checked={!!(app as any)[t.key]} 
                                     onChange={(e) => setApp(p => ({ ...p, status: 'draft', [t.key]: e.target.checked }))}
-                                    className="mt-1 w-4 h-4 rounded bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-emerald-600 focus:ring-offset-white dark:focus:ring-offset-gray-900"
+                                    className="mt-1 w-4 h-4 rounded bg-gray-800 border-gray-600 text-neon-green focus:ring-offset-gray-900"
                                 />
                                 <span>{t.label}</span>
                             </label>
@@ -699,15 +681,24 @@ export const CertifiedProfile: React.FC = () => {
         <div className="space-y-6">
             {app.status === 'approved' ? (
                 <div className="overflow-auto py-4">
-                    <div className="mb-4 flex justify-end gap-2">
-                        <Button onClick={handlePrint}>Print Certificate</Button>
+                    <div className="mb-4 flex justify-between items-center p-4 bg-slate-900 border border-slate-700 rounded-xl">
+                        <div>
+                            <h3 className="text-lg font-bold text-white">Certificate Issued</h3>
+                            <p className="text-sm text-gray-400">ID: {app.certificateId}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={() => alert(`Certificate ${app.certificateId} is VALID.\nIssued to: ${activeUser.name}\nLevel: ${app.certificateLevel}`)}>
+                                Verify Authenticity
+                            </Button>
+                            <Button variant="outline" onClick={handlePrint}>Print / PDF</Button>
+                        </div>
                     </div>
                     <InternationalCertificate profile={profile} user={activeUser} app={app} />
                 </div>
             ) : (
                 <Card>
-                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Certificate Not Available</h3>
+                    <div className="text-center py-12 text-gray-400">
+                        <h3 className="text-xl font-bold text-white mb-2">Certificate Not Available</h3>
                         <p>Your application is currently <strong>{app.status.replace('_', ' ')}</strong>.</p>
                     </div>
                 </Card>

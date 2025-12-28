@@ -6,8 +6,7 @@ import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { ChecklistRunModal } from './ChecklistRunModal';
 import { ChecklistDetailModal } from './ChecklistDetailModal';
-import { ChecklistLibraryModal } from './ChecklistLibraryModal';
-import { MASTER_CHECKLIST_LIBRARY } from '../data/checklistLibrary';
+import { ChecklistLibraryModal } from './ChecklistLibraryModal'; // Import the new modal
 
 const StatCard: React.FC<{ title: string; value: string | number; change?: string }> = ({ title, value, change }) => (
     <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-2xl shadow-lg p-4">
@@ -18,27 +17,23 @@ const StatCard: React.FC<{ title: string; value: string | number; change?: strin
 );
 
 export const Housekeeping: React.FC = () => {
-    const { activeOrg, activeUser, usersList, language } = useAppContext();
-    const { checklistRunList, setChecklistRunList, projects, checklistTemplates, setChecklistTemplates } = useDataContext();
+    const { activeOrg, activeUser, language } = useAppContext();
+    const { checklistRunList, setChecklistRunList, projects, checklistTemplates } = useDataContext();
 
     const [isRunModalOpen, setRunModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
-    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false); // State for library modal
     const [selectedTemplate, setSelectedTemplate] = useState<ChecklistTemplate | null>(null);
 
-    // Filter templates for Housekeeping category
-    const housekeepingTemplates = useMemo(() => {
-        return checklistTemplates.filter(t => t.category === 'Housekeeping' || t.category === 'Welfare');
-    }, [checklistTemplates]);
-
+    const housekeepingTemplates = useMemo(() => checklistTemplates.filter(t => t.category === 'Housekeeping'), [checklistTemplates]);
     const housekeepingRuns = useMemo(() => {
         const templateIds = housekeepingTemplates.map(t => t.id);
         return checklistRunList.filter(run => templateIds.includes(run.template_id));
     }, [checklistRunList, housekeepingTemplates]);
     
-    const getTranslated = (textRecord: Record<string, string> | string) => {
+    const getTranslated = (textRecord: any) => {
       if (typeof textRecord === 'string') return textRecord;
-      return textRecord[language] || textRecord[activeOrg.primaryLanguage] || textRecord['en'] || Object.values(textRecord)[0] || '';
+      return textRecord[language] || textRecord[activeOrg.primaryLanguage] || textRecord['en'] || '';
     };
 
     const handleRunChecklist = (template: ChecklistTemplate) => {
@@ -64,58 +59,58 @@ export const Housekeeping: React.FC = () => {
         setSelectedTemplate(null);
     };
 
-    const handleImportChecklists = (newTemplates: ChecklistTemplate[]) => {
-        setChecklistTemplates(prev => [...prev, ...newTemplates]);
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">Site Housekeeping & Welfare</h1>
-                    <p className="text-text-secondary dark:text-dark-text-secondary">Manage cleanliness, waste, and welfare facilities across the project.</p>
+                    <p className="text-text-secondary dark:text-dark-text-secondary">Manage cleanliness, waste, and welfare facilities.</p>
                 </div>
-                <Button onClick={() => setIsLibraryOpen(true)}>
-                    <PlusIcon className="w-5 h-5 mr-2" />
-                    Import Templates
-                </Button>
+                <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => setIsLibraryOpen(true)}>
+                        Import Checklist
+                    </Button>
+                    <Button onClick={() => {}}>
+                        <PlusIcon className="w-5 h-5 mr-2" />
+                        New Inspection
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <StatCard title="Overall Score" value="92%" change="+1.5% this week" />
                 <StatCard title="Daily Compliance" value="98%" />
                 <StatCard title="Open Findings" value="3" />
-                <StatCard title="Inspections Today" value={housekeepingRuns.filter(r => new Date(r.executed_at).toDateString() === new Date().toDateString()).length} />
+                <StatCard title="Inspections Today" value="8" />
             </div>
 
             <Card title="Housekeeping Checklists">
-                {housekeepingTemplates.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {housekeepingTemplates.map(template => (
-                            <div key={template.id} className="p-4 bg-gray-50 dark:bg-dark-background rounded-lg border dark:border-dark-border flex justify-between items-center">
-                                <div>
-                                    <h4 className="font-semibold text-text-primary dark:text-dark-text-primary">{getTranslated(template.title)}</h4>
-                                    <p className="text-sm text-text-secondary dark:text-dark-text-secondary">{template.items.length} items</p>
-                                </div>
-                                <div className="space-x-2">
-                                    <Button size="sm" variant="secondary" onClick={() => handleViewChecklist(template)}>View</Button>
-                                    <Button size="sm" onClick={() => handleRunChecklist(template)}>Run</Button>
-                                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {housekeepingTemplates.map(template => (
+                        <div key={template.id} className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border dark:border-slate-700 flex justify-between items-center">
+                            <div>
+                                <h4 className="font-semibold text-text-primary dark:text-white">{getTranslated(template.title)}</h4>
+                                <p className="text-sm text-text-secondary dark:text-gray-400">{template.items.length} items</p>
                             </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-center py-8 bg-gray-50 dark:bg-white/5 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
-                        <p className="text-gray-500 dark:text-gray-400 mb-4">No housekeeping templates found.</p>
-                        <Button variant="outline" onClick={() => setIsLibraryOpen(true)}>Import from Library</Button>
-                    </div>
-                )}
+                            <div className="space-x-2">
+                                <Button size="sm" variant="secondary" onClick={() => handleViewChecklist(template)}>View</Button>
+                                <Button size="sm" onClick={() => handleRunChecklist(template)}>Run</Button>
+                            </div>
+                        </div>
+                    ))}
+                    {housekeepingTemplates.length === 0 && (
+                        <div className="col-span-2 text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl">
+                            <p>No housekeeping checklists found.</p>
+                            <Button variant="ghost" className="mt-2" onClick={() => setIsLibraryOpen(true)}>Browse Library</Button>
+                        </div>
+                    )}
+                </div>
             </Card>
 
             <Card title="Recent Activity">
                 <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
-                        <thead className="bg-gray-50 dark:bg-dark-background">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                        <thead className="bg-gray-50 dark:bg-slate-800">
                             <tr>
                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Checklist</th>
                                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Executor</th>
@@ -124,16 +119,16 @@ export const Housekeeping: React.FC = () => {
                                 <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-dark-border">
+                        <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-700">
                             {housekeepingRuns.slice(0, 5).map(run => {
                                 const template = housekeepingTemplates.find(t => t.id === run.template_id);
                                 const user = usersList.find(u => u.id === run.executed_by_id);
                                 return (
                                 <tr key={run.id}>
-                                    <td className="px-4 py-3 font-medium">{template ? getTranslated(template.title) : 'Unknown'}</td>
-                                    <td className="px-4 py-3 text-sm">{user?.name || 'Unknown'}</td>
+                                    <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{template ? getTranslated(template.title) : 'Unknown'}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{user?.name || 'Unknown'}</td>
                                     <td className="px-4 py-3"><Badge color={run.score && run.score >= 85 ? 'green' : 'yellow'}>{run.score}%</Badge></td>
-                                    <td className="px-4 py-3 text-sm">{new Date(run.executed_at).toLocaleDateString()}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{new Date(run.executed_at).toLocaleDateString()}</td>
                                     <td className="px-4 py-3 text-right"><Button size="sm" variant="ghost">View</Button></td>
                                 </tr>
                                 )
@@ -168,10 +163,10 @@ export const Housekeeping: React.FC = () => {
                 />
             )}
 
+            {/* Library Modal */}
             <ChecklistLibraryModal 
-                isOpen={isLibraryOpen}
-                onClose={() => setIsLibraryOpen(false)}
-                onImport={handleImportChecklists}
+                isOpen={isLibraryOpen} 
+                onClose={() => setIsLibraryOpen(false)} 
             />
 
         </div>
