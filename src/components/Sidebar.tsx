@@ -14,6 +14,9 @@ const icons: Record<string, JSX.Element> = {
   dashboard: (
     <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
   ),
+  'hse-statistics': (
+    <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+  ),
   'ai-insights': <path d="M13 10V3L4 14h7v7l9-11h-7z" />,
   'site-map': (
     <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -55,9 +58,8 @@ const icons: Record<string, JSX.Element> = {
   certification: (
     <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
   ),
-  // NEW: Organizations Icon
   organizations: (
-    <path d="M3 21h18M5 21V7l8-4 8 4v14M5 10h14M5 14h14M5 18h14" />
+    <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
   ),
 };
 
@@ -119,6 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { label: 'Dashboard', view: 'dashboard' },
+    { label: 'HSE Statistics', view: 'hse-statistics' },
     { label: 'AI Insights', view: 'ai-insights' },
     { label: 'Site Map', view: 'site-map' },
     { label: 'My Certificate', view: 'certification' },
@@ -133,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { label: 'Toolbox Talks', view: 'tbt' },
     { label: 'Training', view: 'training' },
     { label: 'People', view: 'people' },
-    { label: 'Organizations', view: 'organizations' }, // ADDED THIS LINE
+    { label: 'Organizations', view: 'organizations' },
     { label: 'Settings', view: 'settings' },
   ];
 
@@ -161,19 +164,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
-        {/* Back Button */}
-        <button 
-            onClick={() => window.history.back()} 
-            className={`flex items-center w-full rounded-xl transition-all duration-200 group relative overflow-hidden mb-4 text-slate-400 hover:bg-slate-800/80 hover:text-slate-50 ${isOpen ? 'px-4 py-2.5 mx-2 w-auto' : 'h-10 w-10 justify-center mx-auto'}`}
-        >
-            <div className="w-5 h-5 shrink-0 relative z-10">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                </svg>
-            </div>
-            {isOpen && <span className="ml-3 text-sm font-medium tracking-wide truncate relative z-10">Go Back</span>}
-        </button>
-
         {menuItems.map((item) => (
           <NavItem
             key={item.view}

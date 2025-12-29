@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import type {
   CanonicalPtwPayload,
-  Ptw,
-  PtwType,
-  PtwSafetyRequirement,
+  PtwConfinedSpacePayload,
   PtwHotWorkPayload,
   PtwLiftingPayload,
-  PtwConfinedSpacePayload,
-  PtwExcavationPayload,
+  Ptw,
+  PtwPpe,
+  PtwSafetyRequirement,
+  PtwType,
   PtwRoadClosurePayload,
   PtwWorkAtHeightPayload,
-  PtwWorkflowStage
+  PtwExcavationPayload,
 } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails, emptySignoff, emptySignature, emptyExtension, emptyClosure, ptwChecklistData } from '../config';
@@ -40,7 +40,7 @@ interface PtwCreationModalProps {
 
 export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onClose, onSubmit, mode }) => {
     const { projects } = useDataContext();
-    const { usersList, activeUser } = useAppContext();
+    const { activeUser } = useAppContext();
 
     const [step, setStep] = useState(1);
     const [selectedType, setSelectedType] = useState<PtwType | null>(null);
@@ -64,9 +64,6 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
         work_description: '',
         starts_at: new Date().toISOString().slice(0, 16),
         ends_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 16),
-        risk_assessment_ref: '',
-        emergency_contact: '',
-        number_of_workers: 1,
     });
 
     const [error, setError] = useState('');
@@ -91,6 +88,12 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
         setSelectedType(null);
         setError('');
         setEvidenceFiles([]);
+        setGlobalCompliance({
+            riskAssessmentCompleted: false,
+            emergencyProcedures: false,
+            energyIsolation: false,
+            competentPersonnel: false,
+        });
     };
 
     const handleClose = () => {
@@ -128,13 +131,13 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
 
         const basePayload: CanonicalPtwPayload = {
             creator_id: activeUser?.id || 'unknown',
-            permit_no: mode === 'new' ? `PTW-${Date.now().toString().slice(-6)}` : formData.manual_permit_no,
+            permit_no: mode === 'new' ? '' : formData.manual_permit_no,
             category: 'standard',
             requester: { 
               name: activeUser?.name || 'Unknown', 
               email: activeUser?.email || '', 
-              mobile: '555-0101', 
-              designation: activeUser?.role || 'Worker', 
+              mobile: activeUser?.mobile || '', 
+              designation: activeUser?.role || '', 
               contractor: formData.contractor_name || 'Internal', 
               signature: '',
             },
@@ -148,9 +151,6 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
                     end_time: formData.ends_at.split('T')[1] 
                 },
                 associated_permits: [],
-                risk_assessment_ref: formData.risk_assessment_ref,
-                emergency_contact: formData.emergency_contact,
-                number_of_workers: formData.number_of_workers
             },
             safety_requirements: checklist,
             ppe: { hard_hat: true, safety_shoes: true, safety_harness: false, goggles: false, coverall: false, respirator: false, safety_gloves: false, vest: false },
@@ -160,65 +160,33 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
             extension: emptyExtension,
             closure: emptyClosure,
             attachments: attachmentData,
-            
-            // New Workflow Fields
-            isolations: [],
-            risk_analysis: {
-                risk_level: 'Medium',
-                total_risk_score: 12,
-                base_score: 10,
-                complexity_factor: 1.2,
-                weather_factor: 1.0,
-                time_factor: 1.0,
-                auto_controls: ['Standard PPE', 'TBT Required']
-            },
-            global_compliance: {
-                standards: GLOBAL_PTW_REQUIREMENTS.globalStandards
-            }
+            audit: [],
         };
         
-        // Type-specific payload adjustments
-        let payload: any = basePayload;
+        // Type casting for specific payloads
+        let payload: Ptw['payload'] = basePayload;
+        
         if (selectedType === 'Hot Work') {
              payload = { ...basePayload, fire_watcher: { name: '', mobile: '' }, post_watch_minutes: 30 } as PtwHotWorkPayload;
-        } else if (selectedType === 'Lifting') {
-             payload = { ...basePayload, load_calculation: { load_weight: 0, utilization_percent: 0 } } as PtwLiftingPayload;
+        } else if (selectedType === 'Work at Height') {
+             payload = { ...basePayload, access_equipment: { step_ladder: false, independent_scaffolding: false, tower_mobile_scaffolding: false, scissor_lift: false, articulated_telescopic_boom: false, boatswain_chair: false, man_basket: false, rope_access_system: false, roof_ladder: false, other: '' } } as PtwWorkAtHeightPayload;
         } else if (selectedType === 'Confined Space Entry') {
              payload = { ...basePayload, gas_tests: [], entry_log: [] } as PtwConfinedSpacePayload;
+        } else if (selectedType === 'Lifting') {
+             payload = { ...basePayload, load_calculation: { load_weight: 0, crane_capacity: 0, utilization_percent: 0 } } as PtwLiftingPayload;
         } else if (selectedType === 'Excavation') {
              payload = { ...basePayload, soil_type: 'A', cave_in_protection: [] } as PtwExcavationPayload;
         } else if (selectedType === 'Road Closure') {
              payload = { ...basePayload, closure_type: 'partial' } as PtwRoadClosurePayload;
-        } else if (selectedType === 'Work at Height') {
-             payload = { ...basePayload, access_equipment: { step_ladder: false, independent_scaffolding: false, tower_mobile_scaffolding: false, scissor_lift: false, articulated_telescopic_boom: false, boatswain_chair: false, man_basket: false, rope_access_system: false, roof_ladder: false, other: '' } } as PtwWorkAtHeightPayload;
         }
 
-        const initialStage: PtwWorkflowStage = 'DRAFT';
-
-        const newPtw: any = {
+        const newPtw: Omit<Ptw, 'id' | 'org_id' | 'approvals' | 'audit_log'> = {
             project_id: formData.project_id,
             type: selectedType,
-            status: initialStage,
-            title: formData.work_description.substring(0, 50) + (formData.work_description.length > 50 ? '...' : ''),
+            status: 'DRAFT',
+            title: formData.work_description,
             payload: payload,
-            roles: {
-                requester_id: activeUser?.id || '',
-                issuer_id: '', // To be assigned
-                approver_id: '', // To be assigned
-                receiver_id: '', // To be assigned
-            },
-            workflow_log: [
-                {
-                    stage: 'DRAFT',
-                    action: 'Permit Created',
-                    user_id: activeUser?.id || '',
-                    timestamp: new Date().toISOString(),
-                    comments: 'Initial draft created via system'
-                }
-            ],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-        };
+        }
         
         onSubmit(newPtw);
         handleClose();

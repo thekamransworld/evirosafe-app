@@ -13,12 +13,20 @@ import type {
 } from './types';
 import { useToast } from './components/ui/Toast';
 
-// --- MOCK DATA DEFINITIONS ---
+// --- MOCK DATA DEFINITIONS (Used as defaults if LocalStorage is empty) ---
 const MOCK_PROJECTS: Project[] = [
   { id: 'p1', name: 'Downtown Construction', status: 'active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction' },
   { id: 'p2', name: 'Refinery Maintenance', status: 'active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance' }
 ];
 
+const MOCK_TEMPLATES: ChecklistTemplate[] = [
+    {
+        id: 'ct_1', org_id: 'org_1', category: 'Safety', title: { en: 'Weekly Safety Walkdown' }, 
+        items: [{ id: 'i1', text: { en: 'PPE Compliance' }, description: { en: 'Check helmets, boots, vests' } }]
+    }
+];
+
+// Missing definitions added here to fix the error
 const MOCK_INSPECTIONS: Inspection[] = [];
 const MOCK_CHECKLIST_RUNS: ChecklistRun[] = [];
 const MOCK_PLANS: PlanType[] = [];
@@ -31,12 +39,17 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     { id: 'n1', report_id: 'rep_1', user_id: 'user_1', is_read: false, message: 'System connected successfully.', timestamp: new Date().toISOString() }
 ];
 const MOCK_PTWS: Ptw[] = [];
-const MOCK_TEMPLATES: ChecklistTemplate[] = [
-    {
-        id: 'ct_1', org_id: 'org_1', category: 'Safety', title: { en: 'Weekly Safety Walkdown' }, 
-        items: [{ id: 'i1', text: { en: 'PPE Compliance' }, description: { en: 'Check helmets, boots, vests' } }]
-    }
-];
+
+// --- HELPER: Load from LocalStorage ---
+const loadFromStorage = <T,>(key: string, fallback: T): T => {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : fallback;
+  } catch (e) {
+    console.error(`Error loading ${key} from storage`, e);
+    return fallback;
+  }
+};
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -78,7 +91,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0]);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
+  
+  // Load users from storage or fallback to initialUsers
+  const [usersList, setUsersList] = useState<User[]>(() => loadFromStorage('usersList', initialUsers || []));
+
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
   const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
   const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
@@ -88,6 +104,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const toast = useToast();
+
+  // Persist Users List
+  useEffect(() => {
+    localStorage.setItem('usersList', JSON.stringify(usersList));
+  }, [usersList]);
 
   useEffect(() => {
       const root = window.document.documentElement;
@@ -246,8 +267,6 @@ interface DataContextType {
   handleScheduleSession: (data: any) => void;
   handleCloseSession: (id: string, attendance: any) => void;
   handleUpdateActionStatus: (origin: any, status: any) => void;
-  
-  // Updated for modern inspection & standalone actions
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
 }
@@ -259,23 +278,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const toast = useToast();
     
     const [isLoading, setIsLoading] = useState(false);
-    const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS || []);
-    const [reportList, setReportList] = useState<Report[]>([]);
-    const [inspectionList, setInspectionList] = useState<Inspection[]>(MOCK_INSPECTIONS);
-    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>(MOCK_CHECKLIST_RUNS);
-    const [planList, setPlanList] = useState<PlanType[]>(MOCK_PLANS);
-    const [ramsList, setRamsList] = useState<RamsType[]>(MOCK_RAMS);
-    const [tbtList, setTbtList] = useState<TbtSession[]>(MOCK_TBTS);
-    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>(MOCK_COURSES);
-    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>(MOCK_RECORDS);
-    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>(MOCK_SESSIONS);
-    const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
-    const [ptwList, setPtwList] = useState<Ptw[]>(MOCK_PTWS);
-    const [signs, setSigns] = useState<Sign[]>([]);
-    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
 
-    // Standalone Actions State
-    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
+    // --- INITIALIZE STATE FROM LOCAL STORAGE (Persistence) ---
+    const [projects, setProjects] = useState<Project[]>(() => loadFromStorage('projects', MOCK_PROJECTS));
+    const [reportList, setReportList] = useState<Report[]>(() => loadFromStorage('reportList', []));
+    const [inspectionList, setInspectionList] = useState<Inspection[]>(() => loadFromStorage('inspectionList', MOCK_INSPECTIONS));
+    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>(() => loadFromStorage('checklistRunList', MOCK_CHECKLIST_RUNS));
+    const [planList, setPlanList] = useState<PlanType[]>(() => loadFromStorage('planList', MOCK_PLANS));
+    const [ramsList, setRamsList] = useState<RamsType[]>(() => loadFromStorage('ramsList', MOCK_RAMS));
+    const [tbtList, setTbtList] = useState<TbtSession[]>(() => loadFromStorage('tbtList', MOCK_TBTS));
+    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>(() => loadFromStorage('trainingCourseList', MOCK_COURSES));
+    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>(() => loadFromStorage('trainingRecordList', MOCK_RECORDS));
+    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>(() => loadFromStorage('trainingSessionList', MOCK_SESSIONS));
+    const [notifications, setNotifications] = useState<Notification[]>(() => loadFromStorage('notifications', MOCK_NOTIFICATIONS));
+    const [ptwList, setPtwList] = useState<Ptw[]>(() => loadFromStorage('ptwList', MOCK_PTWS));
+    const [signs, setSigns] = useState<Sign[]>(() => loadFromStorage('signs', []));
+    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(() => loadFromStorage('checklistTemplates', MOCK_TEMPLATES));
+    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>(() => loadFromStorage('standaloneActions', []));
+
+    // --- SAVE TO LOCAL STORAGE ON CHANGE ---
+    useEffect(() => { localStorage.setItem('projects', JSON.stringify(projects)); }, [projects]);
+    useEffect(() => { localStorage.setItem('reportList', JSON.stringify(reportList)); }, [reportList]);
+    useEffect(() => { localStorage.setItem('inspectionList', JSON.stringify(inspectionList)); }, [inspectionList]);
+    useEffect(() => { localStorage.setItem('checklistRunList', JSON.stringify(checklistRunList)); }, [checklistRunList]);
+    useEffect(() => { localStorage.setItem('planList', JSON.stringify(planList)); }, [planList]);
+    useEffect(() => { localStorage.setItem('ramsList', JSON.stringify(ramsList)); }, [ramsList]);
+    useEffect(() => { localStorage.setItem('tbtList', JSON.stringify(tbtList)); }, [tbtList]);
+    useEffect(() => { localStorage.setItem('trainingCourseList', JSON.stringify(trainingCourseList)); }, [trainingCourseList]);
+    useEffect(() => { localStorage.setItem('trainingRecordList', JSON.stringify(trainingRecordList)); }, [trainingRecordList]);
+    useEffect(() => { localStorage.setItem('trainingSessionList', JSON.stringify(trainingSessionList)); }, [trainingSessionList]);
+    useEffect(() => { localStorage.setItem('ptwList', JSON.stringify(ptwList)); }, [ptwList]);
+    useEffect(() => { localStorage.setItem('standaloneActions', JSON.stringify(standaloneActions)); }, [standaloneActions]);
+
+    // --- HANDLERS ---
 
     const handleCreateReport = async (reportData: any) => {
         const newReport = {
@@ -292,16 +327,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.success("Report saved.");
     };
 
-    // --- NEW: Universal Inspection Creation Logic ---
     const handleCreateInspection = (data: any) => {
-        // We use spread ...data to ensure we capture all the new modern fields
-        // like hse_compliance, ppe_requirements, pre_inspection_briefing etc.
         const newInspection = {
             ...data,
             id: `insp_${Date.now()}`,
             org_id: activeOrg.id,
             findings: [],
-            // Ensure status defaults if not provided
             status: data.status || 'Ongoing',
             audit_trail: [{ 
                 user_id: activeUser?.id || 'system', 
@@ -309,8 +340,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 action: 'Inspection Created' 
             }]
         };
-        
-        // This 'any' cast ensures we don't break if types.ts hasn't been updated yet
         setInspectionList(prev => [newInspection as Inspection, ...prev]);
         toast.success("Inspection created successfully.");
     };
@@ -322,7 +351,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             owner_id: data.owner_id,
             due_date: data.due_date,
             status: 'Open',
-            // @ts-ignore - 'priority' is optional in ActionItem type or handled in enhancedActions
+            // @ts-ignore
             priority: data.priority,
             project_id: data.project_id,
             source: { type: 'Standalone' as any, id: '-', description: 'Direct Entry' },
@@ -380,7 +409,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleUpdateInspection = (i: any) => setInspectionList(prev => prev.map(x => x.id === i.id ? i : x));
     const handleCreatePtw = (d: any) => setPtwList(prev => [{ ...d, id: `ptw_${Date.now()}`, status: 'DRAFT' }, ...prev]);
     const handleUpdatePtw = (d: any) => setPtwList(prev => prev.map(p => p.id === d.id ? d : p));
-    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
+    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: d.sections || [], attachments: [] }, people: { prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '' } }, dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, meta: { tags: [], change_note: 'Initial Draft' }, audit_trail: [] } as any, ...prev]);
     const handleUpdatePlan = (d: any) => setPlanList(prev => prev.map(p => p.id === d.id ? d : p));
     const handlePlanStatusChange = (id: string, s: any) => setPlanList(prev => prev.map(p => p.id === id ? { ...p, status: s } : p));
     const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
@@ -420,7 +449,6 @@ interface ModalContextType {
   isReportCreationModalOpen: boolean; setIsReportCreationModalOpen: (isOpen: boolean) => void;
   reportInitialData: Partial<Report> | null; setReportInitialData: (data: Partial<Report> | null) => void;
   
-  // NEW PROPS FOR ACTION MODAL
   isActionCreationModalOpen: boolean; 
   setIsActionCreationModalOpen: (isOpen: boolean) => void;
   openActionCreationModal: (options?: { initialData?: any; mode?: 'create' | 'edit' }) => void;
@@ -452,10 +480,8 @@ export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isReportCreationModalOpen, setIsReportCreationModalOpen] = useState(false);
   const [reportInitialData, setReportInitialData] = useState<Partial<Report> | null>(null);
 
-  // NEW STATES
   const [isActionCreationModalOpen, setIsActionCreationModalOpen] = useState(false);
 
-  // NEW FUNCTIONS
   const openActionCreationModal = (options?: { initialData?: any; mode?: 'create' | 'edit' }) => {
       setIsActionCreationModalOpen(true);
   };
@@ -486,7 +512,6 @@ export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isReportCreationModalOpen, setIsReportCreationModalOpen,
     reportInitialData, setReportInitialData,
     
-    // NEW VALUES
     isActionCreationModalOpen, setIsActionCreationModalOpen,
     openActionCreationModal, openActionDetailModal,
 

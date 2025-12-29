@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import type { Organization, Project, User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -7,7 +7,7 @@ import { useAppContext, useDataContext } from '../contexts';
 import { FormField } from './ui/FormField';
 import { 
   Building, MapPin, Users, Activity, AlertTriangle, ShieldCheck, 
-  ArrowLeft, MoreVertical, Plus, Search, FileText, CheckSquare 
+  ArrowLeft, MoreVertical, Plus, FileText 
 } from 'lucide-react';
 import { SafetyPulseWidget } from './SafetyPulseWidget';
 
@@ -61,20 +61,35 @@ const CreateOrgModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ is
     );
 };
 
-// 2. Create Project Modal
-const CreateProjectModal: React.FC<{ isOpen: boolean, onClose: () => void, orgId: string }> = ({ isOpen, onClose, orgId }) => {
+// 2. Create Project Modal (FIXED)
+const CreateProjectModal: React.FC<{ isOpen: boolean, onClose: () => void, orgId: string, users: User[] }> = ({ isOpen, onClose, orgId, users }) => {
     const { handleCreateProject } = useDataContext();
-    const { usersList } = useAppContext();
     const [name, setName] = useState('');
     const [code, setCode] = useState('');
     const [location, setLocation] = useState('');
     const [managerId, setManagerId] = useState('');
+    const [error, setError] = useState('');
 
     const handleSubmit = () => {
-        if (!name || !code) return;
-        handleCreateProject({ name, code, location, manager_id: managerId, org_id: orgId });
+        if (!name || !code) {
+            setError('Project Name and Code are required.');
+            return;
+        }
+        
+        // Auto-select first user if manager not selected
+        const finalManagerId = managerId || users[0]?.id || 'unknown';
+
+        handleCreateProject({ 
+            name, 
+            code, 
+            location, 
+            manager_id: finalManagerId, 
+            org_id: orgId 
+        });
+        
         onClose();
-        setName(''); setCode(''); setLocation('');
+        // Reset form
+        setName(''); setCode(''); setLocation(''); setManagerId(''); setError('');
     };
 
     if (!isOpen) return null;
@@ -94,9 +109,10 @@ const CreateProjectModal: React.FC<{ isOpen: boolean, onClose: () => void, orgId
                     <FormField label="Project Manager">
                         <select value={managerId} onChange={e => setManagerId(e.target.value)} className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent dark:text-white">
                             <option value="">Select Manager</option>
-                            {usersList.filter(u => u.org_id === orgId).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                         </select>
                     </FormField>
+                    {error && <p className="text-sm text-red-500 font-semibold">{error}</p>}
                 </div>
                 <div className="p-4 bg-gray-50 dark:bg-slate-800/50 flex justify-end gap-3">
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
@@ -326,7 +342,8 @@ const ProjectDetailView: React.FC<{ project: Project; org: Organization; onBack:
 // --- MAIN COMPONENT ---
 export const Organizations: React.FC = () => {
   const { organizations, usersList, activeUser } = useAppContext();
-  const { projects } = useDataContext();
+  const { projects, handleCreateProject } = useDataContext();
+  
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -385,7 +402,7 @@ export const Organizations: React.FC = () => {
                   <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 dark:bg-slate-800/50 text-gray-500 uppercase font-medium"><tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Role</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-gray-200 dark:divide-gray-800">{orgMembers.map(user => (<tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-slate-800/30"><td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{user.name}</td><td className="px-4 py-3"><Badge color="blue">{user.role}</Badge></td><td className="px-4 py-3 text-gray-500">{user.email}</td><td className="px-4 py-3"><Badge color="green">{user.status}</Badge></td><td className="px-4 py-3 text-right"><MoreVertical size={16} className="text-gray-400" /></td></tr>))}</tbody></table></div>
               </Card>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">{orgProjects.map(proj => (<Card key={proj.id} className="cursor-pointer hover:shadow-lg transition-all" onClick={() => handleProjectClick(proj)}><div className="flex justify-between items-start mb-2"><Badge color={proj.status === 'active' ? 'green' : 'gray'}>{proj.status}</Badge><MoreVertical size={16} className="text-gray-400" /></div><h3 className="font-bold text-lg text-gray-900 dark:text-white mb-1">{proj.name}</h3><p className="text-sm text-gray-500 mb-4">{proj.location}</p><div className="flex items-center gap-2 text-xs text-gray-400"><Users size={14} /><span>{usersList.filter(u => u.org_id === selectedOrg.id).length} Team Members</span></div></Card>))}</div>
-              <CreateProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} orgId={selectedOrg.id} />
+              <CreateProjectModal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} orgId={selectedOrg.id} users={usersList.filter(u => u.org_id === selectedOrg.id)} />
               <InviteMemberModal isOpen={isOrgInviteModalOpen} onClose={() => setIsOrgInviteModalOpen(false)} orgId={selectedOrg.id} projectName={selectedOrg.name} />
           </div>
       );

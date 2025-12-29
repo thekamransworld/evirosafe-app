@@ -9,6 +9,7 @@ import { roles as rolesConfig } from './config';
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
+import { HseStatistics } from './components/HseStatistics'; // <--- UPDATED IMPORT
 import { Reports } from './components/Reports';
 import { Inspections } from './components/Inspections';
 import { Ptw } from './components/Ptw';
@@ -46,7 +47,9 @@ import { TrainingCourseModal } from './components/TrainingCourseModal';
 import { TrainingSessionModal } from './components/TrainingSessionModal';
 import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
-import { InspectionCreationModal } from './components/InspectionCreationModal'; // Added
+import { InspectionCreationModal } from './components/InspectionCreationModal';
+import { InspectionConductModal } from './components/InspectionConductModal';
+
 
 // --- Auth Sync ---
 const AuthSync: React.FC = () => {
@@ -95,7 +98,7 @@ const GlobalModals = () => {
     isAttendanceModalOpen, setAttendanceModalOpen,
     courseForSession, sessionForAttendance,
     isActionCreationModalOpen, setIsActionCreationModalOpen,
-    isInspectionCreationModalOpen, setIsInspectionCreationModalOpen // Added
+    isInspectionCreationModalOpen, setIsInspectionCreationModalOpen
   } = useModalContext();
 
   const {
@@ -105,8 +108,8 @@ const GlobalModals = () => {
     handleCreateRams, handleRamsStatusChange, handleUpdateRams,
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-    handleCreateStandaloneAction, handleCreateInspection, // Added
-    projects, usersList, trainingCourseList, checklistTemplates // Added checklistTemplates
+    handleCreateStandaloneAction, handleCreateInspection,
+    projects, usersList, trainingCourseList, checklistTemplates
   } = useDataContext();
 
   if (!activeUser) return null;
@@ -234,7 +237,6 @@ const GlobalModals = () => {
         projects={projects}
       />
 
-      {/* NEW: Inspection Creation Modal */}
       <InspectionCreationModal
         isOpen={isInspectionCreationModalOpen}
         onClose={() => setIsInspectionCreationModalOpen(false)}
@@ -256,7 +258,7 @@ const AppContent = () => {
     setSelectedPlan, setSelectedPlanForEdit, setIsPlanCreationModalOpen,
     setSelectedRams, setSelectedRamsForEdit, setIsRamsCreationModalOpen,
     setCourseModalOpen, setSessionModalOpen, setCourseForSession, setAttendanceModalOpen, setSessionForAttendance,
-    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw,
+    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw
   } = useModalContext();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -265,12 +267,13 @@ const AppContent = () => {
   if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading EviroSafe...</div>;
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100 overflow-hidden">
+    <div className="flex min-h-screen bg-slate-950 text-slate-100 transition-all duration-300">
       <Sidebar currentView={currentView} setCurrentView={setCurrentView} isOpen={sidebarOpen} setOpen={setSidebarOpen} />
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative transition-all duration-300">
+      <main className="flex-1 min-h-screen flex flex-col transition-all duration-300">
         <DemoBanner />
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-thin scrollbar-thumb-slate-700">
+        <div className="flex-1 p-8 overflow-y-auto">
           {currentView === 'dashboard' && <Dashboard />}
+          {currentView === 'hse-statistics' && <HseStatistics />} {/* UPDATED */}
           {currentView === 'site-map' && <div className="h-[calc(100vh-8rem)]"><SiteMap /></div>}
           {currentView === 'reports' && <Reports />}
           {currentView === 'ptw' && (

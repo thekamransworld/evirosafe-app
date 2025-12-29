@@ -1,8 +1,9 @@
-import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory, PtwSafetyRequirement, PtwType } from './types';
+import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, PtwType, PtwSafetyRequirement, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory, HazardType } from './types';
 
-// Neon Gradient Shield Logo (ES Monogram)
+// --- BRANDING ---
 export const logoSrc = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMwMGYzZmYiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iIzM0ZDM5OSIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2Y0NzJiNiIvPjwvbGluZWFyR3JhZGllbnQ+PGZpbHRlciBpZD0iZiI+PGZlRHJvcFNoYWRvdyBkeD0iMCIgZHk9IjAiIHN0ZERldmlhdGlvbj0iMTAiIGZsb29kLWNvbG9yPSIjMDBmM2ZmIiBmbG9vZC1vcGFjaXR5PSIwLjUiLz48L2ZpbHRlcj48L2RlZnM+PHBhdGggZD0iTTI1NiAzMkMxNjAgMzIgNjQgODAgNjQgMTkydjExMmMwIDE0NCAxOTIgMTkyIDE5MiAxOTJzMTkyLTQ4IDE5Mi0xOTJWMTkyYzAtMTEyLTk2LTE2MC0xOTItMTYweiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ1cmwoI2cpIiBzdHJva2Utd2lkdGg9IjI4IiBmaWx0ZXI9InVybCgjZikiLz48dGV4dCB4PSI1MCUiIHk9IjUyJSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIiBmb250LXNpemU9IjIwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0idXJsKCNnKSIgZmlsdGVyPSJ1cmwoI2YpIj5FUzwvdGV4dD48L3N2Zz4=';
 
+// --- LOCALIZATION ---
 export const supportedLanguages: { code: string; name: string; dir: 'ltr' | 'rtl' }[] = [
   { code: 'en', name: 'English', dir: 'ltr' },
   { code: 'ar', name: 'العربية', dir: 'rtl' },
@@ -59,10 +60,10 @@ export const translations: Record<string, Record<string, string>> = {
   },
 };
 
+// --- PERMISSIONS & ROLES ---
 const allActions: Action[] = ['read', 'create', 'update', 'approve', 'delete', 'export', 'assign'];
 const readCreateUpdate: Action[] = ['read', 'create', 'update'];
 
-// --- THIS WAS MISSING IN YOUR FILE ---
 export const allPossiblePermissions: { resource: Resource; actions: Action[]; scopes: Scope[] }[] = [
     { resource: 'dashboard', actions: ['read'], scopes: ['org'] },
     { resource: 'reports', actions: allActions, scopes: ['org', 'project', 'own'] },
@@ -97,11 +98,11 @@ export const roles: Role[] = [
   { 
     org_id: null, key: 'ORG_ADMIN', label: 'Organization Admin', is_system: true,
     permissions: [
-      { resource: 'dashboard', actions: ['read'] as Action[], scope: 'org' },
+      { resource: 'dashboard', actions: ['read'], scope: 'org' },
       { resource: 'projects', actions: readCreateUpdate, scope: 'org' },
-      { resource: 'people', actions: ['read', 'create', 'update', 'delete'] as Action[], scope: 'org' },
-      { resource: 'roles', actions: ['read', 'create', 'update'] as Action[], scope: 'org' },
-      { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'org' },
+      { resource: 'people', actions: ['read', 'create', 'update', 'delete'], scope: 'org' },
+      { resource: 'roles', actions: ['read', 'create', 'update'], scope: 'org' },
+      { resource: 'settings', actions: ['read', 'update'], scope: 'org' },
       ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'plans', 'rams', 'signage', 'tbt', 'training', 'actions', 'site-map', 'certification'].map(r => ({
           resource: r as Resource, actions: allActions, scope: 'org' as Scope
       }))
@@ -110,83 +111,84 @@ export const roles: Role[] = [
   { 
     org_id: null, key: 'HSE_MANAGER', label: 'HSE Manager', is_system: true,
     permissions: [
-      { resource: 'dashboard', actions: ['read'] as Action[], scope: 'org' },
-      { resource: 'projects', actions: ['read'] as Action[], scope: 'org' },
-      { resource: 'people', actions: ['read'] as Action[], scope: 'org' },
-      { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
+      { resource: 'dashboard', actions: ['read'], scope: 'org' },
+      { resource: 'projects', actions: ['read'], scope: 'org' },
+      { resource: 'people', actions: ['read'], scope: 'org' },
+      { resource: 'settings', actions: ['read', 'update'], scope: 'own' },
        ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'plans', 'rams', 'signage', 'tbt', 'training', 'actions', 'site-map', 'certification'].map(r => ({
-          resource: r as Resource, actions: ['read', 'create', 'update', 'approve', 'export', 'assign'] as Action[], scope: 'org' as Scope
+          resource: r as Resource, actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' as Scope
       }))
     ]
   },
   {
     org_id: null, key: 'SUPERVISOR', label: 'Supervisor', is_system: true,
     permissions: [
-      { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'projects', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'people', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
+      { resource: 'dashboard', actions: ['read'], scope: 'project' },
+      { resource: 'projects', actions: ['read'], scope: 'project' },
+      { resource: 'people', actions: ['read'], scope: 'project' },
+      { resource: 'settings', actions: ['read', 'update'], scope: 'own' },
       ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'tbt', 'actions', 'site-map', 'certification'].map(r => ({
-          resource: r as Resource, actions: ['read', 'create', 'update', 'assign'] as Action[], scope: 'project' as Scope
+          resource: r as Resource, actions: ['read', 'create', 'update', 'assign'], scope: 'project' as Scope
       })),
        ...['plans', 'rams', 'signage', 'training'].map(r => ({
-          resource: r as Resource, actions: ['read'] as Action[], scope: 'project' as Scope
+          resource: r as Resource, actions: ['read'], scope: 'project' as Scope
       })),
     ]
   },
   {
     org_id: null, key: 'HSE_OFFICER', label: 'HSE Officer', is_system: true,
     permissions: [
-      { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'people', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
+      { resource: 'dashboard', actions: ['read'], scope: 'project' },
+      { resource: 'people', actions: ['read'], scope: 'project' },
+      { resource: 'settings', actions: ['read', 'update'], scope: 'own' },
       ...['reports', 'inspections', 'ptw', 'checklists', 'housekeeping', 'tbt', 'actions', 'site-map', 'certification'].map(r => ({
-          resource: r as Resource, actions: ['read', 'create', 'update'] as Action[], scope: 'project' as Scope
+          resource: r as Resource, actions: ['read', 'create', 'update'], scope: 'project' as Scope
       })),
        ...['plans', 'rams', 'signage', 'training'].map(r => ({
-          resource: r as Resource, actions: ['read'] as Action[], scope: 'project' as Scope
+          resource: r as Resource, actions: ['read'], scope: 'project' as Scope
       })),
     ]
   },
   {
     org_id: null, key: 'INSPECTOR', label: 'Inspector', is_system: true,
     permissions: [
-      { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'inspections', actions: ['read', 'create', 'update'] as Action[], scope: 'project' },
-      { resource: 'checklists', actions: ['read', 'create'] as Action[], scope: 'project' },
-      { resource: 'reports', actions: ['read', 'create'] as Action[], scope: 'project' },
-      { resource: 'actions', actions: ['read', 'update'] as Action[], scope: 'own' },
-      { resource: 'site-map', actions: ['read'] as Action[], scope: 'project' },
-      { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
+      { resource: 'dashboard', actions: ['read'], scope: 'project' },
+      { resource: 'inspections', actions: ['read', 'create', 'update'], scope: 'project' },
+      { resource: 'checklists', actions: ['read', 'create'], scope: 'project' },
+      { resource: 'reports', actions: ['read', 'create'], scope: 'project' },
+      { resource: 'actions', actions: ['read', 'update'], scope: 'own' },
+      { resource: 'site-map', actions: ['read'], scope: 'project' },
+      { resource: 'settings', actions: ['read', 'update'], scope: 'own' },
       { resource: 'certification', actions: ['read', 'update'], scope: 'own' },
     ]
   },
   {
     org_id: null, key: 'WORKER', label: 'Worker', is_system: true,
     permissions: [
-        { resource: 'dashboard', actions: ['read'] as Action[], scope: 'own' },
-        { resource: 'reports', actions: ['read', 'create'] as Action[], scope: 'own' },
-        { resource: 'tbt', actions: ['read'] as Action[], scope: 'project' },
-        { resource: 'training', actions: ['read'] as Action[], scope: 'own' },
-        { resource: 'actions', actions: ['read', 'update'] as Action[], scope: 'own' },
-        { resource: 'settings', actions: ['read', 'update'] as Action[], scope: 'own' },
+        { resource: 'dashboard', actions: ['read'], scope: 'own' },
+        { resource: 'reports', actions: ['read', 'create'], scope: 'own' },
+        { resource: 'tbt', actions: ['read'], scope: 'project' },
+        { resource: 'training', actions: ['read'], scope: 'own' },
+        { resource: 'actions', actions: ['read', 'update'], scope: 'own' },
+        { resource: 'settings', actions: ['read', 'update'], scope: 'own' },
         { resource: 'certification', actions: ['read', 'update'], scope: 'own' },
     ]
   },
   {
     org_id: null, key: 'CLIENT_VIEWER', label: 'Client Viewer', is_system: true,
     permissions: [
-        { resource: 'dashboard', actions: ['read'] as Action[], scope: 'project' },
-        { resource: 'reports', actions: ['read', 'export'] as Action[], scope: 'project' },
-        { resource: 'inspections', actions: ['read', 'export'] as Action[], scope: 'project' },
-        { resource: 'ptw', actions: ['read'] as Action[], scope: 'project' },
-        { resource: 'plans', actions: ['read', 'approve'] as Action[], scope: 'project' },
-        { resource: 'rams', actions: ['read', 'approve'] as Action[], scope: 'project' },
-        { resource: 'site-map', actions: ['read'] as Action[], scope: 'project' },
+        { resource: 'dashboard', actions: ['read'], scope: 'project' },
+        { resource: 'reports', actions: ['read', 'export'], scope: 'project' },
+        { resource: 'inspections', actions: ['read', 'export'], scope: 'project' },
+        { resource: 'ptw', actions: ['read'], scope: 'project' },
+        { resource: 'plans', actions: ['read', 'approve'], scope: 'project' },
+        { resource: 'rams', actions: ['read', 'approve'], scope: 'project' },
+        { resource: 'site-map', actions: ['read'], scope: 'project' },
     ]
-  }
+  },
 ];
 
+// --- PLANS CONFIG ---
 export const planTypes: PlanType[] = ['HSEMP', 'Lifting', 'Work at Height', 'Confined Space', 'Fire', 'ERP', 'EMP', 'Waste'];
 
 export const planTemplates: Record<PlanType, PlanContentSection[]> = {
@@ -206,19 +208,42 @@ export const planTemplates: Record<PlanType, PlanContentSection[]> = {
         { title: '1. Lift Details', content: 'Specify the load, location, and equipment.', is_complete: false },
         { title: '2. Personnel', content: 'List the competent persons involved.', is_complete: false },
         { title: '3. Calculations', content: 'Attach load charts and calculations.', is_complete: false },
+        { title: '4. Communication', content: 'Define signaling methods.', is_complete: false },
     ],
     'Work at Height': [
         { title: '1. Access Method', content: 'Describe the method of access (scaffold, MEWP, etc.).', is_complete: false },
         { title: '2. Fall Protection', content: 'Detail the fall protection systems to be used.', is_complete: false },
         { title: '3. Rescue Plan', content: 'Outline the procedure for rescue from height.', is_complete: false },
     ],
-    'Confined Space': [],
-    'Fire': [],
-    'ERP': [],
-    'EMP': [],
-    'Waste': [],
+    'Confined Space': [
+        { title: '1. Space Description', content: 'Describe the confined space.', is_complete: false },
+        { title: '2. Hazards', content: 'List atmospheric and physical hazards.', is_complete: false },
+        { title: '3. Entry Procedures', content: 'Detail entry/exit and communication.', is_complete: false },
+        { title: '4. Emergency Rescue', content: 'Rescue team and equipment details.', is_complete: false },
+    ],
+    'Fire': [
+        { title: '1. Fire Risk Assessment', content: 'Identify fire hazards.', is_complete: false },
+        { title: '2. Prevention Measures', content: 'Storage, hot work controls.', is_complete: false },
+        { title: '3. Evacuation Plan', content: 'Routes and assembly points.', is_complete: false },
+    ],
+    'ERP': [
+        { title: '1. Emergency Scenarios', content: 'Fire, Medical, Spill, etc.', is_complete: false },
+        { title: '2. Response Team', content: 'Roles and responsibilities.', is_complete: false },
+        { title: '3. Communication', content: 'Emergency contact numbers.', is_complete: false },
+    ],
+    'EMP': [
+        { title: '1. Environmental Aspects', content: 'Dust, Noise, Waste, Water.', is_complete: false },
+        { title: '2. Mitigation Measures', content: 'Controls for each aspect.', is_complete: false },
+        { title: '3. Monitoring', content: 'Inspection and reporting schedule.', is_complete: false },
+    ],
+    'Waste': [
+        { title: '1. Waste Types', content: 'Hazardous vs Non-Hazardous.', is_complete: false },
+        { title: '2. Segregation', content: 'Color coding and bins.', is_complete: false },
+        { title: '3. Disposal Methods', content: 'Licensed carriers and facilities.', is_complete: false },
+    ],
 };
 
+// --- TBT CONFIG ---
 export const tbtTopicsLibrary = {
     'General Safety': [
         'Slips, Trips, and Falls Prevention',
@@ -250,6 +275,7 @@ export const tbtTopicsLibrary = {
     ]
 };
 
+// --- RAMS CONFIG ---
 export const ramsTemplate: Omit<RamsType, 'id'|'org_id'|'project_id'|'activity'|'location'|'audit_log'|'prepared_by'> = {
     status: 'draft',
     version: 'v0.1',
@@ -269,6 +295,7 @@ export const ramsTemplate: Omit<RamsType, 'id'|'org_id'|'project_id'|'activity'|
     linked_ptw_types: [],
 };
 
+// --- PTW CONFIG ---
 export const ptwTypeDetails: Record<PtwType, { icon: string; description: string; color: string; hex: string; }> = {
     'General Work': { icon: '🔹', description: 'Baseline, low-risk work', color: 'blue-500', hex: '#3B82F6' },
     'Hot Work': { icon: '🔥', description: 'Welding, cutting, sparks', color: 'red-500', hex: '#EF4444' },
@@ -361,6 +388,7 @@ export const emptySignature: PtwSignature = { signature: '', signed_at: '' };
 export const emptyExtension: PtwExtension = { is_requested: false, reason: '', days: { from: '', to: '' }, hours: { from: '', to: '' }, requester: emptySignature, client_proponent: emptySignature, client_hs: emptySignature };
 export const emptyClosure: PtwClosure = { note: '', permit_requester: emptySignature, client_proponent: emptySignature, client_hs: emptySignature };
 
+// --- SIGNAGE CONFIG ---
 export const signageConfig: Record<SignCategory, {
   shape: 'circle' | 'triangle' | 'rectangle';
   bgColor: string;
