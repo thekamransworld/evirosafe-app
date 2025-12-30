@@ -46,7 +46,7 @@ The combination of a **double shift** (fatigue) and **wet floor** (environmental
 "What is the first thing you do if you see an unsafe condition?"`;
   }
 
-  // Default response - USING BACKTICKS HERE IS CRITICAL
+  // Default response
   return `I have analyzed your request regarding **"${prompt}"**.
 
 - **Compliance Check:** ISO 45001 standards applied.
@@ -60,6 +60,17 @@ export const getPredictiveInsights = async () => {
         { id: 2, title: 'Fatigue Risk', probability: '60%', impact: 'Night Shift', action: 'Extra breaks required' },
         { id: 3, title: 'Equipment Failure', probability: 'Low', impact: 'Excavator 04', action: 'Maintenance due in 2 days' },
     ];
+};
+
+// --- MISSING FUNCTION RESTORED ---
+export const generateAiRiskForecast = async () => {
+    // Simulate AI analysis delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return {
+        risk_level: 'Medium',
+        summary: 'Moderate risk detected due to high temperatures and ongoing lifting operations.',
+        recommendations: ['Enforce hydration breaks', 'Check lifting gear certification', 'Monitor wind speeds']
+    };
 };
 
 // Keep existing exports for compatibility
