@@ -1,232 +1,237 @@
-import React, { useState } from 'react';
+---
+
+### **Step 2: Update `src/components/AiInsights.tsx`**
+This is the **new UI code**. It replaces the static form with a **Chat Interface** on the left and **Live Predictions** on the right.
+
+```tsx
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { generateSafetyReport } from '../services/geminiService';
+import { generateResponse, getPredictiveInsights } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 import { 
-  Sparkles, Brain, AlertTriangle, FileText, 
-  Send, RefreshCw, ChevronRight, Zap,
-  BarChart, Shield, Lock, BrainCircuit // <--- Added missing import
+    Send, Bot, User, Sparkles, AlertTriangle, 
+    Wind, Thermometer, Activity, Zap, BrainCircuit 
 } from 'lucide-react';
 
-const glassCard = "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl";
+interface Message {
+    id: string;
+    role: 'user' | 'ai';
+    content: string;
+    timestamp: Date;
+}
 
-const PresetPrompt: React.FC<{ 
-  icon: React.ReactNode; 
-  title: string; 
-  prompt: string; 
-  onClick: (p: string) => void; 
-}> = ({ icon, title, prompt, onClick }) => (
-  <button 
-    onClick={() => onClick(prompt)}
-    className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-cyan-500/30 transition-all group text-left w-full"
-  >
-    <div className="p-2 rounded-lg bg-black/20 text-cyan-400 group-hover:scale-110 transition-transform">
-      {icon}
-    </div>
-    <div>
-      <h4 className="font-bold text-slate-200 text-sm mb-1 group-hover:text-white">{title}</h4>
-      <p className="text-xs text-slate-400 line-clamp-2">{prompt}</p>
-    </div>
-  </button>
-);
+interface Insight {
+    id: number;
+    title: string;
+    probability: string;
+    impact: string;
+    action: string;
+}
 
 export const AiInsights: React.FC = () => {
-  const [prompt, setPrompt] = useState('');
-  const [report, setReport] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+    const [input, setInput] = useState('');
+    const [messages, setMessages] = useState<Message[]>([
+        {
+            id: '1',
+            role: 'ai',
+            content: 'Hello! I am **NeuroCommand**, your HSE Intelligence Assistant.\n\nI can help you:\n- Analyze incident root causes\n- Draft Risk Assessments (RAMS)\n- Create Toolbox Talks\n\n*What safety challenge are we solving today?*',
+            timestamp: new Date()
+        }
+    ]);
+    const [isTyping, setIsTyping] = useState(false);
+    const [insights, setInsights] = useState<Insight[]>([]);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleGenerate = async () => {
-    if (!prompt.trim()) return;
-    setIsLoading(true);
-    setError(null);
-    setReport('');
-    try {
-      const result = await generateSafetyReport(prompt);
-      // Format the JSON result into Markdown for display
-      const formattedReport = `
-# 🤖 AI Safety Assessment
+    useEffect(() => {
+        // Load predictive insights
+        getPredictiveInsights().then(setInsights);
+    }, []);
 
-### **Risk Level:** ${result.riskLevel}
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
 
-### **Root Cause Analysis**
-${result.rootCause}
+    const handleSend = async () => {
+        if (!input.trim()) return;
 
-### **Executive Summary**
-${result.description}
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: input,
+            timestamp: new Date()
+        };
 
-### **Recommended Actions**
-${result.recommendation}
-      `;
-      setReport(formattedReport);
-    } catch (e: any) {
-      setError("AI Service unavailable. Please check your API Key in .env");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+        setIsTyping(true);
 
-  const prompts = [
-    {
-      title: "Risk Assessment Generator",
-      icon: <Shield className="w-5 h-5" />,
-      text: "Generate a comprehensive risk assessment for a high-rise scaffolding installation in high wind conditions, focusing on dropped objects and fall protection."
-    },
-    {
-      title: "Incident Root Cause",
-      icon: <AlertTriangle className="w-5 h-5" />,
-      text: "Analyze this incident: A forklift operator collided with a racking unit in the warehouse. The floor was wet from rain, and the driver was working a double shift."
-    },
-    {
-      title: "Toolbox Talk Creator",
-      icon: <MegaphoneIcon className="w-5 h-5" />,
-      text: "Create a 5-minute Toolbox Talk about 'Heat Stress Management' for a construction crew working in 45°C temperatures."
-    },
-    {
-      title: "Policy Compliance Check",
-      icon: <FileText className="w-5 h-5" />,
-      text: "Review the safety requirements for 'Confined Space Entry' according to OSHA 1910.146 and list the mandatory permits and equipment."
-    }
-  ];
+        try {
+            const response = await generateResponse(userMsg.content);
+            const aiMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                role: 'ai',
+                content: response,
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMsg]);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsTyping(false);
+        }
+    };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 p-6 relative overflow-hidden">
-      
-      {/* Background Effects */}
-      <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[120px]" />
-      </div>
+    const handleQuickPrompt = (text: string) => {
+        setInput(text);
+    };
 
-      <div className="relative z-10 max-w-6xl mx-auto">
-        
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Brain className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white">NeuroCommand AI</h1>
-            <p className="text-slate-400">Advanced Safety Analytics & Generative Intelligence</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* LEFT: Input Console */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className={`${glassCard} p-6`}>
-              <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-4 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-400" />
-                Quick Prompts
-              </h3>
-              <div className="space-y-3">
-                {prompts.map((p, i) => (
-                  <PresetPrompt 
-                    key={i} 
-                    icon={p.icon} 
-                    title={p.title} 
-                    prompt={p.text} 
-                    onClick={setPrompt} 
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <Lock className="w-4 h-4 text-purple-400" />
-                <span className="text-xs font-bold text-purple-300">ENTERPRISE GRADE SECURITY</span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Your data is processed securely. AI insights are generated based on global HSE standards (ISO 45001, OSHA).
-              </p>
-            </div>
-          </div>
-
-          {/* RIGHT: Chat & Results */}
-          <div className="lg:col-span-8 space-y-6">
+    return (
+        <div className="h-[calc(100vh-6rem)] flex flex-col lg:flex-row gap-6 p-2">
             
-            {/* Input Area */}
-            <div className={`${glassCard} p-1`}>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe a safety scenario, ask for a regulation check, or request a risk assessment..."
-                className="w-full h-32 bg-transparent text-white p-4 resize-none focus:outline-none placeholder:text-slate-600"
-              />
-              <div className="flex justify-between items-center bg-black/20 p-2 rounded-xl">
-                <div className="flex gap-2">
-                   {/* Tool buttons placeholder */}
-                   <button className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white"><FileText className="w-4 h-4"/></button>
+            {/* LEFT: Chat Interface */}
+            <div className="flex-1 flex flex-col bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden border border-gray-200 dark:border-slate-800">
+                {/* Chat Header */}
+                <div className="p-4 border-b dark:border-slate-800 bg-gray-50 dark:bg-slate-950 flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                            <BrainCircuit className="w-6 h-6 text-indigo-400" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-gray-900 dark:text-white text-lg">NeuroCommand AI</h2>
+                            <p className="text-xs text-emerald-500 flex items-center gap-1 font-mono">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                SYSTEM ONLINE
+                            </p>
+                        </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setMessages([])}>Clear History</Button>
                 </div>
-                <Button 
-                  onClick={handleGenerate} 
-                  disabled={isLoading || !prompt.trim()}
-                  className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20"
-                >
-                  {isLoading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Generate Insight
-                    </>
-                  )}
-                </Button>
-              </div>
+
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 dark:bg-slate-950/50">
+                    {messages.map((msg) => (
+                        <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[85%] rounded-2xl p-5 shadow-sm ${
+                                msg.role === 'user' 
+                                ? 'bg-indigo-600 text-white rounded-br-none' 
+                                : 'bg-white dark:bg-slate-900 border dark:border-slate-800 text-gray-800 dark:text-gray-200 rounded-bl-none'
+                            }`}>
+                                {msg.role === 'ai' ? (
+                                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm">{msg.content}</p>
+                                )}
+                                <p className={`text-[10px] mt-2 opacity-70 text-right`}>
+                                    {msg.timestamp.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                    {isTyping && (
+                        <div className="flex justify-start">
+                            <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 p-4 rounded-2xl rounded-bl-none shadow-sm flex gap-2 items-center">
+                                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            </div>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="p-4 bg-white dark:bg-slate-900 border-t dark:border-slate-800">
+                    {messages.length === 1 && (
+                        <div className="flex gap-2 mb-4 overflow-x-auto pb-2 no-scrollbar">
+                            <button onClick={() => handleQuickPrompt("Analyze this incident: Forklift collision due to wet floor")} className="whitespace-nowrap px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:border-indigo-500/50 rounded-full text-xs text-slate-600 dark:text-slate-300 border dark:border-slate-700 transition-all">
+                                🚨 Analyze Incident
+                            </button>
+                            <button onClick={() => handleQuickPrompt("Draft a Risk Assessment for Working at Height")} className="whitespace-nowrap px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:border-indigo-500/50 rounded-full text-xs text-slate-600 dark:text-slate-300 border dark:border-slate-700 transition-all">
+                                🛡️ Create RAMS
+                            </button>
+                            <button onClick={() => handleQuickPrompt("Write a TBT about Heat Stress")} className="whitespace-nowrap px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-indigo-500/20 hover:border-indigo-500/50 rounded-full text-xs text-slate-600 dark:text-slate-300 border dark:border-slate-700 transition-all">
+                                🗣️ Draft TBT
+                            </button>
+                        </div>
+                    )}
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            placeholder="Ask NeuroCommand..."
+                            className="flex-1 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white placeholder-slate-400"
+                        />
+                        <Button onClick={handleSend} disabled={!input.trim() || isTyping} className="rounded-xl px-5 bg-indigo-600 hover:bg-indigo-700 text-white">
+                            <Send className="w-5 h-5" />
+                        </Button>
+                    </div>
+                </div>
             </div>
 
-            {/* Results Display */}
-            {report && (
-              <div className={`${glassCard} p-8 animate-fade-in-up`}>
-                <div className="flex items-center justify-between mb-6 pb-6 border-b border-white/10">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
-                      <BotIcon className="w-6 h-6" />
+            {/* RIGHT: Predictive Insights Panel */}
+            <div className="w-full lg:w-80 flex flex-col gap-4">
+                {/* Hero Card */}
+                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                    <Sparkles className="absolute top-4 right-4 w-12 h-12 text-white/20 animate-pulse" />
+                    <h3 className="font-bold text-lg mb-1">Predictive Risk</h3>
+                    <p className="text-indigo-100 text-xs mb-4 uppercase tracking-wider">24h Forecast</p>
+                    <div className="flex items-end gap-2">
+                        <span className="text-5xl font-black">Medium</span>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Analysis Complete</h3>
-                      <p className="text-xs text-slate-400">Generated by Gemini 1.5 Flash</p>
+                    <div className="mt-4 h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
+                        <div className="h-full bg-yellow-400 w-[60%]"></div>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                     <Button variant="secondary" size="sm">Copy</Button>
-                     <Button variant="secondary" size="sm">Export PDF</Button>
-                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-2">
+                    <h3 className="font-bold text-gray-700 dark:text-gray-300">Live Insights</h3>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded border border-emerald-500/20">Real-time</span>
                 </div>
                 
-                <div className="prose prose-invert max-w-none">
-                  <ReactMarkdown>{report}</ReactMarkdown>
+                <div className="space-y-3 overflow-y-auto flex-1 pr-1 custom-scrollbar">
+                    {insights.map((insight) => (
+                        <Card key={insight.id} className="p-4 border-l-4 border-l-amber-500 hover:shadow-md transition-all bg-white dark:bg-slate-900 border-y dark:border-y-slate-800 border-r dark:border-r-slate-800">
+                            <div className="flex justify-between items-start mb-2">
+                                <h4 className="font-bold text-sm text-gray-900 dark:text-white">{insight.title}</h4>
+                                <span className="text-[10px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded">
+                                    {insight.probability} Prob.
+                                </span>
+                            </div>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <Activity className="w-3 h-3 text-indigo-400" />
+                                    <span>Impact: <span className="text-gray-900 dark:text-gray-200 font-medium">{insight.impact}</span></span>
+                                </div>
+                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                    <Zap className="w-3 h-3 text-yellow-400" />
+                                    <span>Action: <span className="text-gray-900 dark:text-gray-200 font-medium">{insight.action}</span></span>
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+
+                    {/* Weather Card */}
+                    <Card className="p-4 border-l-4 border-l-blue-500 bg-white dark:bg-slate-900 border-y dark:border-y-slate-800 border-r dark:border-r-slate-800">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                                <Wind className="w-4 h-4" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-gray-900 dark:text-white">Wind Gusts</h4>
+                                <p className="text-[10px] text-gray-500 uppercase">Weather Alert</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                            Wind speeds expected to exceed <strong>35km/h</strong> at 14:00. Secure crane operations immediately.
+                        </p>
+                    </Card>
                 </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 flex items-center gap-3">
-                <AlertTriangle className="w-5 h-5" />
-                {error}
-              </div>
-            )}
-
-            {!report && !isLoading && !error && (
-              <div className="flex flex-col items-center justify-center h-64 text-slate-600">
-                <BrainCircuit className="w-16 h-16 mb-4 opacity-20" />
-                <p>Ready to analyze safety data</p>
-              </div>
-            )}
-
-          </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
-
-// Icons helper
-const MegaphoneIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>;
-const BotIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>;

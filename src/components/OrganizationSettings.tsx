@@ -1,113 +1,123 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../contexts';
 import { Card } from './ui/Card';
-import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
-import type { User } from '../types';
+import { Badge } from './ui/Badge';
 import { roles } from '../config';
+import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useToast } from './ui/Toast';
 
 export const OrganizationSettings: React.FC = () => {
-  const { activeOrg, usersList, handleUpdateUser, activeUser } = useAppContext();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { activeOrg, activeUser } = useAppContext();
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const toast = useToast();
 
-  // Filter users belonging to this organization
-  const orgUsers = usersList.filter(u => u.org_id === activeOrg.id);
-  
-  const filteredUsers = orgUsers.filter(u => 
-    u.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Fetch users from Firebase
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!activeOrg?.id) return;
+      try {
+        const q = query(collection(db, 'users'), where('org_id', '==', activeOrg.id));
+        const snapshot = await getDocs(q);
+        const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setUsers(userList);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [activeOrg]);
 
-  const handleRoleChange = (userId: string, newRole: User['role']) => {
-    const user = usersList.find(u => u.id === userId);
-    if (user) {
-      handleUpdateUser({ ...user, role: newRole });
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, { role: newRole });
+      
+      // Update local state
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success("User role updated successfully.");
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast.error("Failed to update role.");
     }
   };
 
-  const handleStatusChange = (userId: string, newStatus: User['status']) => {
-    const user = usersList.find(u => u.id === userId);
-    if (user) {
-      handleUpdateUser({ ...user, status: newStatus });
+  const handleStatusChange = async (userId: string, newStatus: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, { status: newStatus });
+      
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: newStatus } : u));
+      toast.success(`User marked as ${newStatus}.`);
+    } catch (error) {
+      toast.error("Failed to update status.");
     }
   };
 
-  // Only ADMIN or ORG_ADMIN can see this
-  if (activeUser?.role !== 'ADMIN' && activeUser?.role !== 'ORG_ADMIN') {
-    return (
-      <div className="p-8 text-center text-gray-500">
-        You do not have permission to manage organization settings.
-      </div>
-    );
-  }
+  if (loading) return <div className="p-8 text-center">Loading users...</div>;
 
   return (
     <div className="space-y-6">
       <Card>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 border-b pb-4 dark:border-gray-700">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{activeOrg.name} Team</h2>
-            <p className="text-sm text-gray-500">Manage access and roles for your organization members.</p>
+            <p className="text-sm text-gray-500">Manage user access and permissions.</p>
           </div>
-          <div className="flex gap-2">
-             <input 
-                type="text" 
-                placeholder="Search users..." 
-                className="p-2 border rounded-md text-sm bg-transparent dark:border-gray-700 dark:text-white"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-             />
-             <Button>Invite New User</Button>
+          <div className="text-right">
+            <p className="text-xs text-gray-400 uppercase">Total Users</p>
+            <p className="text-2xl font-bold text-primary-600">{users.length}</p>
           </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-white/5">
+          <table className="min-w-full text-sm text-left">
+            <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-800">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3">User</th>
+                <th className="px-6 py-3">Email</th>
+                <th className="px-6 py-3">Current Role</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white dark:bg-transparent divide-y divide-gray-200 dark:divide-gray-800">
-              {filteredUsers.map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <img className="h-10 w-10 rounded-full" src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}`} alt="" />
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </div>
-                    </div>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {users.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
+                    {user.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 text-gray-500">{user.email}</td>
+                  <td className="px-6 py-4">
                     <select 
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user.id, e.target.value as User['role'])}
-                        className="text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-black/20 dark:border-gray-700 dark:text-white"
-                        disabled={user.id === activeUser.id} // Can't change own role
+                      value={user.role}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                      className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-primary-500"
+                      disabled={user.id === activeUser?.id} // Prevent changing own role
                     >
-                        {roles.map(r => (
-                            <option key={r.key} value={r.key}>{r.label}</option>
-                        ))}
+                      {roles.map(r => (
+                        <option key={r.key} value={r.key}>{r.label}</option>
+                      ))}
                     </select>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4">
                     <Badge color={user.status === 'active' ? 'green' : 'red'}>
-                        {user.status}
+                      {user.status}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {user.id !== activeUser.id && (
-                        <button 
-                            onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')}
-                            className={`text-xs font-semibold ${user.status === 'active' ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
-                        >
-                            {user.status === 'active' ? 'Suspend' : 'Activate'}
-                        </button>
+                  <td className="px-6 py-4 text-right">
+                    {user.id !== activeUser?.id && (
+                      <Button 
+                        size="sm" 
+                        variant="secondary"
+                        onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'inactive' : 'active')}
+                      >
+                        {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                      </Button>
                     )}
                   </td>
                 </tr>

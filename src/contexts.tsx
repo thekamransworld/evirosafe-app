@@ -12,21 +12,14 @@ import type {
   Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem 
 } from './types';
 import { useToast } from './components/ui/Toast';
+import * as dbService from './services/dbService';
 
-// --- MOCK DATA DEFINITIONS (Used as defaults if LocalStorage is empty) ---
+// --- MOCK DATA DEFINITIONS ---
 const MOCK_PROJECTS: Project[] = [
   { id: 'p1', name: 'Downtown Construction', status: 'active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction' },
   { id: 'p2', name: 'Refinery Maintenance', status: 'active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance' }
 ];
 
-const MOCK_TEMPLATES: ChecklistTemplate[] = [
-    {
-        id: 'ct_1', org_id: 'org_1', category: 'Safety', title: { en: 'Weekly Safety Walkdown' }, 
-        items: [{ id: 'i1', text: { en: 'PPE Compliance' }, description: { en: 'Check helmets, boots, vests' } }]
-    }
-];
-
-// Missing definitions added here to fix the error
 const MOCK_INSPECTIONS: Inspection[] = [];
 const MOCK_CHECKLIST_RUNS: ChecklistRun[] = [];
 const MOCK_PLANS: PlanType[] = [];
@@ -39,17 +32,12 @@ const MOCK_NOTIFICATIONS: Notification[] = [
     { id: 'n1', report_id: 'rep_1', user_id: 'user_1', is_read: false, message: 'System connected successfully.', timestamp: new Date().toISOString() }
 ];
 const MOCK_PTWS: Ptw[] = [];
-
-// --- HELPER: Load from LocalStorage ---
-const loadFromStorage = <T,>(key: string, fallback: T): T => {
-  try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : fallback;
-  } catch (e) {
-    console.error(`Error loading ${key} from storage`, e);
-    return fallback;
-  }
-};
+const MOCK_TEMPLATES: ChecklistTemplate[] = [
+    {
+        id: 'ct_1', org_id: 'org_1', category: 'Safety', title: { en: 'Weekly Safety Walkdown' }, 
+        items: [{ id: 'i1', text: { en: 'PPE Compliance' }, description: { en: 'Check helmets, boots, vests' } }]
+    }
+];
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -91,10 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0]);
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  
-  // Load users from storage or fallback to initialUsers
-  const [usersList, setUsersList] = useState<User[]>(() => loadFromStorage('usersList', initialUsers || []));
-
+  const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
   const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
   const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
@@ -104,11 +89,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const toast = useToast();
-
-  // Persist Users List
-  useEffect(() => {
-    localStorage.setItem('usersList', JSON.stringify(usersList));
-  }, [usersList]);
 
   useEffect(() => {
       const root = window.document.documentElement;
@@ -246,6 +226,8 @@ interface DataContextType {
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
   setPtwList: React.Dispatch<React.SetStateAction<Ptw[]>>;
+  // ADDED: Setter for checklist templates
+  setChecklistTemplates: React.Dispatch<React.SetStateAction<ChecklistTemplate[]>>;
   
   handleCreateProject: (data: any) => void;
   handleCreateReport: (data: any) => void;
@@ -267,6 +249,7 @@ interface DataContextType {
   handleScheduleSession: (data: any) => void;
   handleCloseSession: (id: string, attendance: any) => void;
   handleUpdateActionStatus: (origin: any, status: any) => void;
+  
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
 }
@@ -277,73 +260,119 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { activeOrg, activeUser } = useAppContext();
     const toast = useToast();
     
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    
+    // DB Connected States
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [reportList, setReportList] = useState<Report[]>([]);
+    const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
+    const [ptwList, setPtwList] = useState<Ptw[]>([]);
 
-    // --- INITIALIZE STATE FROM LOCAL STORAGE (Persistence) ---
-    const [projects, setProjects] = useState<Project[]>(() => loadFromStorage('projects', MOCK_PROJECTS));
-    const [reportList, setReportList] = useState<Report[]>(() => loadFromStorage('reportList', []));
-    const [inspectionList, setInspectionList] = useState<Inspection[]>(() => loadFromStorage('inspectionList', MOCK_INSPECTIONS));
-    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>(() => loadFromStorage('checklistRunList', MOCK_CHECKLIST_RUNS));
-    const [planList, setPlanList] = useState<PlanType[]>(() => loadFromStorage('planList', MOCK_PLANS));
-    const [ramsList, setRamsList] = useState<RamsType[]>(() => loadFromStorage('ramsList', MOCK_RAMS));
-    const [tbtList, setTbtList] = useState<TbtSession[]>(() => loadFromStorage('tbtList', MOCK_TBTS));
-    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>(() => loadFromStorage('trainingCourseList', MOCK_COURSES));
-    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>(() => loadFromStorage('trainingRecordList', MOCK_RECORDS));
-    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>(() => loadFromStorage('trainingSessionList', MOCK_SESSIONS));
-    const [notifications, setNotifications] = useState<Notification[]>(() => loadFromStorage('notifications', MOCK_NOTIFICATIONS));
-    const [ptwList, setPtwList] = useState<Ptw[]>(() => loadFromStorage('ptwList', MOCK_PTWS));
-    const [signs, setSigns] = useState<Sign[]>(() => loadFromStorage('signs', []));
-    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(() => loadFromStorage('checklistTemplates', MOCK_TEMPLATES));
-    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>(() => loadFromStorage('standaloneActions', []));
+    // Mock/Local States (Not yet in DB)
+    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>(MOCK_CHECKLIST_RUNS);
+    const [planList, setPlanList] = useState<PlanType[]>(MOCK_PLANS);
+    const [ramsList, setRamsList] = useState<RamsType[]>(MOCK_RAMS);
+    const [tbtList, setTbtList] = useState<TbtSession[]>(MOCK_TBTS);
+    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>(MOCK_COURSES);
+    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>(MOCK_RECORDS);
+    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>(MOCK_SESSIONS);
+    const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+    const [signs, setSigns] = useState<Sign[]>([]);
+    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(MOCK_TEMPLATES);
+    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
-    // --- SAVE TO LOCAL STORAGE ON CHANGE ---
-    useEffect(() => { localStorage.setItem('projects', JSON.stringify(projects)); }, [projects]);
-    useEffect(() => { localStorage.setItem('reportList', JSON.stringify(reportList)); }, [reportList]);
-    useEffect(() => { localStorage.setItem('inspectionList', JSON.stringify(inspectionList)); }, [inspectionList]);
-    useEffect(() => { localStorage.setItem('checklistRunList', JSON.stringify(checklistRunList)); }, [checklistRunList]);
-    useEffect(() => { localStorage.setItem('planList', JSON.stringify(planList)); }, [planList]);
-    useEffect(() => { localStorage.setItem('ramsList', JSON.stringify(ramsList)); }, [ramsList]);
-    useEffect(() => { localStorage.setItem('tbtList', JSON.stringify(tbtList)); }, [tbtList]);
-    useEffect(() => { localStorage.setItem('trainingCourseList', JSON.stringify(trainingCourseList)); }, [trainingCourseList]);
-    useEffect(() => { localStorage.setItem('trainingRecordList', JSON.stringify(trainingRecordList)); }, [trainingRecordList]);
-    useEffect(() => { localStorage.setItem('trainingSessionList', JSON.stringify(trainingSessionList)); }, [trainingSessionList]);
-    useEffect(() => { localStorage.setItem('ptwList', JSON.stringify(ptwList)); }, [ptwList]);
-    useEffect(() => { localStorage.setItem('standaloneActions', JSON.stringify(standaloneActions)); }, [standaloneActions]);
+    // --- FETCH DATA ON LOAD ---
+    useEffect(() => {
+        const loadData = async () => {
+            setIsLoading(true);
+            try {
+                // Fetch all data in parallel from Firebase
+                const [dbProjects, dbReports, dbPtws, dbInspections] = await Promise.all([
+                    dbService.getProjects(),
+                    dbService.getReports(),
+                    dbService.getPtws(),
+                    dbService.getInspections()
+                ]);
 
-    // --- HANDLERS ---
+                setProjects(dbProjects);
+                setReportList(dbReports);
+                setPtwList(dbPtws);
+                setInspectionList(dbInspections);
+            } catch (error) {
+                console.error("Failed to load data:", error);
+                toast.error("Failed to load data from server. Using local mode.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        loadData();
+    }, []);
+
+    // --- DB HANDLERS ---
 
     const handleCreateReport = async (reportData: any) => {
-        const newReport = {
-            ...reportData,
-            id: `rep_${Date.now()}`,
-            org_id: activeOrg.id,
-            reporter_id: activeUser?.id || 'unknown',
-            status: 'submitted',
-            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
-            capa: [],
-            acknowledgements: []
-        };
-        setReportList(prev => [newReport, ...prev]);
-        toast.success("Report saved.");
+        try {
+            const newReportData = {
+                ...reportData,
+                org_id: activeOrg.id,
+                reporter_id: activeUser?.id || 'unknown',
+                status: 'submitted',
+                audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
+                capa: [],
+                acknowledgements: []
+            };
+            // Save to DB
+            const savedReport = await dbService.createReport(newReportData);
+            // Update Local State
+            setReportList(prev => [savedReport as Report, ...prev]);
+            toast.success("Report saved to database.");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to save report.");
+        }
     };
 
-    const handleCreateInspection = (data: any) => {
-        const newInspection = {
-            ...data,
-            id: `insp_${Date.now()}`,
-            org_id: activeOrg.id,
-            findings: [],
-            status: data.status || 'Ongoing',
-            audit_trail: [{ 
-                user_id: activeUser?.id || 'system', 
-                timestamp: new Date().toISOString(), 
-                action: 'Inspection Created' 
-            }]
-        };
-        setInspectionList(prev => [newInspection as Inspection, ...prev]);
-        toast.success("Inspection created successfully.");
+    const handleCreateProject = async (data: any) => {
+        try {
+            const newProjectData = { ...data, org_id: activeOrg.id, status: 'active' };
+            const savedProject = await dbService.createProject(newProjectData);
+            setProjects(prev => [...prev, savedProject as Project]);
+            toast.success("Project created.");
+        } catch (e) {
+            toast.error("Error creating project.");
+        }
     };
 
+    const handleCreatePtw = async (data: any) => {
+        try {
+            const newPtwData = { ...data, org_id: activeOrg.id, status: 'DRAFT', audit_log: [], approvals: [] };
+            const savedPtw = await dbService.createPtw(newPtwData);
+            setPtwList(prev => [savedPtw as Ptw, ...prev]);
+            toast.success("Permit created.");
+        } catch (e) {
+            toast.error("Error creating permit.");
+        }
+    };
+
+    const handleCreateInspection = async (data: any) => {
+        try {
+            const newInspData = {
+                ...data,
+                org_id: activeOrg.id,
+                findings: [],
+                status: data.status || 'Ongoing',
+                audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }]
+            };
+            const savedInsp = await dbService.createInspection(newInspData);
+            setInspectionList(prev => [savedInsp as Inspection, ...prev]);
+            toast.success("Inspection created.");
+        } catch (e) {
+            toast.error("Error creating inspection.");
+        }
+    };
+
+    // --- LOCAL HANDLERS (Not yet in DB) ---
     const handleCreateStandaloneAction = (data: any) => {
         const newAction: ActionItem = {
             id: `act_${Date.now()}`,
@@ -360,11 +389,64 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStandaloneActions(prev => [newAction, ...prev]);
         toast.success("Action created.");
     };
+
+    const handleStatusChange = async (id: string, s: any) => {
+        // Optimistic update
+        setReportList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
+        // DB update
+        await dbService.updateReport(id, { status: s });
+    };
+
+    const handleUpdateInspection = async (i: any, action?: any) => {
+        setInspectionList(prev => prev.map(x => x.id === i.id ? i : x));
+        await dbService.updateInspection(i.id, i);
+    };
+
+    const handleUpdatePtw = async (d: any, action?: any) => {
+        setPtwList(prev => prev.map(p => p.id === d.id ? d : p));
+        await dbService.updatePtw(d.id, d);
+    };
+
+    // ... (Keep other local handlers)
+    const handleCapaActionChange = (id: string, index: number, status: any) => {
+         setReportList(prev => prev.map(r => {
+            if (r.id === id) {
+                const newCapa = [...r.capa];
+                if (newCapa[index]) {
+                    newCapa[index] = { ...newCapa[index], status: status };
+                    return { ...r, capa: newCapa };
+                }
+            }
+            return r;
+        }));
+    };
+    const handleAcknowledgeReport = (id: string) => setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: [...r.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }] } : r));
+    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
+    const handleUpdatePlan = (d: any) => setPlanList(prev => prev.map(p => p.id === d.id ? d : p));
+    const handlePlanStatusChange = (id: string, s: any) => setPlanList(prev => prev.map(p => p.id === id ? { ...p, status: s } : p));
+    const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
+    const handleUpdateRams = (d: any) => setRamsList(prev => prev.map(r => r.id === d.id ? d : r));
+    const handleRamsStatusChange = (id: string, s: any) => setRamsList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
+    const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
+    const handleUpdateTbt = (d: any) => setTbtList(prev => prev.map(t => t.id === d.id ? d : t));
+    const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
+    const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
+    const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
     
+    const handleUpdateActionStatus = (origin: any, newStatus: any) => {
+        if (origin.type === 'report-capa') {
+            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
+        } else if (origin.type === 'standalone') {
+             setStandaloneActions(prev => prev.map(a => 
+                a.id === origin.parentId ? { ...a, status: newStatus } : a
+            ));
+        }
+    };
+
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
         reportList.forEach(report => {
-            report.capa.forEach((action, index) => {
+            report.capa?.forEach((action, index) => {
                 items.push({
                     id: `report-${report.id}-capa-${index}`,
                     action: action.action,
@@ -380,53 +462,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [...items, ...standaloneActions];
     }, [reportList, standaloneActions]);
 
-    const handleUpdateActionStatus = (origin: any, newStatus: any) => {
-        if (origin.type === 'report-capa') {
-            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
-        } else if (origin.type === 'standalone') {
-             setStandaloneActions(prev => prev.map(a => 
-                a.id === origin.parentId ? { ...a, status: newStatus } : a
-            ));
-        }
-    };
-
-    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
-        setReportList(prev => prev.map(r => {
-            if (r.id === reportId) {
-                const newCapa = [...r.capa];
-                if (newCapa[capaIndex]) {
-                    newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
-                    return { ...r, capa: newCapa };
-                }
-            }
-            return r;
-        }));
-    };
-
-    const handleCreateProject = (data: any) => setProjects(prev => [...prev, { ...data, id: `proj_${Date.now()}`, org_id: activeOrg.id, status: 'active' }]);
-    const handleStatusChange = (id: string, s: any) => setReportList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
-    const handleAcknowledgeReport = (id: string) => setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: [...r.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }] } : r));
-    const handleUpdateInspection = (i: any) => setInspectionList(prev => prev.map(x => x.id === i.id ? i : x));
-    const handleCreatePtw = (d: any) => setPtwList(prev => [{ ...d, id: `ptw_${Date.now()}`, status: 'DRAFT' }, ...prev]);
-    const handleUpdatePtw = (d: any) => setPtwList(prev => prev.map(p => p.id === d.id ? d : p));
-    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: d.sections || [], attachments: [] }, people: { prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '' } }, dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, meta: { tags: [], change_note: 'Initial Draft' }, audit_trail: [] } as any, ...prev]);
-    const handleUpdatePlan = (d: any) => setPlanList(prev => prev.map(p => p.id === d.id ? d : p));
-    const handlePlanStatusChange = (id: string, s: any) => setPlanList(prev => prev.map(p => p.id === id ? { ...p, status: s } : p));
-    const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
-    const handleUpdateRams = (d: any) => setRamsList(prev => prev.map(r => r.id === d.id ? d : r));
-    const handleRamsStatusChange = (id: string, s: any) => setRamsList(prev => prev.map(r => r.id === id ? { ...r, status: s } : r));
-    const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
-    const handleUpdateTbt = (d: any) => setTbtList(prev => prev.map(t => t.id === d.id ? d : t));
-    const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
-    const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
-    const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
-
     const value = {
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
         actionItems,
         setInspectionList, setChecklistRunList, setPtwList,
+        setChecklistTemplates, // EXPOSED HERE
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,

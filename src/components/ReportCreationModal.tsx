@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
+import type { Report, Project, User, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
 import { generateSafetyReport } from '../services/geminiService';
+import { uploadFiles } from '../services/storageService'; // Import Storage Service
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -81,7 +82,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const [formData, setFormData] = useState(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
-  
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -174,7 +174,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
           const newFormData: any = {
               ...formData,
-              description: aiData.description || aiPrompt, 
+              description: aiData.description, 
               conditions: aiData.rootCause ? `Root Cause: ${aiData.rootCause}` : formData.conditions,
               immediate_actions: aiData.recommendation || formData.immediate_actions,
               risk_pre_control: {
@@ -189,7 +189,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
               newFormData.details = {
                   ...defaultDetails.leadership,
                   ...formData.details,
-                  key_observations: aiData.description || aiPrompt
+                  key_observations: aiData.description 
               };
           }
 
@@ -197,16 +197,14 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
       } catch (e) {
           console.error(e);
-          // Fallback if AI fails
-          setFormData(prev => ({...prev, description: aiPrompt}));
+          setError("AI analysis failed. Check your connection or API Key.");
       } finally {
           setIsAiLoading(false);
       }
   };
 
-  // --- ROBUST SUBMIT HANDLER ---
+  // --- REAL FIREBASE UPLOAD SUBMIT HANDLER ---
   const handleSubmit = async () => {
-    // 1. Validation
     if (!formData.project_id) {
         setError("A project must be selected.");
         return;
@@ -228,38 +226,19 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     setIsSubmitting(true);
 
     try {
+      // 1. Upload to Firebase Storage
       let realUrls: string[] = [];
       
-      // 2. Try Upload to Cloudinary (with Fallback)
       if (evidenceFiles.length > 0) {
-          try {
-              const uploadPromises = evidenceFiles.map(async (file) => {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('upload_preset', 'evirosafe_preset'); 
-                
-                const response = await fetch('https://api.cloudinary.com/v1_1/dsw9llfdo/image/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error('Cloudinary upload failed');
-                }
-                const data = await response.json();
-                return data.secure_url; 
-              });
-
-              realUrls = await Promise.all(uploadPromises);
-          } catch (uploadError) {
-              console.warn("Real upload failed, falling back to local preview URLs", uploadError);
-              // Fallback: Use local object URLs so the user can still submit
-              realUrls = evidenceFiles.map(f => URL.createObjectURL(f));
-          }
+          // Upload to 'reports' folder in Storage
+          realUrls = await uploadFiles(evidenceFiles, 'reports');
       }
 
-      // 3. Save the report
-      await handleCreateReport({ ...formData, evidence_urls: realUrls });
+      // 2. Save the report to Firebase Database (Firestore)
+      await handleCreateReport({ 
+          ...formData, 
+          evidence_urls: realUrls 
+      });
       
       onClose();
 
