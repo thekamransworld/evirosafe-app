@@ -1,9 +1,3 @@
----
-
-### **Step 2: Update `src/components/AiInsights.tsx`**
-This is the **new UI code**. It replaces the static form with a **Chat Interface** on the left and **Live Predictions** on the right.
-
-```tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
