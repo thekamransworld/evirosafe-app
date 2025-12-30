@@ -4,6 +4,7 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
+import { OrganizationDetails } from './OrganizationDetails'; // Import the new component
 
 // --- Organization Creation Modal ---
 interface OrganizationCreationModalProps {
@@ -65,6 +66,9 @@ export const Organizations: React.FC = () => {
   const { organizations, usersList, activeUser, handleCreateOrganization } = useAppContext();
   const { projects } = useDataContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // NEW STATE: Track selected organization for drill-down
+  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
 
   const getStatusColor = (status: Organization['status']): 'green' | 'gray' => {
     switch (status) {
@@ -77,6 +81,11 @@ export const Organizations: React.FC = () => {
   const handleSubmit = (data: { name: string, industry: string, country: string }) => {
     handleCreateOrganization({ ...data, domain: `${data.name.split(' ')[0].toLowerCase()}.com`, timezone: 'GMT+4' });
     setIsModalOpen(false);
+  }
+
+  // If an org is selected, show the details view instead of the list
+  if (selectedOrg) {
+      return <OrganizationDetails org={selectedOrg} onBack={() => setSelectedOrg(null)} />;
   }
 
   return (
@@ -123,8 +132,9 @@ export const Organizations: React.FC = () => {
                   </div>
               </div>
               <div className="mt-6 border-t dark:border-dark-border pt-4 flex justify-end space-x-2">
-                  <Button variant="ghost" size="sm">Manage</Button>
-                  <Button variant="secondary" size="sm">Settings</Button>
+                  {/* Updated Buttons to trigger drill-down */}
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedOrg(org)}>Manage</Button>
+                  <Button variant="secondary" size="sm" onClick={() => setSelectedOrg(org)}>Settings</Button>
               </div>
             </Card>
           )
