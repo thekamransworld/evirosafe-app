@@ -7,8 +7,7 @@ import {
   onSnapshot, 
   query, 
   where, 
-  orderBy, 
-  Timestamp 
+  orderBy
 } from 'firebase/firestore';
 import { db } from './firebase'; 
 import { translations, supportedLanguages, roles } from './config';
@@ -20,6 +19,24 @@ import type {
   Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem 
 } from './types';
 import { useToast } from './components/ui/Toast';
+
+// --- MOCK DATA (Fallbacks) ---
+const MOCK_PROJECTS: Project[] = [
+  { id: 'p1', name: 'Downtown Construction', status: 'active', org_id: 'org1', location: 'City Center', start_date: '2023-01-01', code: 'DTC-001', finish_date: '2024-01-01', manager_id: 'user_1', type: 'Construction' },
+  { id: 'p2', name: 'Refinery Maintenance', status: 'active', org_id: 'org1', location: 'Sector 7', start_date: '2023-03-15', code: 'REF-002', finish_date: '2024-03-15', manager_id: 'user_2', type: 'Maintenance' }
+];
+
+const MOCK_INSPECTIONS: Inspection[] = [];
+const MOCK_CHECKLIST_RUNS: ChecklistRun[] = [];
+const MOCK_PLANS: PlanType[] = [];
+const MOCK_RAMS: RamsType[] = [];
+const MOCK_TBTS: TbtSession[] = [];
+const MOCK_COURSES: TrainingCourse[] = [];
+const MOCK_RECORDS: TrainingRecord[] = [];
+const MOCK_SESSIONS: TrainingSession[] = [];
+const MOCK_NOTIFICATIONS: Notification[] = [];
+const MOCK_PTWS: Ptw[] = [];
+const MOCK_TEMPLATES: ChecklistTemplate[] = [];
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -158,7 +175,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return permission.actions.includes(action);
   };
 
-  // FIX: Added safe navigation (?.) to prevent crash if preferences is undefined
   const language = activeUser?.preferences?.language || 'en';
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
@@ -277,6 +293,7 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
+  handleCreateChecklistTemplate: (data: any) => void; // <--- ADDED THIS
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -306,7 +323,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         if (!activeOrg?.id || activeOrg.id === 'temp') return;
 
-        // FIX: Added error handling to prevent crash if index is missing
         try {
             const unsubProjects = onSnapshot(query(collection(db, 'projects'), where('org_id', '==', activeOrg.id)), (s) => setProjects(s.docs.map(d => ({id: d.id, ...d.data()} as Project))));
             
@@ -400,6 +416,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) { toast.error("Error creating action."); }
     };
 
+    // --- NEW: Handle Checklist Template Import ---
+    const handleCreateChecklistTemplate = async (data: any) => {
+        try {
+            await addDoc(collection(db, 'checklist_templates'), data);
+            toast.success("Checklist template imported.");
+        } catch (e) {
+            toast.error("Error importing template.");
+        }
+    };
+
     // --- UPDATE HANDLERS ---
 
     const handleStatusChange = async (id: string, status: any) => {
@@ -482,7 +508,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus,
         handleCreateInspection,       
-        handleCreateStandaloneAction 
+        handleCreateStandaloneAction,
+        handleCreateChecklistTemplate // <--- EXPOSED HERE
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

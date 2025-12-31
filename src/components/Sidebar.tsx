@@ -138,6 +138,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { label: 'Settings', view: 'settings' },
   ];
 
+  // Safe email extraction
+  const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'U';
+
   return (
     <div
       className={`shrink-0 h-screen flex flex-col transition-all duration-300 z-50
@@ -210,12 +213,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }`}
         >
           <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0 shadow-md">
-            {currentUser?.email?.charAt(0).toUpperCase() || 'U'}
+            {userInitial}
           </div>
           {isOpen && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-100 truncate">
-                {currentUser?.email}
+                {currentUser?.email || 'User'}
               </p>
               <p className="text-xs text-slate-500 truncate">Admin</p>
             </div>

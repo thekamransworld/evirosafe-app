@@ -8,7 +8,7 @@ import { FormField } from './ui/FormField';
 
 // --- IMPORTS FOR SEEDING ---
 import { db } from '../firebase';
-import { writeBatch, doc, collection } from 'firebase/firestore';
+import { writeBatch, doc } from 'firebase/firestore';
 import { 
   projects, reports, inspections, checklistTemplates, 
   users as initialUsers, organizations 
@@ -83,14 +83,32 @@ export const Settings: React.FC<SettingsProps> = () => {
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>('Profile');
-  const [editedUser, setEditedUser] = useState<User>(activeUser || {} as User);
+  
+  // Default user structure to prevent crashes
+  const defaultUser: User = {
+      id: '', org_id: '', email: '', name: '', avatar_url: '', role: 'WORKER', status: 'active',
+      preferences: {
+          language: 'en',
+          default_view: 'dashboard',
+          units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' }
+      }
+  };
+
+  const [editedUser, setEditedUser] = useState<User>(activeUser || defaultUser);
   const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Update local state when activeUser loads/changes, ensuring preferences exist
   useEffect(() => {
-    if(activeUser) setEditedUser(activeUser);
+    if (activeUser) {
+        const safeUser = {
+            ...activeUser,
+            preferences: activeUser.preferences || defaultUser.preferences
+        };
+        setEditedUser(safeUser);
+    }
   }, [activeUser]);
 
   useEffect(() => {
@@ -169,7 +187,7 @@ export const Settings: React.FC<SettingsProps> = () => {
         });
 
         await batch.commit();
-        toast.success("Database populated successfully! Refresh the page.");
+        toast.success("Database populated successfully! Refreshing...");
         setTimeout(() => window.location.reload(), 1500);
 
     } catch (error: any) {
@@ -180,7 +198,7 @@ export const Settings: React.FC<SettingsProps> = () => {
     }
   };
 
-  if (!activeUser) return null;
+  if (!activeUser) return <div className="p-8 text-center">Loading settings...</div>;
 
   const userRole = roles.find((r) => r.key === editedUser.role);
 
@@ -301,12 +319,12 @@ export const Settings: React.FC<SettingsProps> = () => {
           >
             <FormField label="Language">
               <select
-                value={editedUser.preferences.language}
+                value={editedUser.preferences?.language || 'en'}
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,
                     preferences: {
-                      ...editedUser.preferences,
+                      ...(editedUser.preferences || defaultUser.preferences),
                       language: e.target.value as 'en' | 'ar',
                     },
                   })
@@ -320,12 +338,12 @@ export const Settings: React.FC<SettingsProps> = () => {
 
             <FormField label="Default Home Screen">
               <select
-                value={editedUser.preferences.default_view}
+                value={editedUser.preferences?.default_view || 'dashboard'}
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,
                     preferences: {
-                      ...editedUser.preferences,
+                      ...(editedUser.preferences || defaultUser.preferences),
                       default_view:
                         e.target.value as User['preferences']['default_view'],
                     },
