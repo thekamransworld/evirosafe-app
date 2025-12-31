@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import type { Organization, Project, User } from '../types';
+import type { Organization } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
-import { Projects } from './Projects';
-import { People } from './People';
+import { ProjectCreationModal } from './ProjectCreationModal';
 
 interface OrganizationDetailsProps {
   org: Organization;
@@ -16,8 +15,9 @@ type Tab = 'Overview' | 'Projects' | 'People' | 'Settings';
 
 export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, onBack }) => {
   const { usersList } = useAppContext();
-  const { projects } = useDataContext();
+  const { projects, handleCreateProject } = useDataContext();
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
 
   // Filter data for this specific organization
   const orgProjects = useMemo(() => projects.filter(p => p.org_id === org.id), [projects, org.id]);
@@ -27,6 +27,11 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
     activeProjects: orgProjects.filter(p => p.status === 'active').length,
     totalUsers: orgUsers.length,
     admins: orgUsers.filter(u => u.role === 'ORG_ADMIN').length,
+  };
+
+  const handleProjectSubmit = (data: any) => {
+      handleCreateProject({ ...data, org_id: org.id });
+      setIsProjectModalOpen(false);
   };
 
   return (
@@ -92,8 +97,8 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
             </Card>
             
             <Card className="md:col-span-3">
-                <h3 className="text-lg font-bold mb-4">Organization Details</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Organization Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
                     <div>
                         <p className="text-gray-500">Industry</p>
                         <p className="font-medium">{org.industry || 'N/A'}</p>
@@ -116,61 +121,73 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
         )}
 
         {activeTab === 'Projects' && (
-            // We reuse the Projects component but we might need to filter it or just show it.
-            // Since Projects component shows ALL projects for the activeOrg in context, 
-            // and we are likely viewing the activeOrg, this works. 
-            // If viewing a different org, we'd need to pass props to Projects to filter, 
-            // but for now let's assume we are viewing the context's active org or just list them manually.
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-bold">Projects List</h3>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Projects List</h3>
+                    <Button onClick={() => setIsProjectModalOpen(true)}>
+                        <PlusIcon className="w-5 h-5 mr-2" />
+                        New Project
+                    </Button>
                 </div>
-                {/* Reusing the logic from Projects.tsx but simplified for this view */}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {orgProjects.map(p => (
                         <Card key={p.id} className="hover:border-primary-500 transition-colors cursor-pointer">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h4 className="font-bold text-lg">{p.name}</h4>
+                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">{p.name}</h4>
                                     <p className="text-sm text-gray-500">{p.code}</p>
                                 </div>
                                 <Badge color={p.status === 'active' ? 'green' : 'gray'}>{p.status}</Badge>
                             </div>
                             <div className="mt-4 text-sm text-gray-600 dark:text-gray-300">
                                 <p>📍 {p.location}</p>
+                                <p className="text-xs text-gray-500 mt-1">Manager: {usersList.find(u => u.id === p.manager_id)?.name || 'Unassigned'}</p>
                             </div>
                         </Card>
                     ))}
-                    {orgProjects.length === 0 && <p className="text-gray-500">No projects found.</p>}
+                    {orgProjects.length === 0 && (
+                        <div className="col-span-2 text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+                            <p className="text-gray-500">No projects found for this organization.</p>
+                            <Button variant="ghost" className="mt-2" onClick={() => setIsProjectModalOpen(true)}>Create First Project</Button>
+                        </div>
+                    )}
                 </div>
             </div>
         )}
 
         {activeTab === 'People' && (
              <div className="space-y-4">
-                <h3 className="text-lg font-bold">Team Members</h3>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Team Members</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {orgUsers.map(u => (
                         <Card key={u.id} className="flex items-center gap-4">
                             <img src={u.avatar_url} alt={u.name} className="w-10 h-10 rounded-full bg-gray-200" />
                             <div>
-                                <p className="font-bold">{u.name}</p>
+                                <p className="font-bold text-gray-900 dark:text-white">{u.name}</p>
                                 <p className="text-xs text-gray-500">{u.role}</p>
                             </div>
                         </Card>
                     ))}
+                    {orgUsers.length === 0 && <p className="text-gray-500">No users found.</p>}
                 </div>
              </div>
         )}
 
         {activeTab === 'Settings' && (
             <Card>
-                <h3 className="text-lg font-bold mb-4">Organization Settings</h3>
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Organization Settings</h3>
                 <p className="text-gray-500">Global settings for {org.name} will go here.</p>
-                {/* Add specific org settings forms here later */}
             </Card>
         )}
       </div>
+
+      <ProjectCreationModal 
+        isOpen={isProjectModalOpen} 
+        onClose={() => setIsProjectModalOpen(false)}
+        onSubmit={handleProjectSubmit}
+        users={orgUsers}
+      />
     </div>
   );
 };
@@ -178,5 +195,11 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
 const ArrowLeftIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+  </svg>
+);
+
+const PlusIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
   </svg>
 );

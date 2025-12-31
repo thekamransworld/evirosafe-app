@@ -4,7 +4,7 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
-import { ProjectCreationModal } from './ProjectCreationModal'; // Import the new modal
+import { ProjectCreationModal } from './ProjectCreationModal';
 
 // --- Project Card Component ---
 const ProjectCard: React.FC<{ project: Project; users: User[] }> = ({ project, users }) => {
@@ -32,12 +32,12 @@ const ProjectCard: React.FC<{ project: Project; users: User[] }> = ({ project, u
             </div>
             <div className="mt-4 border-t dark:border-dark-border pt-4">
                 <h4 className="text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Crew Overview</h4>
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-800 dark:text-gray-200"><strong>{crewCounts.managers}</strong> Managers</div>
-                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-800 dark:text-gray-200"><strong>{crewCounts.officers}</strong> HSE Officers</div>
-                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-800 dark:text-gray-200"><strong>{crewCounts.supervisors}</strong> Supervisors</div>
-                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-800 dark:text-gray-200"><strong>{crewCounts.inspectors}</strong> Inspectors</div>
-                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded col-span-2 text-gray-800 dark:text-gray-200"><strong>{crewCounts.workers}</strong> Workers</div>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-600 dark:text-gray-400">
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded"><strong>{crewCounts.managers}</strong> Managers</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded"><strong>{crewCounts.officers}</strong> HSE Officers</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded"><strong>{crewCounts.supervisors}</strong> Supervisors</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded"><strong>{crewCounts.inspectors}</strong> Inspectors</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded col-span-2"><strong>{crewCounts.workers}</strong> Workers</div>
                 </div>
             </div>
              <div className="mt-4 border-t dark:border-dark-border pt-4 grid grid-cols-3 gap-2 text-center">
@@ -74,8 +74,8 @@ export const Projects: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-            <h1 className="text-3xl font-bold text-text-primary dark:text-white">Projects Dashboard</h1>
-            <p className="text-text-secondary dark:text-gray-400">{activeOrg.name}</p>
+            <h1 className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">Projects Dashboard</h1>
+            <p className="text-text-secondary dark:text-dark-text-secondary">{activeOrg.name}</p>
         </div>
         {canCreate && (
             <Button onClick={() => setIsModalOpen(true)}>
