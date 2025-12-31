@@ -2,10 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { roles } from '../config';
 import { useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
+
+// --- IMPORTS FOR SEEDING ---
+import { db } from '../firebase';
+import { writeBatch, doc, collection } from 'firebase/firestore';
+import { 
+  projects, reports, inspections, checklistTemplates, 
+  users as initialUsers, organizations 
+} from '../data';
+import { useToast } from './ui/Toast';
 
 interface SettingsProps {}
 
@@ -26,7 +34,7 @@ const TabButton: React.FC<{
     onClick={() => onClick(label)}
     className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap ${
       activeTab === label
-        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
         : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5'
     }`}
   >
@@ -70,61 +78,20 @@ const ComplianceItem: React.FC<{
   </div>
 );
 
-// --- LEGAL MODAL ---
-const LegalModal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; content: string }> = ({ isOpen, onClose, title, content }) => {
-    if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card w-full max-w-2xl rounded-xl shadow-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-white/10 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-white">&times;</button>
-                </div>
-                <div className="p-6 overflow-y-auto text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                    {content}
-                </div>
-                <div className="p-6 border-t dark:border-white/10 flex justify-end">
-                    <Button onClick={onClose}>Close</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const PRIVACY_POLICY_TEXT = `
-**Privacy Policy**
-
-1. **Data Collection**: We collect personal information (name, email, role) and operational data (incidents, permits) to provide HSE management services.
-2. **Data Usage**: Data is used for safety reporting, compliance tracking, and audit purposes.
-3. **Data Sharing**: We do not share data with third parties unless required by law or for essential service provision (e.g., cloud hosting).
-4. **Security**: We implement industry-standard security measures to protect your data.
-5. **User Rights**: You have the right to access, correct, or delete your personal data. Contact your organization admin for assistance.
-
-Last Updated: December 2025
-`;
-
-const TERMS_OF_USE_TEXT = `
-**Terms of Use**
-
-1. **Acceptance**: By using EviroSafe, you agree to these terms.
-2. **Authorized Use**: You must use this platform only for legitimate HSE management activities authorized by your organization.
-3. **Account Responsibility**: You are responsible for maintaining the confidentiality of your login credentials.
-4. **Prohibited Conduct**: You may not misuse the platform, attempt to breach security, or upload malicious content.
-5. **Liability**: EviroSafe is a tool to assist in safety management but does not replace professional judgment or legal compliance obligations.
-
-Last Updated: December 2025
-`;
-
 export const Settings: React.FC<SettingsProps> = () => {
   const { activeUser, handleUpdateUser } = useAppContext();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>('Profile');
-  const [editedUser, setEditedUser] = useState<User>(activeUser);
+  const [editedUser, setEditedUser] = useState<User>(activeUser || {} as User);
   const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
   
-  // Legal Modal State
-  const [legalModal, setLegalModal] = useState<{ isOpen: boolean; title: string; content: string }>({ isOpen: false, title: '', content: '' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if(activeUser) setEditedUser(activeUser);
+  }, [activeUser]);
 
   useEffect(() => {
     return () => {
@@ -156,10 +123,64 @@ export const Settings: React.FC<SettingsProps> = () => {
   const handleChoosePictureClick = () => {
     fileInputRef.current?.click();
   };
-  
-  const openLegalModal = (title: string, content: string) => {
-      setLegalModal({ isOpen: true, title, content });
+
+  // --- DATABASE SEEDING FUNCTION ---
+  const handleSeedDatabase = async () => {
+    if (!window.confirm("⚠️ WARNING: This will upload initial data to your database. Continue?")) return;
+    
+    setIsSeeding(true);
+    try {
+        const batch = writeBatch(db);
+
+        // 1. Organizations
+        organizations.forEach(org => {
+            const ref = doc(db, 'organizations', org.id);
+            batch.set(ref, org);
+        });
+
+        // 2. Users
+        initialUsers.forEach(u => {
+            const ref = doc(db, 'users', u.id);
+            batch.set(ref, u);
+        });
+
+        // 3. Projects
+        projects.forEach(p => {
+            const ref = doc(db, 'projects', p.id);
+            batch.set(ref, p);
+        });
+
+        // 4. Reports
+        reports.forEach(r => {
+            const ref = doc(db, 'reports', r.id);
+            batch.set(ref, r);
+        });
+
+        // 5. Checklist Templates
+        checklistTemplates.forEach(t => {
+            const ref = doc(db, 'checklist_templates', t.id);
+            batch.set(ref, t);
+        });
+
+        // 6. Inspections (if any in mock data)
+        inspections.forEach(i => {
+            const ref = doc(db, 'inspections', i.id);
+            batch.set(ref, i);
+        });
+
+        await batch.commit();
+        toast.success("Database populated successfully! Refresh the page.");
+        setTimeout(() => window.location.reload(), 1500);
+
+    } catch (error: any) {
+        console.error("Seeding failed:", error);
+        toast.error(`Seeding failed: ${error.message}`);
+    } finally {
+        setIsSeeding(false);
+    }
   };
+
+  if (!activeUser) return null;
 
   const userRole = roles.find((r) => r.key === editedUser.role);
 
@@ -170,7 +191,7 @@ export const Settings: React.FC<SettingsProps> = () => {
         Manage your profile, preferences, and system settings.
       </p>
 
-      <div className="flex space-x-2 border-b dark:border-dark-border mb-6 overflow-x-auto pb-px">
+      <div className="flex space-x-2 border-b border-gray-200 dark:border-dark-border mb-6 overflow-x-auto pb-px">
         <TabButton label="Profile" activeTab={activeTab} onClick={setActiveTab} />
         <TabButton label="Preferences" activeTab={activeTab} onClick={setActiveTab} />
         <TabButton label="Security" activeTab={activeTab} onClick={setActiveTab} />
@@ -188,7 +209,7 @@ export const Settings: React.FC<SettingsProps> = () => {
             description="This information will be displayed publicly so be careful what you share."
           >
             <div className="grid grid-cols-3 gap-6">
-              <label className="block text-sm font-medium text-text-primary dark:text-white col-span-1 pt-2">
+              <label className="block text-sm font-medium text-text-primary dark:text-gray-300 col-span-1 pt-2">
                 Profile Picture
               </label>
               <div className="col-span-2">
@@ -196,7 +217,7 @@ export const Settings: React.FC<SettingsProps> = () => {
                   <img
                     src={newAvatarPreviewUrl || editedUser.avatar_url}
                     alt="Profile"
-                    className="w-16 h-16 rounded-full object-cover"
+                    className="w-16 h-16 rounded-full object-cover border dark:border-gray-600"
                   />
                   <input
                     type="file"
@@ -317,15 +338,9 @@ export const Settings: React.FC<SettingsProps> = () => {
                 <option value="ptw">Permit to Work</option>
                 <option value="inspections">Inspections</option>
                 <option value="tbt">Toolbox Talks</option>
-                <option value="trainings">Trainings</option>
+                <option value="training">Trainings</option>
               </select>
             </FormField>
-
-            <div className="pt-4 border-t dark:border-dark-border">
-              <Button variant="ghost" size="sm">
-                ✨ AI: Optimize My Settings
-              </Button>
-            </div>
           </Section>
         )}
 
@@ -335,15 +350,12 @@ export const Settings: React.FC<SettingsProps> = () => {
             description="Manage your login credentials and view your permissions."
           >
             <FormField label="Current Role">
-              <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={userRole?.label || editedUser.role}
-                    className="w-full p-2 border bg-gray-100 dark:bg-white/5 rounded-md dark:border-dark-border dark:text-white"
-                  />
-                  <Badge color="blue">{editedUser.role}</Badge>
-              </div>
+              <input
+                type="text"
+                readOnly
+                value={userRole?.label || editedUser.role}
+                className="w-full p-2 border bg-gray-100 rounded-md dark:bg-white/5 dark:border-dark-border dark:text-gray-300"
+              />
             </FormField>
 
             <FormField label="Permissions">
@@ -362,21 +374,6 @@ export const Settings: React.FC<SettingsProps> = () => {
                 </ul>
               </div>
             </FormField>
-
-            <div className="flex items-center justify-between pt-4 border-t dark:border-dark-border">
-              <div>
-                <p className="text-sm font-medium text-text-primary dark:text-white">
-                  Reset password
-                </p>
-                <p className="text-xs text-text-secondary dark:text-gray-400">
-                  For security reasons this will redirect you to your
-                  organization’s login portal.
-                </p>
-              </div>
-              <Button variant="secondary" type="button">
-                Manage Password
-              </Button>
-            </div>
           </Section>
         )}
 
@@ -401,13 +398,6 @@ export const Settings: React.FC<SettingsProps> = () => {
                 </label>
               </div>
             </FormField>
-
-            <FormField label="In-app alerts">
-              <p className="text-sm text-text-secondary dark:text-gray-400">
-                In-app alerts are always enabled for critical safety items
-                (Life Saving Rules, emergency incidents, and evacuations).
-              </p>
-            </FormField>
           </Section>
         )}
 
@@ -418,7 +408,7 @@ export const Settings: React.FC<SettingsProps> = () => {
           >
             <ComplianceItem
               title="Data Processing & Privacy"
-              action={<Button variant="ghost" onClick={() => openLegalModal('Privacy Policy', PRIVACY_POLICY_TEXT)}>View Policy</Button>}
+              action={<Button variant="ghost">View Policy</Button>}
             >
               EviroSafe processes data in line with your organization’s
               contractual requirements and local regulations.
@@ -426,7 +416,7 @@ export const Settings: React.FC<SettingsProps> = () => {
 
             <ComplianceItem
               title="Terms of Use"
-              action={<Button variant="ghost" onClick={() => openLegalModal('Terms of Use', TERMS_OF_USE_TEXT)}>View Terms</Button>}
+              action={<Button variant="ghost">View Terms</Button>}
             >
               Updated terms apply to all users accessing EviroSafe systems.
             </ComplianceItem>
@@ -443,23 +433,23 @@ export const Settings: React.FC<SettingsProps> = () => {
             title="Platform Administration"
             description="High-level controls for EviroSafe modules and tenant configuration."
           >
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg mb-6">
+                <h4 className="font-bold text-blue-800 dark:text-blue-300 mb-2">Database Management</h4>
+                <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
+                    Your database is currently live. If you see empty screens, you can seed the database with initial demo data.
+                </p>
+                <Button onClick={handleSeedDatabase} disabled={isSeeding}>
+                    {isSeeding ? 'Uploading Data...' : '🚀 Seed Database with Demo Data'}
+                </Button>
+            </div>
+
             <FormField label="Enabled modules">
               <div className="flex flex-wrap gap-2 text-sm">
-                <span className="px-2 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                  Incident Reporting
-                </span>
-                <span className="px-2 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                  Inspections
-                </span>
-                <span className="px-2 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                  Permit to Work
-                </span>
-                <span className="px-2 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                  RAMS
-                </span>
-                <span className="px-2 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                  Trainings
-                </span>
+                {['Incident Reporting', 'Inspections', 'Permit to Work', 'RAMS', 'Trainings'].map(m => (
+                    <span key={m} className="px-2 py-1 rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+                    {m}
+                    </span>
+                ))}
               </div>
             </FormField>
 
@@ -481,13 +471,6 @@ export const Settings: React.FC<SettingsProps> = () => {
           Save Changes
         </Button>
       </div>
-
-      <LegalModal 
-        isOpen={legalModal.isOpen} 
-        onClose={() => setLegalModal({ ...legalModal, isOpen: false })} 
-        title={legalModal.title} 
-        content={legalModal.content} 
-      />
     </div>
   );
 };
