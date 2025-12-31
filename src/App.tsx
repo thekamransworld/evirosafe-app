@@ -20,7 +20,7 @@ import { Tbt } from './components/Tbt';
 import { Trainings } from './components/Trainings';
 import { People } from './components/People';
 import { Roles } from './components/Roles';
-import { Organizations } from './components/Organizations'; // Ensure this is imported
+import { Organizations } from './components/Organizations';
 import { Projects } from './components/Projects';
 import { Signage } from './components/Signage';
 import { AiInsights } from './components/AiInsights';
@@ -28,6 +28,7 @@ import { Settings } from './components/Settings';
 import { SiteMap } from './components/SiteMap';
 import { Housekeeping } from './components/Housekeeping';
 import { CertifiedProfile } from './components/CertifiedProfile';
+import { HseStatistics } from './components/HseStatistics'; // <--- NEW IMPORT
 
 // --- Import Modals ---
 import { ReportCreationModal } from './components/ReportCreationModal';
@@ -48,6 +49,8 @@ import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
+import { ChecklistRunModal } from './components/ChecklistRunModal';
+import { ChecklistDetailModal } from './components/ChecklistDetailModal';
 
 
 // --- Auth Sync ---
@@ -227,6 +230,7 @@ const GlobalModals = () => {
           users={usersList}
         />
       )}
+      
       <ActionCreationModal
         isOpen={isActionCreationModalOpen}
         onClose={() => setIsActionCreationModalOpen(false)}
@@ -234,6 +238,7 @@ const GlobalModals = () => {
         users={usersList}
         projects={projects}
       />
+
       <InspectionCreationModal
         isOpen={isInspectionCreationModalOpen}
         onClose={() => setIsInspectionCreationModalOpen(false)}
@@ -270,6 +275,7 @@ const AppContent = () => {
         <DemoBanner />
         <div className="flex-1 p-8 overflow-y-auto">
           {currentView === 'dashboard' && <Dashboard />}
+          {currentView === 'hse-statistics' && <HseStatistics />} {/* <--- ADDED THIS */}
           {currentView === 'site-map' && <div className="h-[calc(100vh-8rem)]"><SiteMap /></div>}
           {currentView === 'reports' && <Reports />}
           {currentView === 'ptw' && (
