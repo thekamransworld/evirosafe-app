@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Report, Project, User, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
+import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
 import { generateSafetyReport } from '../services/geminiService';
-import { uploadFiles } from '../services/storageService'; // Import Storage Service
+// FIX: Corrected import name here (changed from uploadFiles to uploadFileToFirebase)
+import { uploadFileToFirebase } from '../services/storageService';
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -82,6 +83,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const [formData, setFormData] = useState(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
+  
   const [aiPrompt, setAiPrompt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -203,7 +205,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
       }
   };
 
-  // --- REAL FIREBASE UPLOAD SUBMIT HANDLER ---
   const handleSubmit = async () => {
     if (!formData.project_id) {
         setError("A project must be selected.");
@@ -226,19 +227,17 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     setIsSubmitting(true);
 
     try {
-      // 1. Upload to Firebase Storage
+      // Upload to Cloudinary (via storageService)
       let realUrls: string[] = [];
       
       if (evidenceFiles.length > 0) {
-          // Upload to 'reports' folder in Storage
-          realUrls = await uploadFiles(evidenceFiles, 'reports');
+          const uploadPromises = evidenceFiles.map(file => 
+            uploadFileToFirebase(file, 'incident_evidence')
+          );
+          realUrls = await Promise.all(uploadPromises);
       }
 
-      // 2. Save the report to Firebase Database (Firestore)
-      await handleCreateReport({ 
-          ...formData, 
-          evidence_urls: realUrls 
-      });
+      await handleCreateReport({ ...formData, evidence_urls: realUrls });
       
       onClose();
 
@@ -265,7 +264,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
         
         <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
             
-            {/* Report Type Selection Grid */}
             <section>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">What do you want to report? (Select One)</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
@@ -286,7 +284,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                 </div>
             </section>
 
-            {/* Quick AI Helper */}
             <section className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 p-4 rounded-xl border border-primary-200 dark:border-primary-800">
                 <div className="flex items-start gap-4">
                     <div className="bg-white dark:bg-black p-2 rounded-full shadow-sm text-primary-600">
@@ -312,7 +309,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                 </div>
             </section>
 
-            {/* Main Form - Conditional Rendering based on Type */}
             {!isLeadership && (
                 <>
                     <section>
@@ -347,7 +343,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                         </div>
                     </section>
 
-                    {/* Injury Details Section (Only for Injury Types) */}
                     {isInjuryType && (
                         <section className="bg-red-50 dark:bg-red-900/10 p-4 rounded-lg border border-red-200 dark:border-red-800">
                             <h3 className="text-md font-bold mb-3 text-red-800 dark:text-red-300">Injury Details</h3>
@@ -372,7 +367,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                 </>
             )}
 
-            {/* LEADERSHIP EVENT FLOW */}
             {isLeadership && (
                 <section className="bg-teal-50 dark:bg-teal-900/10 p-5 rounded-xl border border-teal-200 dark:border-teal-900/30">
                     <h3 className="text-lg font-bold text-teal-800 dark:text-teal-300 mb-4">Leadership Engagement Details</h3>
@@ -412,7 +406,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                 </section>
             )}
 
-            {/* Common Footer Sections */}
             <section className="border-t dark:border-dark-border pt-6">
                  <h3 className="text-lg font-semibold mb-3">Evidence & Distribution</h3>
                  {formData.ai_suggested_evidence && formData.ai_suggested_evidence.length > 0 && (
