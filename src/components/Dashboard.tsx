@@ -51,7 +51,7 @@ const DashboardHeader: React.FC<{ riskLevel: string; workforceCount: number; tem
                 </div>
                 <div>
                     <div className="text-sm font-bold tracking-widest text-slate-200 uppercase">
-                        {activeOrg.name}
+                        {activeOrg?.name || 'EviroSafe'}
                     </div>
                     <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
                         Live Site Operations
@@ -88,14 +88,15 @@ const RiskLevelCard: React.FC<{
 }> = ({ riskLevel, aiSummary, recommendations, className }) => {
     const isHighRisk = riskLevel === 'High' || riskLevel === 'Critical';
     const baseClass = "rounded-3xl p-6 text-slate-100 transition-all duration-300 shadow-xl relative overflow-hidden";
-    // Force dark theme colors regardless of system preference for the "Command Center" look
     const themeClass = isHighRisk 
         ? "bg-gradient-to-br from-slate-900 via-red-900/20 to-slate-900 border border-red-500/30" 
         : "bg-gradient-to-br from-slate-900 via-emerald-900/10 to-slate-900 border border-emerald-500/30";
 
+    // Safety check for recommendations array
+    const safeRecommendations = Array.isArray(recommendations) ? recommendations : [];
+
     return (
         <div className={`${baseClass} ${themeClass} ${className} flex flex-col justify-between`}>
-            {/* Decorative Glow */}
             <div className={`pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl opacity-10 ${isHighRisk ? 'bg-red-500' : 'bg-emerald-500'}`} />
 
             <div>
@@ -112,7 +113,6 @@ const RiskLevelCard: React.FC<{
                     </div>
                 </div>
 
-                {/* AI Insight Pill */}
                 <div className="mt-2 flex items-start gap-3 relative z-10">
                     <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400">
                         <Satellite className="w-4 h-4" />
@@ -124,13 +124,12 @@ const RiskLevelCard: React.FC<{
                 </div>
             </div>
 
-            {/* Recommendations */}
             <div className="mt-6 border-t border-white/5 pt-5">
                 <p className="mb-3 text-[10px] tracking-[0.2em] uppercase text-slate-500 font-bold">
                     Priority Actions
                 </p>
                 <ul className="space-y-2">
-                    {recommendations.slice(0, 3).map((rec, idx) => (
+                    {safeRecommendations.slice(0, 3).map((rec, idx) => (
                         <li key={idx} className="flex gap-3 items-center text-xs text-slate-300 bg-white/5 px-3 py-2 rounded-lg border border-white/5 hover:bg-white/10 transition-colors cursor-default">
                             <span className={`flex-shrink-0 h-1.5 w-1.5 rounded-full ${idx === 0 ? 'bg-sky-400' : idx === 1 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                             <span>{rec}</span>
@@ -179,18 +178,16 @@ const WidgetCard: React.FC<{ title: string; children: React.ReactNode; className
 );
 
 export const Dashboard: React.FC = () => {
-    const { reportList, ptwList } = useDataContext();
+    const { reportList = [], ptwList = [] } = useDataContext(); // Default to empty arrays
     const { setIsReportCreationModalOpen, setIsTbtCreationModalOpen, setSelectedReport, setIsInspectionCreationModalOpen } = useModalContext();
     const { setCurrentView } = useAppContext();
     
     const [aiForecast, setAiForecast] = useState<{ risk_level: string, summary: string, recommendations: string[] } | null>(null);
     const [isSafetyPulseModalOpen, setIsSafetyPulseModalOpen] = useState(false);
     
-    // Live Data Simulation State
     const [simulatedWorkforce, setSimulatedWorkforce] = useState(65);
     const [simulatedTemp, setSimulatedTemp] = useState(38);
 
-    // Mock Data Loading
     useEffect(() => {
         const fetchForecast = async () => {
             try {
@@ -203,7 +200,6 @@ export const Dashboard: React.FC = () => {
         fetchForecast();
     }, []);
 
-    // Simulate live data changes
     useEffect(() => {
         const interval = setInterval(() => {
             setSimulatedWorkforce(prev => Math.max(10, prev + (Math.random() > 0.5 ? 1 : -1) * (Math.random() > 0.7 ? 1 : 0)));
@@ -216,15 +212,17 @@ export const Dashboard: React.FC = () => {
     }, []);
 
     const riskLevel = aiForecast?.risk_level || 'Medium';
-    const pendingReports = reportList.filter(r => r.status === 'under_review');
+    
+    // SAFE FILTERING: Ensure reportList is an array before filtering
+    const pendingReports = Array.isArray(reportList) 
+        ? reportList.filter(r => r.status === 'under_review') 
+        : [];
 
     return (
-        <div className="min-h-screen bg-[#020617] p-6"> {/* Forced Dark Background */}
+        <div className="min-h-screen bg-[#020617] p-6">
             <DashboardHeader riskLevel={riskLevel} workforceCount={simulatedWorkforce} temperature={simulatedTemp} />
 
-            {/* ROW 1: HERO & ACTIONS */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-6">
-                {/* Hero Risk Card (8 cols) */}
                 <div className="xl:col-span-8">
                     <RiskLevelCard 
                         riskLevel={riskLevel} 
@@ -234,9 +232,7 @@ export const Dashboard: React.FC = () => {
                     />
                 </div>
 
-                {/* Quick Actions & Stats (4 cols) */}
                 <div className="xl:col-span-4 flex flex-col gap-6">
-                    {/* Quick Actions */}
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5">
                         <h2 className="mb-4 text-xs font-bold tracking-widest uppercase text-slate-500">
                             Operations
@@ -256,7 +252,6 @@ export const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Approvals Mini List */}
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/80 flex-1 p-5 flex flex-col">
                         <h2 className="mb-4 text-xs font-bold tracking-widest uppercase text-slate-500 flex justify-between">
                             <span>Pending Approvals</span>
@@ -282,22 +277,17 @@ export const Dashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* ROW 2: SITE TWIN & ENVIRONMENT */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-                {/* Site Digital Twin (2 cols) */}
                 <div className="xl:col-span-2 h-96">
                     <WidgetCard title="3D Site Digital Twin" className="h-full p-0 overflow-hidden relative group border-slate-800 bg-slate-950">
-                        {/* Legend Overlay */}
                         <div className="absolute top-4 right-4 z-10 flex gap-2 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
                             <span className="px-2 py-1 bg-black/80 rounded text-[10px] text-red-400 border border-red-900/50">Incident</span>
                             <span className="px-2 py-1 bg-black/80 rounded text-[10px] text-blue-400 border border-blue-900/50">Permit</span>
                         </div>
-                        {/* Map Component */}
                         <SiteMap embedded={true} />
                     </WidgetCard>
                 </div>
 
-                {/* Environment Widget (1 col) */}
                 <div className="h-96">
                     <WidgetCard title="Site Conditions" className="h-full relative overflow-hidden">
                         <div className="absolute -right-10 -top-10 text-orange-500/10 animate-spin-slow">
@@ -334,7 +324,6 @@ export const Dashboard: React.FC = () => {
                 </div>
             </div>
 
-            {/* ROW 3: SAFETY PULSE */}
             <div className="h-80">
                  <SafetyPulseWidget onExpand={() => setIsSafetyPulseModalOpen(true)} />
             </div>
@@ -344,5 +333,4 @@ export const Dashboard: React.FC = () => {
     );
 };
 
-// Icons
 const Sun = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>;
