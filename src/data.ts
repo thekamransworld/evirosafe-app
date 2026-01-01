@@ -1,6 +1,8 @@
 import type { Organization, User, Project, Report, Inspection, ChecklistTemplate, ChecklistRun, Plan, Rams, Sign, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, Notification, Ptw, CertificationProfile } from './types';
 import { logoSrc } from './config';
 
+// --- DEFAULT DATA (Prevents Crashes) ---
+
 export const organizations: Organization[] = [
   {
     id: 'org_1',
@@ -45,6 +47,7 @@ export const projects: Project[] = [
   }
 ];
 
+// Ensure these are exported as empty arrays, NEVER undefined
 export const reports: Report[] = [];
 export const inspections: Inspection[] = [];
 export const checklistTemplates: ChecklistTemplate[] = [
