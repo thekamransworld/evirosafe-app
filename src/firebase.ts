@@ -1,10 +1,15 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
-// Direct configuration to ensure immediate connection
 const firebaseConfig = {
+  // ... keep your existing config ...
   apiKey: "AIzaSyBsG6olIcDkJpNNVcK3RPoH0jScmocZanM",
   authDomain: "evirosafe-auth.firebaseapp.com",
   projectId: "evirosafe-auth",
@@ -14,10 +19,16 @@ const firebaseConfig = {
   measurementId: "G-NLZV3LWNEM"
 };
 
-// Initialize Firebase (checks if app is already running to prevent crashes)
+// Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-const db = getFirestore(app);
+// Initialize Firestore with Offline Persistence
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
 const auth = getAuth(app);
 const storage = getStorage(app);
 

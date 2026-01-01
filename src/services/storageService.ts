@@ -1,35 +1,43 @@
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { app } from "../firebase";
+// src/services/storageService.ts
 
-const storage = getStorage(app);
+// --- CLOUDINARY CONFIGURATION ---
+const CLOUD_NAME = "dsw9llfdo"; 
+const UPLOAD_PRESET = "evirosafe_preset"; 
 
 /**
- * Uploads a file to Firebase Storage and returns the public download URL.
+ * Uploads a file to Cloudinary (Free Image/Video Hosting)
  * @param file The file object from the input
- * @param path The folder path (e.g., 'reports', 'avatars')
+ * @param folder Optional folder name (Cloudinary handles this via presets usually)
  */
-export const uploadFile = async (file: File, path: string): Promise<string> => {
+export const uploadFileToFirebase = async (file: File, folder: string): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+  
+  // Note: Folders in Cloudinary usually require the preset to allow dynamic folders, 
+  // or they just go to the root. We append it just in case your preset supports it.
+  formData.append("folder", folder); 
+
   try {
-    // Create a unique filename: timestamp_random_filename
-    const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 9)}_${file.name}`;
-    const storageRef = ref(storage, `${path}/${uniqueName}`);
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
 
-    // Upload
-    const snapshot = await uploadBytes(storageRef, file);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Cloudinary Error:", errorData);
+      throw new Error(errorData.error?.message || "Upload failed");
+    }
 
-    // Get URL
-    const downloadURL = await getDownloadURL(snapshot.ref);
-    return downloadURL;
+    const data = await response.json();
+    // Return the secure HTTPS URL of the uploaded file
+    return data.secure_url; 
   } catch (error) {
     console.error("Error uploading file:", error);
     throw error;
   }
-};
-
-/**
- * Uploads multiple files in parallel
- */
-export const uploadFiles = async (files: File[], path: string): Promise<string[]> => {
-  const uploadPromises = files.map(file => uploadFile(file, path));
-  return Promise.all(uploadPromises);
 };

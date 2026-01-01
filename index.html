@@ -2,19 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link
-      rel="icon"
-      type="image/png"
-      href="https://storage.googleapis.com/aai-web-samples/app-icons/evirosafe.png"
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- FIXED: Mobile Viewport & PWA Tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="EviroSafe" />
 
     <!-- Clean Title -->
     <title>EviroSafe | Next-Gen HSE Command Center</title>
 
     <meta
       name="description"
-      content="EviroSafe 3.0 - The intelligent HSE management platform for modern construction and industrial sites. Features AI risk forecasting, digital twin site mapping, and real-time safety analytics."
+      content="EviroSafe 3.0 - The intelligent HSE management platform for modern construction and industrial sites."
     />
     <meta name="theme-color" content="#020617" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -24,13 +26,12 @@
       rel="stylesheet"
     />
     <style>
-      /* Base Styles using CSS Variables to handle standard/dark toggle cleaner */
       :root {
         --bg-color: #f8fafc;
         --text-color: #0f172a;
       }
       .dark {
-        --bg-color: #0f172a;
+        --bg-color: #020617;
         --text-color: #f8fafc;
       }
 
@@ -38,9 +39,10 @@
         background-color: var(--bg-color);
         color: var(--text-color);
         transition: background-color 0.3s ease, color 0.3s ease;
+        overscroll-behavior-y: none; /* Prevents pull-to-refresh on mobile */
       }
 
-      /* Glassmorphism utilities - primarily for Dark Mode */
+      /* Glassmorphism utilities */
       .dark .glass {
         background: rgba(255, 255, 255, 0.05);
         backdrop-filter: blur(10px);
@@ -48,7 +50,6 @@
         border: 1px solid rgba(255, 255, 255, 0.1);
       }
 
-      /* Light Mode Card */
       .glass {
         background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(12px);
@@ -67,17 +68,6 @@
       .dark .glass-panel {
         background: rgba(30, 41, 59, 0.7);
         border: 1px solid rgba(255, 255, 255, 0.08);
-      }
-
-      /* Ambient Glow Classes */
-      .ambient-glow-red {
-        box-shadow: 0 0 80px -20px rgba(255, 61, 113, 0.3);
-      }
-      .ambient-glow-green {
-        box-shadow: 0 0 80px -20px rgba(0, 255, 157, 0.3);
-      }
-      .ambient-glow-amber {
-        box-shadow: 0 0 80px -20px rgba(255, 179, 0, 0.3);
       }
 
       /* Custom Scrollbar */
@@ -116,12 +106,10 @@
         }
       }
     </script>
-    <!-- CSS PATH -->
     <link rel="stylesheet" href="/src/index.css" />
   </head>
   <body class="font-sans antialiased">
     <div id="root"></div>
-    <!-- SCRIPT PATH -->
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>
