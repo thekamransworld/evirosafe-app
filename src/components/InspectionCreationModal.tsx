@@ -2,12 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ChecklistTemplate, Inspection, Project, User } from '../types';
 import { Button } from './ui/Button';
 import { useAppContext } from '../contexts';
-import { Badge } from './ui/Badge';
-import { 
-    Calendar, Clock, Shield, Users, Building, 
-    FileText, Save, RefreshCw, Bell, AlertTriangle, 
-    CheckCircle, X, Upload 
-} from 'lucide-react';
 
 // ================================
 // GLOBAL / INTERNATIONAL INSPECTION SETUP
@@ -71,43 +65,22 @@ const complianceLabels: Array<{ key: HseComplianceKey; label: string; critical?:
 
 const stdRefs: StdRef[] = ['ISO 45001', 'OSHA', 'ISO 14001', 'ILO', 'NFPA', 'NEOM', 'Local Regs'];
 
-// Helper for tabs
-const TabButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; label: string }> = ({ active, onClick, icon, label }) => (
-    <button
-        onClick={onClick}
-        className={`px-4 py-3 font-bold text-sm flex items-center gap-2 border-b-2 transition-all ${
-            active ? 'border-blue-600 text-blue-700 dark:text-blue-400 dark:border-blue-400' : 'border-transparent text-gray-700 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-        }`}
-    >
-        {icon}
-        {label}
-    </button>
-);
-
-// Card Section Wrapper
-const CardSection: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className }) => (
-    <div className={`border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden mb-6 ${className}`}>
-        <div className="bg-gray-100 dark:bg-gray-800 px-4 py-3 border-b border-gray-300 dark:border-gray-700">
-            <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-wide">{title}</h3>
-        </div>
-        <div className="p-4 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-            {children}
-        </div>
-    </div>
-);
+// Icons
+const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>;
+const XMarkIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
+const CheckAllIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
 export const InspectionCreationModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (inspection: Omit<Inspection, 'id' | 'org_id' | 'created_by_id' | 'audit_trail'>) => void;
-  projects?: Project[];
-  users?: User[];
-  checklistTemplates?: ChecklistTemplate[];
-}> = ({ isOpen, onClose, onSubmit, projects = [], users = [], checklistTemplates = [] }) => {
-  const { language, t, activeOrg } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'identification' | 'schedule' | 'properties' | 'team'>('identification');
+  projects: Project[];
+  users: User[];
+  checklistTemplates: ChecklistTemplate[];
+}> = ({ isOpen, onClose, onSubmit, projects, users, checklistTemplates }) => {
+  const { language, t } = useAppContext();
 
-  // Base form state
+  // Base form
   const [title, setTitle] = useState('');
   const [type, setType] = useState<Inspection['type']>('Safety');
   const [projectId, setProjectId] = useState('');
@@ -125,6 +98,8 @@ export const InspectionCreationModal: React.FC<{
   const [preInspectionBriefing, setPreInspectionBriefing] = useState('');
   const [ppeRequirements, setPpeRequirements] = useState('');
   const [hseCompliance, setHseCompliance] = useState<Record<HseComplianceKey, boolean>>(DEFAULT_COMPLIANCE);
+  
+  // Evidence State
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
 
   // Reset when opened
@@ -137,9 +112,16 @@ export const InspectionCreationModal: React.FC<{
 
     setTitle('');
     setType('Safety');
-    setProjectId((projects && projects.length > 0) ? projects[0].id : '');
-    setPersonResponsibleId('');
-    setChecklistTemplateId((checklistTemplates && checklistTemplates.length > 0) ? checklistTemplates[0].id : '');
+    
+    // Auto-select first project if available
+    setProjectId(projects.length > 0 ? projects[0].id : '');
+    
+    // Auto-select first template if available
+    setChecklistTemplateId(checklistTemplates.length > 0 ? checklistTemplates[0].id : '');
+    
+    // Auto-select first user as responsible
+    setPersonResponsibleId(users.length > 0 ? users[0].id : '');
+
     setScheduleAt(isoLocal);
     setTeamMemberIds([]);
     setObservers([]);
@@ -152,33 +134,35 @@ export const InspectionCreationModal: React.FC<{
     setPpeRequirements('');
     setHseCompliance(DEFAULT_COMPLIANCE);
     setEvidenceFiles([]);
-  }, [isOpen, projects, checklistTemplates]);
+  }, [isOpen, projects, checklistTemplates, users]);
 
-  const selectedProject = useMemo(() => (projects || []).find(p => p.id === projectId), [projects, projectId]);
+  const selectedProject = useMemo(() => projects.find(p => p.id === projectId), [projects, projectId]);
 
-  // Filter templates safely
+  // Filter templates optionally by category/type
   const filteredTemplates = useMemo(() => {
-    const safeTemplates = checklistTemplates || [];
-    const byType = safeTemplates.filter(tpl => (tpl.category || '').toLowerCase().includes(type.toLowerCase()));
-    return byType.length > 0 ? byType : safeTemplates;
+    const byType = checklistTemplates.filter(tpl => (tpl.category || '').toLowerCase().includes(type.toLowerCase()));
+    return byType.length > 0 ? byType : checklistTemplates;
   }, [checklistTemplates, type]);
 
   // Readiness score
   const readiness = useMemo(() => {
     const total = complianceLabels.length;
     const done = complianceLabels.filter(i => hseCompliance[i.key]).length;
+
     const criticalMissing = complianceLabels
       .filter(i => i.critical)
       .filter(i => !hseCompliance[i.key])
       .map(i => i.label);
+
     const score = total === 0 ? 0 : Math.round((done / total) * 100);
+
     return { total, done, score, criticalMissing };
   }, [hseCompliance]);
 
   const autoTitle = useMemo(() => {
-    const projName = selectedProject?.name ? ` - ${selectedProject.name}` : '';
+    const proj = selectedProject?.name ? ` - ${selectedProject.name}` : '';
     const datePart = scheduleAt ? ` - ${new Date(scheduleAt).toLocaleDateString()}` : '';
-    return `${type} Inspection${projName}${datePart}`;
+    return `${type} Inspection${proj}${datePart}`;
   }, [type, selectedProject?.name, scheduleAt]);
 
   const validationStatus = useMemo(() => {
@@ -203,20 +187,20 @@ export const InspectionCreationModal: React.FC<{
     setEvidenceFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleJumpToFix = () => {
-    if (readiness.criticalMissing.length > 0) {
-        setActiveTab('schedule'); // Jump to the tab where checkboxes are
-    } else if (!projectId) {
-        setActiveTab('identification');
-    }
+  const handleSelectAllCompliance = () => {
+      const allChecked: any = {};
+      complianceLabels.forEach(item => {
+          allChecked[item.key] = true;
+      });
+      setHseCompliance(allChecked);
   };
 
+  // Helper to safely render titles
   const getTemplateTitle = (tpl: ChecklistTemplate): string => {
-    if (!tpl) return '';
     if (typeof tpl.title === 'string') return tpl.title;
     if (typeof tpl.title === 'object' && tpl.title !== null) {
       const record = tpl.title as Record<string, string>;
-      return record['en'] || record[activeOrg?.primaryLanguage] || Object.values(record)[0] || 'Untitled Checklist';
+      return record['en'] || Object.values(record)[0] || 'Untitled Checklist';
     }
     return 'Untitled Checklist';
   };
@@ -225,16 +209,19 @@ export const InspectionCreationModal: React.FC<{
     if (!canCreate) return;
 
     const finalTitle = title.trim() || autoTitle;
+
+    // Fake uploading for demo (In real app, use storageService)
     const fakeUrls = evidenceFiles.map(() => `https://source.unsplash.com/random/200x200?sig=${Math.random()}`);
 
     const meta = [
-      `Scope: ${locationArea || 'N/A'}`,
+      `Scope / Location: ${locationArea || 'N/A'}`,
       `Contractor: ${contractorName || 'N/A'}`,
-      `Ref: ${selectedStandards.join(', ')}`,
-      `Brief: ${preInspectionBriefing || 'N/A'}`,
+      `Frequency: ${frequency}`,
+      `Standards: ${selectedStandards.join(', ')}`,
+      `Pre-brief: ${preInspectionBriefing || 'N/A'}`,
       `PPE: ${ppeRequirements || 'N/A'}`,
-      `Readiness: ${readiness.score}%`,
-      `Evidence: ${evidenceFiles.length} files`,
+      `Readiness Score: ${readiness.score}%`,
+      `Evidence Count: ${evidenceFiles.length}`,
     ].join('\n');
 
     const newInspection = {
@@ -265,324 +252,210 @@ export const InspectionCreationModal: React.FC<{
       <div className="bg-white dark:bg-dark-card w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="p-5 border-b border-gray-200 dark:border-dark-border flex items-start justify-between shrink-0 bg-white dark:bg-dark-card sticky top-0 z-10">
+        <div className="p-5 border-b dark:border-dark-border flex items-start justify-between shrink-0 bg-white dark:bg-dark-card sticky top-0 z-10">
           <div>
-            <h2 className="text-xl font-black text-gray-900 dark:text-white">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Create Modern Inspection
             </h2>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Planning → Readiness → Evidence → Checklist
             </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
-             <X className="w-6 h-6" />
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+             <XMarkIcon />
           </button>
         </div>
 
-        {/* Tabs Navigation */}
-        <div className="flex border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-            <TabButton active={activeTab === 'identification'} onClick={() => setActiveTab('identification')} icon={<Building className="w-4 h-4"/>} label="Identification" />
-            <TabButton active={activeTab === 'schedule'} onClick={() => setActiveTab('schedule')} icon={<Calendar className="w-4 h-4"/>} label="Schedule & Readiness" />
-            <TabButton active={activeTab === 'properties'} onClick={() => setActiveTab('properties')} icon={<Shield className="w-4 h-4"/>} label="Standards & PPE" />
-            <TabButton active={activeTab === 'team'} onClick={() => setActiveTab('team')} icon={<Users className="w-4 h-4"/>} label="Team" />
-        </div>
-
-        <div className="p-6 space-y-6 overflow-y-auto bg-gray-50/50 dark:bg-black/20">
+        <div className="p-6 space-y-8 overflow-y-auto">
           
-          {/* TAB 1: IDENTIFICATION */}
-          {activeTab === 'identification' && (
-            <div className="space-y-6">
-                <CardSection title="Core Information">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="md:col-span-2">
-                            <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Inspection Title</label>
-                            <input
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                placeholder={autoTitle}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Type</label>
-                            <select
-                                value={type}
-                                onChange={(e) => setType(e.target.value as Inspection['type'])}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                            >
-                                <option value="Safety">Safety</option>
-                                <option value="Quality">Quality</option>
-                                <option value="Environmental">Environmental</option>
-                                <option value="Fire">Fire</option>
-                                <option value="Equipment">Equipment</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Project</label>
-                            <select
-                                value={projectId}
-                                onChange={(e) => setProjectId(e.target.value)}
-                                className={`w-full rounded-lg border px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:text-white ${!projectId ? 'border-red-400 ring-1 ring-red-200' : 'border-gray-300 dark:border-gray-700'}`}
-                            >
-                                <option value="">Select project...</option>
-                                {(projects || []).map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="md:col-span-2">
-                             <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Scope / Location / Area</label>
-                            <input
-                                value={locationArea}
-                                onChange={(e) => setLocationArea(e.target.value)}
-                                placeholder="e.g., Area-03, Workshop, Roof..."
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                            />
-                        </div>
-                    </div>
-                </CardSection>
+          {/* Section 1: Core Info */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Inspection Title</label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={autoTitle}
+                className="mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-dark-background dark:border-dark-border dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
             </div>
-          )}
 
-          {/* TAB 2: SCHEDULE & READINESS */}
-          {activeTab === 'schedule' && (
-              <div className="space-y-6">
-                <CardSection title="Timing">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Schedule Date</label>
-                            <input
-                                type="datetime-local"
-                                value={scheduleAt}
-                                onChange={(e) => setScheduleAt(e.target.value)}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                            />
+            <div>
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Type</label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as Inspection['type'])}
+                className="mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-dark-background dark:border-dark-border dark:text-white"
+              >
+                <option value="Safety">Safety</option>
+                <option value="Quality">Quality</option>
+                <option value="Environmental">Environmental</option>
+                <option value="Fire">Fire</option>
+                <option value="Equipment">Equipment</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Project</label>
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className={`mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-dark-background dark:text-white ${!projectId ? 'border-red-400 bg-red-50 dark:bg-red-900/10' : 'dark:border-dark-border'}`}
+              >
+                <option value="">Select project...</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Section 2: Global Readiness (Critical) */}
+          <div className="rounded-xl border border-blue-100 bg-blue-50/50 dark:border-blue-900/30 dark:bg-blue-900/10 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-200 dark:bg-blue-800 text-xs">!</span>
+                Pre-Inspection Readiness
+              </h3>
+              <div className="flex items-center gap-3">
+                  <button onClick={handleSelectAllCompliance} className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 flex items-center gap-1">
+                      <CheckAllIcon /> Mark All Ready
+                  </button>
+                  <span className={`text-sm font-bold px-3 py-1 rounded-full ${readiness.score === 100 ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700 shadow-sm'}`}>
+                    {readiness.score}% Ready
+                  </span>
+              </div>
+            </div>
+
+            {readiness.criticalMissing.length > 0 && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                <p className="font-bold">Critical items missing:</p>
+                <ul className="list-disc ml-5 mt-1">
+                  {readiness.criticalMissing.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {complianceLabels.map(item => (
+                <label key={item.key} className="flex items-start gap-3 text-sm cursor-pointer p-2 rounded-lg hover:bg-white/60 dark:hover:bg-white/5 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={hseCompliance[item.key]}
+                    onChange={(e) => setHseCompliance(prev => ({ ...prev, [item.key]: e.target.checked }))}
+                    className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 w-4 h-4"
+                  />
+                  <span className={`${item.critical ? 'font-semibold text-slate-800 dark:text-slate-200' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {item.label} {item.critical && <span className="text-red-500 ml-1" title="Required">*</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Section 3: Evidence Upload (NEW) */}
+          <div className="space-y-3">
+            <h3 className="font-bold text-gray-900 dark:text-white">Site Evidence / Media</h3>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer relative">
+                <input 
+                    type="file" 
+                    multiple 
+                    accept="image/*,video/*" 
+                    onChange={handleFileChange} 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <UploadIcon />
+                    <span className="text-sm font-medium">Click to upload photos or videos</span>
+                    <span className="text-xs">Supports JPG, PNG, MP4</span>
+                </div>
+            </div>
+            
+            {evidenceFiles.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                    {evidenceFiles.map((file, i) => (
+                        <div key={i} className="relative group bg-gray-100 dark:bg-white/10 p-2 rounded-lg flex items-center gap-2">
+                             <div className="w-8 h-8 bg-gray-300 rounded flex-shrink-0"></div>
+                             <span className="text-xs truncate flex-1">{file.name}</span>
+                             <button 
+                                onClick={() => handleRemoveFile(i)}
+                                className="text-gray-400 hover:text-red-500"
+                             >
+                                 <XMarkIcon />
+                             </button>
                         </div>
-                        <div>
-                            <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Frequency</label>
-                            <select
-                                value={frequency}
-                                onChange={(e) => setFrequency(e.target.value as InspectionFrequency)}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                            >
-                                <option value="One-off">One-off</option>
-                                <option value="Daily">Daily</option>
-                                <option value="Weekly">Weekly</option>
-                                <option value="Monthly">Monthly</option>
-                                <option value="Quarterly">Quarterly</option>
-                            </select>
-                        </div>
-                    </div>
-                </CardSection>
-
-                <div className="rounded-xl border border-blue-200 bg-blue-50 dark:border-blue-900/30 dark:bg-blue-900/10 p-5 space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-2">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-200 dark:bg-blue-800 text-xs">!</span>
-                            Pre-Inspection Readiness
-                        </h3>
-                        <span className={`text-sm font-bold px-3 py-1 rounded-full ${readiness.score === 100 ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700 shadow-sm border border-blue-100'}`}>
-                            {readiness.score}% Ready
-                        </span>
-                    </div>
-
-                    {readiness.criticalMissing.length > 0 && (
-                        <div className="bg-red-50 border border-red-200 dark:bg-red-900/20 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
-                            <p className="font-bold mb-1">Critical items missing:</p>
-                            <ul className="list-disc ml-5 space-y-0.5">
-                            {readiness.criticalMissing.map((x, i) => <li key={i}>{x}</li>)}
-                            </ul>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                    {complianceLabels.map(item => (
-                        <label key={item.key} className="flex items-start gap-3 text-sm cursor-pointer p-2 rounded-lg hover:bg-white/60 dark:hover:bg-white/5 transition-colors border border-transparent hover:border-blue-100">
-                        <input
-                            type="checkbox"
-                            checked={hseCompliance[item.key]}
-                            onChange={(e) => setHseCompliance(prev => ({ ...prev, [item.key]: e.target.checked }))}
-                            className="mt-0.5 rounded text-primary-600 focus:ring-primary-500 w-4 h-4 border-gray-300"
-                        />
-                        <span className={`${item.critical ? 'font-bold text-slate-800 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
-                            {item.label} {item.critical && <span className="text-red-500 ml-1" title="Required">*</span>}
-                        </span>
-                        </label>
                     ))}
-                    </div>
                 </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* TAB 3: PROPERTIES */}
-          {activeTab === 'properties' && (
-              <div className="space-y-6">
-                <CardSection title="Checklist & Standards">
-                     <div className="mb-4">
-                        <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Checklist Template</label>
-                        <select
-                            value={checklistTemplateId}
-                            onChange={(e) => setChecklistTemplateId(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                        >
-                            <option value="">Select checklist template</option>
-                            {filteredTemplates.map(tpl => (
-                            <option key={tpl.id} value={tpl.id}>
-                                {tpl.category} - {getTemplateTitle(tpl)}
-                            </option>
-                            ))}
-                        </select>
-                    </div>
-
-                     <div>
-                        <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Reference Standards</label>
-                        <div className="flex flex-wrap gap-2">
-                            {stdRefs.map(std => (
+          {/* Section 4: Details & Team */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="space-y-4">
+                <h3 className="font-bold text-gray-900 dark:text-white">Logistics</h3>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Checklist Template</label>
+                  <select
+                    value={checklistTemplateId}
+                    onChange={(e) => setChecklistTemplateId(e.target.value)}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 dark:bg-dark-background dark:border-dark-border dark:text-white"
+                  >
+                    <option value="">Select checklist template</option>
+                    {filteredTemplates.map(tpl => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {getTemplateTitle(tpl)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                 <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Team Members</label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {users.slice(0, 6).map(u => (
                             <button
-                                key={std}
-                                type="button"
-                                onClick={() =>
-                                setSelectedStandards(prev => prev.includes(std) ? prev.filter(x => x !== std) : [...prev, std])
-                                }
-                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                                selectedStandards.includes(std)
-                                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
-                                }`}
+                            key={u.id}
+                            onClick={() => setTeamMemberIds(prev => toggleArray(prev, u.id))}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                                teamMemberIds.includes(u.id)
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-dark-background dark:border-dark-border dark:text-gray-400'
+                            }`}
                             >
-                                {std}
+                            {u.name}
                             </button>
-                            ))}
-                        </div>
+                        ))}
                     </div>
-                </CardSection>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <CardSection title="Briefing & Hazards" className="h-full">
-                         <textarea 
-                            value={preInspectionBriefing}
-                            onChange={(e) => setPreInspectionBriefing(e.target.value)}
-                            className="w-full h-32 p-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none" 
-                            placeholder="Key hazards discussed..."
-                        />
-                    </CardSection>
-                    <CardSection title="PPE Requirements" className="h-full">
-                         <textarea 
-                            value={ppeRequirements}
-                            onChange={(e) => setPpeRequirements(e.target.value)}
-                            className="w-full h-32 p-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none" 
-                            placeholder="Helmet, Boots, Vest..."
-                         />
-                    </CardSection>
                 </div>
-              </div>
-          )}
+             </div>
+          </div>
 
-          {/* TAB 4: TEAM & EVIDENCE */}
-          {activeTab === 'team' && (
-              <div className="space-y-6">
-                <CardSection title="Inspection Team">
-                    <div className="mb-6">
-                        <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Lead Inspector</label>
-                        <select
-                            value={personResponsibleId}
-                            onChange={(e) => setPersonResponsibleId(e.target.value)}
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                        >
-                            <option value="">Select person</option>
-                            {(users || []).map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Additional Members</label>
-                        <div className="flex flex-wrap gap-2">
-                            {(users || []).slice(0, 10).map(u => (
-                                <button
-                                key={u.id}
-                                type="button"
-                                onClick={() => setTeamMemberIds(prev => toggleArray(prev, u.id))}
-                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                                    teamMemberIds.includes(u.id)
-                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300'
-                                }`}
-                                >
-                                {u.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </CardSection>
-
-                {/* Evidence Upload */}
-                <CardSection title="Pre-Inspection Media / Evidence">
-                    <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer relative">
-                        <input 
-                            type="file" 
-                            multiple 
-                            accept="image/*,video/*" 
-                            onChange={handleFileChange} 
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400">
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-full text-blue-600">
-                                <Upload className="w-6 h-6" />
-                            </div>
-                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Click to upload photos or videos</span>
-                            <span className="text-xs">Supports JPG, PNG, MP4</span>
-                        </div>
-                    </div>
-                    
-                    {evidenceFiles.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                            {evidenceFiles.map((file, i) => (
-                                <div key={i} className="relative group bg-gray-100 dark:bg-gray-800 p-2 rounded-lg flex items-center gap-2 border border-gray-200 dark:border-gray-700">
-                                    <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0 flex items-center justify-center text-xs font-bold text-white">IMG</div>
-                                    <span className="text-xs truncate flex-1 text-gray-700 dark:text-gray-300">{file.name}</span>
-                                    <button 
-                                        onClick={() => handleRemoveFile(i)}
-                                        className="text-gray-400 hover:text-red-500 p-1"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardSection>
-              </div>
-          )}
         </div>
 
-        {/* Footer */}
-        <div className="p-5 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-between gap-3 shrink-0">
-          <div className="text-sm text-gray-500 flex items-center gap-2">
-             <span className={`w-2 h-2 rounded-full ${selectedProject ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></span>
-             <span>Linked to: <span className="font-bold text-gray-900 dark:text-white">{selectedProject ? selectedProject.name : 'No Project Selected'}</span></span>
+        <div className="p-5 border-t dark:border-dark-border bg-gray-50 dark:bg-black/20 flex items-center justify-between gap-3 shrink-0">
+          <div className="text-sm text-gray-500">
+            {selectedProject ? (
+              <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                  Linked to: <span className="font-bold text-gray-900 dark:text-white">{selectedProject.name}</span>
+              </span>
+            ) : (
+               <span className="flex items-center gap-2 text-red-500 animate-pulse">
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                  Action Required: Select a Project
+              </span>
+            )}
           </div>
 
           <div className="flex gap-3 items-center">
             {!canCreate && (
-                <button 
-                    onClick={handleJumpToFix}
-                    className="text-xs font-bold text-red-500 mr-2 text-right hover:underline"
-                >
+                <span className="text-xs font-bold text-red-500 mr-2">
                     {validationStatus}
-                </button>
+                </span>
             )}
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-                onClick={handleCreate} 
-                disabled={!canCreate} 
-                className={!canCreate ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg'}
-            >
+            <Button onClick={handleCreate} disabled={!canCreate}>
               Create Inspection
             </Button>
           </div>
