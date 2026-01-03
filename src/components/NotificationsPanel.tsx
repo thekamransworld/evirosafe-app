@@ -13,7 +13,7 @@ interface NotificationsPanelProps {
 
 export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({ onClose }) => {
   const { notifications } = useDataContext();
-  const { activeUser } = useAppContext();
+  const { activeUser } = useAppContext(); // <--- FIXED: activeUser from AppContext
 
   // Filter notifications for the current user
   const myNotifications = notifications.filter(n => n.user_id === activeUser?.id);

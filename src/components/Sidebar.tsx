@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { logoSrc } from '../config';
 import { useAuth } from '../contexts/AuthContext';
-import { useAppContext, useDataContext } from '../contexts'; // Import DataContext
-import { NotificationsPanel } from './NotificationsPanel'; // Import Panel
-import { Bell } from 'lucide-react'; // Import Bell Icon
+import { useAppContext, useDataContext } from '../contexts';
+import { NotificationsPanel } from './NotificationsPanel';
+import { Bell } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -16,7 +16,7 @@ interface SidebarProps {
 const icons: Record<string, JSX.Element> = {
   dashboard: <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
   'ai-insights': <path d="M13 10V3L4 14h7v7l9-11h-7z" />,
-  'hse-statistics': <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />, // Placeholder
+  'hse-statistics': <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
   'site-map': <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />,
   reports: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM14 9V3.5L18.5 9H14z" />,
   actions: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
@@ -88,7 +88,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setOpen,
 }) => {
   const { logout, currentUser } = useAuth();
-  const { notifications, activeUser } = useDataContext(); // Get notifications
+  const { notifications } = useDataContext();
+  const { activeUser } = useAppContext(); // <--- FIXED: activeUser from AppContext
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Calculate unread notifications for the current user
