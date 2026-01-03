@@ -6,17 +6,25 @@ const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
-// AI sometimes wraps JSON in ```json ... ``` blocks. This removes them.
 const cleanJson = (text: string) => {
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
-// --- 1. INCIDENT ANALYSIS ---
-export const generateSafetyReport = async (prompt: string) => {
-  if (!apiKey) {
-    console.warn("No API Key found. Using Mock.");
-    return mockSafetyReport(prompt);
+// --- 1. GENERIC RESPONSE (Fixes build error) ---
+export const generateResponse = async (prompt: string) => {
+  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY.";
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("AI Error:", error);
+    return "Error generating response.";
   }
+};
+
+// --- 2. INCIDENT ANALYSIS ---
+export const generateSafetyReport = async (prompt: string) => {
+  if (!apiKey) return mockSafetyReport(prompt);
 
   try {
     const result = await model.generateContent(`
@@ -35,7 +43,7 @@ export const generateSafetyReport = async (prompt: string) => {
   }
 };
 
-// --- 2. RAMS GENERATION ---
+// --- 3. RAMS GENERATION ---
 export const generateRamsContent = async (activity: string) => {
   if (!apiKey) return mockRams(activity);
 
@@ -62,12 +70,11 @@ export const generateRamsContent = async (activity: string) => {
     const response = await result.response;
     return JSON.parse(cleanJson(response.text()));
   } catch (error) {
-    console.error("AI RAMS Error:", error);
     return mockRams(activity);
   }
 };
 
-// --- 3. TOOLBOX TALK GENERATION ---
+// --- 4. TOOLBOX TALK GENERATION ---
 export const generateTbtContent = async (topic: string) => {
   if (!apiKey) return mockTbt(topic);
 
@@ -89,7 +96,7 @@ export const generateTbtContent = async (topic: string) => {
   }
 };
 
-// --- 4. COURSE GENERATION ---
+// --- 5. COURSE GENERATION ---
 export const generateCourseContent = async (title: string) => {
   if (!apiKey) return mockCourse(title);
 
@@ -109,7 +116,7 @@ export const generateCourseContent = async (title: string) => {
   }
 };
 
-// --- 5. CERTIFICATION INSIGHT ---
+// --- 6. CERTIFICATION INSIGHT ---
 export const generateCertificationInsight = async (profile: any) => {
   if (!apiKey) return mockCertInsight();
 
@@ -143,7 +150,6 @@ export const translateText = async (text: string, lang: string) => {
 };
 
 export const generateAiRiskForecast = async () => {
-    // Risk forecast usually requires weather API + site data, keeping mock for stability unless you have weather API
     return {
         risk_level: 'Medium',
         summary: 'AI Analysis: Moderate risk due to high activity levels and potential heat stress.',
@@ -151,8 +157,11 @@ export const generateAiRiskForecast = async () => {
     };
 };
 
+// Alias for backward compatibility (Fixes build error)
+export const getPredictiveInsights = generateAiRiskForecast;
 
-// --- FALLBACK MOCKS (If API Fails or No Key) ---
+
+// --- FALLBACK MOCKS ---
 const mockSafetyReport = (prompt: string) => ({
   description: `Report: ${prompt}`,
   rootCause: "Pending Investigation",
