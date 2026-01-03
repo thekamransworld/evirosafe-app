@@ -79,6 +79,9 @@ const RiskLevelCard: React.FC<{
     const isHighRisk = riskLevel === 'High' || riskLevel === 'Critical';
     const baseClass = "rounded-3xl p-6 text-slate-100 transition-all duration-300 shadow-[0_18px_45px_rgba(0,0,0,0.55)]";
     const themeClass = isHighRisk ? "hero-card-high" : "hero-card-normal";
+    
+    // Safety check for recommendations array
+    const safeRecs = Array.isArray(recommendations) ? recommendations : [];
 
     return (
         <div className={`${baseClass} ${themeClass} ${className} flex flex-col justify-between`}>
@@ -119,7 +122,7 @@ const RiskLevelCard: React.FC<{
                     Recommended Actions
                 </p>
                 <ul className="space-y-2">
-                    {recommendations.slice(0, 3).map((rec, idx) => (
+                    {safeRecs.slice(0, 3).map((rec, idx) => (
                         <li key={idx} className="flex gap-3 items-center text-xs text-slate-300 bg-white/5 px-3 py-2 rounded-lg border border-white/5 hover:bg-white/10 transition-colors cursor-default">
                             <span className={`flex-shrink-0 h-1.5 w-1.5 rounded-full ${idx === 0 ? 'bg-sky-400' : idx === 1 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                             <span>{rec}</span>
@@ -168,19 +171,18 @@ const WidgetCard: React.FC<{ title: string; children: React.ReactNode; className
 );
 
 export const Dashboard: React.FC = () => {
-    // FIX: Separate contexts to avoid undefined errors
-    const { reportList, ptwList } = useDataContext();
-    const { usersList, setCurrentView } = useAppContext(); 
+    const { reportList, ptwList, usersList } = useDataContext();
     const { setIsReportCreationModalOpen, setIsTbtCreationModalOpen, setSelectedReport, setIsInspectionCreationModalOpen } = useModalContext();
+    const { setCurrentView } = useAppContext();
     
     const [isSafetyPulseModalOpen, setIsSafetyPulseModalOpen] = useState(false);
     const [simulatedTemp, setSimulatedTemp] = useState(38);
 
     // --- REAL DATA CALCULATIONS ---
     // Safety check: Ensure lists are arrays
-    const safePtwList = ptwList || [];
-    const safeReportList = reportList || [];
-    const safeUsersList = usersList || [];
+    const safePtwList = Array.isArray(ptwList) ? ptwList : [];
+    const safeReportList = Array.isArray(reportList) ? reportList : [];
+    const safeUsersList = Array.isArray(usersList) ? usersList : [];
 
     const activePermits = useMemo(() => safePtwList.filter(p => p.status === 'ACTIVE').length, [safePtwList]);
     const pendingReports = useMemo(() => safeReportList.filter(r => r.status === 'under_review' || r.status === 'submitted'), [safeReportList]);

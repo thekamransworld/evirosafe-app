@@ -18,7 +18,7 @@ const seriesConfig = {
     positiveObservation: { name: 'Positive Obs.', color: '#10b981', gradient: ['#10b981', '#064e3b'] },
 };
 
-// Mock Data Generator for the CHART visual (keeps the "heartbeat" look)
+// Mock Data Generator
 const generateTrendData = (points: number) => {
     const data = [];
     const now = new Date();
@@ -50,13 +50,16 @@ const KPICard: React.FC<{ title: string; value: number; color: string }> = ({ ti
 );
 
 export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand, stats }) => {
-    const [data, setData] = useState(() => generateTrendData(24));
+    // Initialize with data immediately
+    const [data, setData] = useState<any[]>(generateTrendData(24));
     const [selectedRange, setSelectedRange] = useState('Last 60m');
 
-    // Simulate live chart movement (Visual only)
     useEffect(() => {
         const interval = setInterval(() => {
             setData(prev => {
+                // SAFETY CHECK: Ensure prev is an array
+                if (!Array.isArray(prev)) return generateTrendData(24);
+
                 const nextTime = new Date();
                 const newPoint = {
                     time: nextTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -65,6 +68,7 @@ export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand, 
                     unsafeCondition: Math.floor(Math.random() * 2),
                     positiveObservation: Math.floor(Math.random() * 3),
                 };
+                // Safe slice
                 return [...prev.slice(1), newPoint];
             });
         }, 4000);
@@ -105,7 +109,7 @@ export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand, 
             <div className="flex flex-1 overflow-hidden">
                 {/* Left: Metrics & Chart */}
                 <div className="flex-1 flex flex-col p-4">
-                    {/* KPI Strip - CONNECTED TO REAL DATA */}
+                    {/* KPI Strip */}
                     <div className="grid grid-cols-4 gap-3 mb-4">
                         <KPICard title="Incidents" value={safeStats.incidents} color={seriesConfig.incident.color} />
                         <KPICard title="Unsafe Acts" value={safeStats.unsafeActs} color={seriesConfig.unsafeAct.color} />
