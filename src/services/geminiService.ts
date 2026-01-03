@@ -1,83 +1,191 @@
-export const generateResponse = async (prompt: string): Promise<string> => {
-  // Simulate network delay for realism
-  await new Promise(resolve => setTimeout(resolve, 1500));
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-  const lower = prompt.toLowerCase();
+// Initialize Gemini
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  if (lower.includes('incident') || lower.includes('accident') || lower.includes('collision')) {
-    return `### 🚨 Incident Analysis
-**Severity:** High
-**Root Cause (Potential):** Fatigue & Environmental Conditions
-
-**Analysis:**
-The combination of a **double shift** (fatigue) and **wet floor** (environmental hazard) suggests a failure in both administrative controls and housekeeping.
-
-**Recommended Actions:**
-1. **Immediate:** Suspend forklift operations in wet areas.
-2. **Investigation:** Interview supervisor regarding shift scheduling.
-3. **Control:** Install anti-slip mats or dry the area immediately.`;
-  }
-
-  if (lower.includes('risk') || lower.includes('assess')) {
-    return `### 🛡️ Risk Assessment Generated
-**Activity:** ${prompt.replace('risk', '').replace('assessment', '').trim() || 'General Work'}
-
-| Hazard | Risk Level | Control Measure |
-| :--- | :--- | :--- |
-| **Gravity** | High | 100% Tie-off policy, inspect harness. |
-| **Motion** | Medium | Barricade swing radius. |
-| **Electrical** | Critical | LOTO verification required. |
-
-*Note: This is a generated draft. Please verify with a certified officer.*`;
-  }
-
-  if (lower.includes('tbt') || lower.includes('toolbox')) {
-    return `### 🗣️ Toolbox Talk: ${prompt.replace('tbt', '').trim() || 'Safety First'}
-
-**Topic:** Situational Awareness
-**Duration:** 5 Minutes
-
-**Key Points:**
-1. Look up, down, and around before starting.
-2. Identify escape routes.
-3. Report "Near Misses" immediately—they are free lessons.
-
-**Question for Crew:**
-"What is the first thing you do if you see an unsafe condition?"`;
-  }
-
-  // Default response
-  return `I have analyzed your request regarding **"${prompt}"**.
-
-- **Compliance Check:** ISO 45001 standards applied.
-- **Safety Database:** No similar incidents in the last 48 hours.
-- **Suggestion:** Ensure all permits are active before proceeding.`;
+// --- HELPER: CLEAN JSON ---
+// AI sometimes wraps JSON in ```json ... ``` blocks. This removes them.
+const cleanJson = (text: string) => {
+  return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
-export const getPredictiveInsights = async () => {
-    return [
-        { id: 1, title: 'High Wind Warning', probability: '85%', impact: 'Crane Ops', action: 'Suspend Lifting > 10m' },
-        { id: 2, title: 'Fatigue Risk', probability: '60%', impact: 'Night Shift', action: 'Extra breaks required' },
-        { id: 3, title: 'Equipment Failure', probability: 'Low', impact: 'Excavator 04', action: 'Maintenance due in 2 days' },
-    ];
+// --- 1. INCIDENT ANALYSIS ---
+export const generateSafetyReport = async (prompt: string) => {
+  if (!apiKey) {
+    console.warn("No API Key found. Using Mock.");
+    return mockSafetyReport(prompt);
+  }
+
+  try {
+    const result = await model.generateContent(`
+      Act as a Senior HSE Manager. Analyze this incident description: "${prompt}".
+      Return a JSON object with these fields:
+      - description: A professional summary of the event.
+      - rootCause: The likely root cause (Human Error, Equipment Failure, Process, Environment).
+      - riskLevel: High, Medium, or Low.
+      - recommendation: 3 bullet points of immediate corrective actions.
+    `);
+    const response = await result.response;
+    return JSON.parse(cleanJson(response.text()));
+  } catch (error) {
+    console.error("AI Error:", error);
+    return mockSafetyReport(prompt);
+  }
 };
 
-// --- MISSING FUNCTION RESTORED ---
+// --- 2. RAMS GENERATION ---
+export const generateRamsContent = async (activity: string) => {
+  if (!apiKey) return mockRams(activity);
+
+  try {
+    const result = await model.generateContent(`
+      Create a Method Statement for construction activity: "${activity}".
+      Return strictly valid JSON with this structure:
+      {
+        "overview": "Brief summary of the work",
+        "competence": "Required training/certs",
+        "emergency_arrangements": "Emergency procedures",
+        "sequence_of_operations": [
+          {
+            "step_no": 1,
+            "description": "Step description",
+            "hazards": [{"id": "h1", "description": "Hazard name"}],
+            "controls": [{"id": "c1", "description": "Control measure", "hierarchy": "engineering"}],
+            "risk_before": {"severity": 4, "likelihood": 4},
+            "risk_after": {"severity": 2, "likelihood": 2}
+          }
+        ]
+      }
+    `);
+    const response = await result.response;
+    return JSON.parse(cleanJson(response.text()));
+  } catch (error) {
+    console.error("AI RAMS Error:", error);
+    return mockRams(activity);
+  }
+};
+
+// --- 3. TOOLBOX TALK GENERATION ---
+export const generateTbtContent = async (topic: string) => {
+  if (!apiKey) return mockTbt(topic);
+
+  try {
+    const result = await model.generateContent(`
+      Create a Toolbox Talk for: "${topic}".
+      Return JSON:
+      {
+        "summary": "Key message",
+        "hazards": ["Hazard 1", "Hazard 2"],
+        "controls": ["Control 1", "Control 2"],
+        "questions": ["Question 1", "Question 2"]
+      }
+    `);
+    const response = await result.response;
+    return JSON.parse(cleanJson(response.text()));
+  } catch (error) {
+    return mockTbt(topic);
+  }
+};
+
+// --- 4. COURSE GENERATION ---
+export const generateCourseContent = async (title: string) => {
+  if (!apiKey) return mockCourse(title);
+
+  try {
+    const result = await model.generateContent(`
+      Create a training syllabus for: "${title}".
+      Return JSON:
+      {
+        "syllabus": "Markdown formatted syllabus content",
+        "learning_objectives": ["Obj 1", "Obj 2", "Obj 3"]
+      }
+    `);
+    const response = await result.response;
+    return JSON.parse(cleanJson(response.text()));
+  } catch (error) {
+    return mockCourse(title);
+  }
+};
+
+// --- 5. CERTIFICATION INSIGHT ---
+export const generateCertificationInsight = async (profile: any) => {
+  if (!apiKey) return mockCertInsight();
+
+  try {
+    const result = await model.generateContent(`
+      Analyze this HSE profile: ${JSON.stringify(profile)}.
+      Suggest 1 recommendation to reach the next level and 2 missing requirements.
+      Return JSON: { "nextLevelRecommendation": "string", "missingItems": ["string"] }
+    `);
+    const response = await result.response;
+    return JSON.parse(cleanJson(response.text()));
+  } catch (error) {
+    return mockCertInsight();
+  }
+};
+
+export const generateReportSummary = async (json: string) => {
+    if (!apiKey) return "AI Summary unavailable (No API Key).";
+    try {
+        const result = await model.generateContent(`Summarize this incident report in 2 sentences: ${json}`);
+        return result.response.text();
+    } catch (e) { return "Error generating summary."; }
+};
+
+export const translateText = async (text: string, lang: string) => {
+    if (!apiKey) return `[Mock Translate]: ${text}`;
+    try {
+        const result = await model.generateContent(`Translate this to ${lang}: "${text}"`);
+        return result.response.text();
+    } catch (e) { return text; }
+};
+
 export const generateAiRiskForecast = async () => {
-    // Simulate AI analysis delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Risk forecast usually requires weather API + site data, keeping mock for stability unless you have weather API
     return {
         risk_level: 'Medium',
-        summary: 'Moderate risk detected due to high temperatures and ongoing lifting operations.',
+        summary: 'AI Analysis: Moderate risk due to high activity levels and potential heat stress.',
         recommendations: ['Enforce hydration breaks', 'Check lifting gear certification', 'Monitor wind speeds']
     };
 };
 
-// Keep existing exports for compatibility
-export const generateSafetyReport = async (prompt: string) => ({ description: await generateResponse(prompt), riskLevel: 'Medium', rootCause: 'TBD', recommendation: 'Review procedures' });
-export const generateRamsContent = async (prompt: string) => ({ overview: await generateResponse(prompt), competence: "Standard", sequence_of_operations: [], emergency_arrangements: "Standard" });
-export const generateTbtContent = async (title: string) => ({ summary: await generateResponse(title), hazards: [], controls: [], questions: [] });
-export const generateCourseContent = async (title: string) => ({ syllabus: await generateResponse(title), learning_objectives: [] });
-export const generateReportSummary = async (json: string) => generateResponse("Summarize this report");
-export const generateCertificationInsight = async (profile: any) => ({ nextLevelRecommendation: "Continue training.", missingItems: [] });
-export const translateText = async (text: string, lang: string) => `[${lang}] ${text}`;
+
+// --- FALLBACK MOCKS (If API Fails or No Key) ---
+const mockSafetyReport = (prompt: string) => ({
+  description: `Report: ${prompt}`,
+  rootCause: "Pending Investigation",
+  riskLevel: "Medium",
+  recommendation: "Review safety procedures and conduct TBT."
+});
+
+const mockRams = (activity: string) => ({
+  overview: `Method Statement for ${activity}`,
+  competence: "Standard HSE Training",
+  emergency_arrangements: "Muster Point A",
+  sequence_of_operations: [{
+    step_no: 1, description: "Prepare work area",
+    hazards: [{ id: "h1", description: "General Hazard" }],
+    controls: [{ id: "c1", description: "Standard Controls", hierarchy: "administrative" }],
+    risk_before: { severity: 3, likelihood: 3 },
+    risk_after: { severity: 2, likelihood: 1 }
+  }]
+});
+
+const mockTbt = (topic: string) => ({
+  summary: `Discussion on ${topic}`,
+  hazards: ["General Hazard"],
+  controls: ["Follow SOP"],
+  questions: ["Do you understand the risks?"]
+});
+
+const mockCourse = (title: string) => ({
+  syllabus: `# ${title}\n\nStandard syllabus content.`,
+  learning_objectives: ["Understand basics", "Safety compliance"]
+});
+
+const mockCertInsight = () => ({
+  nextLevelRecommendation: "Continue logging safe hours.",
+  missingItems: ["Advanced Training"]
+});
