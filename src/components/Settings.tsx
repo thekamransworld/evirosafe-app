@@ -2,23 +2,25 @@ import React, { useState, useRef, useEffect } from 'react';
 import type { User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
 import { roles } from '../config';
 import { useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
+import { useToast } from './ui/Toast';
 
-// --- IMPORTS FOR SEEDING ---
+// --- FIREBASE IMPORTS ---
 import { db } from '../firebase';
-import { writeBatch, doc } from 'firebase/firestore';
+import { writeBatch, doc, collection, updateDoc, setDoc } from 'firebase/firestore';
 import { 
   projects, reports, inspections, checklistTemplates, 
   users as initialUsers, organizations 
 } from '../data';
-import { useToast } from './ui/Toast';
 
 interface SettingsProps {}
 
 type Tab =
   | 'Profile'
+  | 'Organization' // <--- NEW TAB
   | 'Preferences'
   | 'Security'
   | 'Notifications'
@@ -32,7 +34,7 @@ const TabButton: React.FC<{
 }> = ({ label, activeTab, onClick }) => (
   <button
     onClick={() => onClick(label)}
-    className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap ${
+    className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${
       activeTab === label
         ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
         : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5'
@@ -79,36 +81,23 @@ const ComplianceItem: React.FC<{
 );
 
 export const Settings: React.FC<SettingsProps> = () => {
-  const { activeUser, handleUpdateUser } = useAppContext();
+  const { activeUser, handleUpdateUser, usersList, activeOrg, handleInviteUser } = useAppContext();
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>('Profile');
-  
-  // Default user structure to prevent crashes
-  const defaultUser: User = {
-      id: '', org_id: '', email: '', name: '', avatar_url: '', role: 'WORKER', status: 'active',
-      preferences: {
-          language: 'en',
-          default_view: 'dashboard',
-          units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' }
-      }
-  };
-
-  const [editedUser, setEditedUser] = useState<User>(activeUser || defaultUser);
+  const [editedUser, setEditedUser] = useState<User>(activeUser || {} as User);
   const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   
+  // Invite State
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [inviteRole, setInviteRole] = useState<User['role']>('WORKER');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Update local state when activeUser loads/changes, ensuring preferences exist
   useEffect(() => {
-    if (activeUser) {
-        const safeUser = {
-            ...activeUser,
-            preferences: activeUser.preferences || defaultUser.preferences
-        };
-        setEditedUser(safeUser);
-    }
+    if(activeUser) setEditedUser(activeUser);
   }, [activeUser]);
 
   useEffect(() => {
@@ -125,6 +114,7 @@ export const Settings: React.FC<SettingsProps> = () => {
       avatar_url: newAvatarPreviewUrl || editedUser.avatar_url,
     };
     handleUpdateUser(userToUpdate);
+    toast.success("Profile updated successfully");
   };
 
   const handlePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,7 +132,43 @@ export const Settings: React.FC<SettingsProps> = () => {
     fileInputRef.current?.click();
   };
 
-  // --- DATABASE SEEDING FUNCTION ---
+  const handleSendInvite = async () => {
+      if(!inviteEmail || !inviteName) {
+          toast.error("Please fill in name and email");
+          return;
+      }
+      
+      // Create new user object
+      const newUser: User = {
+          id: `user_${Date.now()}`,
+          org_id: activeOrg.id,
+          email: inviteEmail,
+          name: inviteName,
+          role: inviteRole,
+          status: 'invited',
+          avatar_url: `https://ui-avatars.com/api/?name=${inviteName}&background=random`,
+          preferences: {
+              language: 'en',
+              default_view: 'dashboard',
+              units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' }
+          }
+      };
+
+      try {
+          // Save to Firestore
+          await setDoc(doc(db, 'users', newUser.id), newUser);
+          // Update local state via context
+          handleInviteUser(newUser);
+          
+          setInviteEmail('');
+          setInviteName('');
+          toast.success(`Invitation sent to ${inviteEmail}`);
+      } catch (e: any) {
+          console.error(e);
+          toast.error("Failed to send invite");
+      }
+  };
+
   const handleSeedDatabase = async () => {
     if (!window.confirm("⚠️ WARNING: This will upload initial data to your database. Continue?")) return;
     
@@ -150,44 +176,38 @@ export const Settings: React.FC<SettingsProps> = () => {
     try {
         const batch = writeBatch(db);
 
-        // 1. Organizations
         organizations.forEach(org => {
             const ref = doc(db, 'organizations', org.id);
             batch.set(ref, org);
         });
 
-        // 2. Users
         initialUsers.forEach(u => {
             const ref = doc(db, 'users', u.id);
             batch.set(ref, u);
         });
 
-        // 3. Projects
         projects.forEach(p => {
             const ref = doc(db, 'projects', p.id);
             batch.set(ref, p);
         });
 
-        // 4. Reports
         reports.forEach(r => {
             const ref = doc(db, 'reports', r.id);
             batch.set(ref, r);
         });
 
-        // 5. Checklist Templates
         checklistTemplates.forEach(t => {
             const ref = doc(db, 'checklist_templates', t.id);
             batch.set(ref, t);
         });
 
-        // 6. Inspections (if any in mock data)
         inspections.forEach(i => {
             const ref = doc(db, 'inspections', i.id);
             batch.set(ref, i);
         });
 
         await batch.commit();
-        toast.success("Database populated successfully! Refreshing...");
+        toast.success("Database populated successfully! Refresh the page.");
         setTimeout(() => window.location.reload(), 1500);
 
     } catch (error: any) {
@@ -198,9 +218,10 @@ export const Settings: React.FC<SettingsProps> = () => {
     }
   };
 
-  if (!activeUser) return <div className="p-8 text-center">Loading settings...</div>;
+  if (!activeUser) return null;
 
   const userRole = roles.find((r) => r.key === editedUser.role);
+  const isAdmin = activeUser.role === 'ADMIN' || activeUser.role === 'ORG_ADMIN';
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -211,6 +232,7 @@ export const Settings: React.FC<SettingsProps> = () => {
 
       <div className="flex space-x-2 border-b border-gray-200 dark:border-dark-border mb-6 overflow-x-auto pb-px">
         <TabButton label="Profile" activeTab={activeTab} onClick={setActiveTab} />
+        {isAdmin && <TabButton label="Organization" activeTab={activeTab} onClick={setActiveTab} />}
         <TabButton label="Preferences" activeTab={activeTab} onClick={setActiveTab} />
         <TabButton label="Security" activeTab={activeTab} onClick={setActiveTab} />
         <TabButton label="Notifications" activeTab={activeTab} onClick={setActiveTab} />
@@ -298,18 +320,92 @@ export const Settings: React.FC<SettingsProps> = () => {
                 className="w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white"
               />
             </FormField>
-
-            <FormField label="Company / Contractor">
-              <input
-                type="text"
-                value={editedUser.company || ''}
-                onChange={(e) =>
-                  setEditedUser({ ...editedUser, company: e.target.value })
-                }
-                className="w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white"
-              />
-            </FormField>
+            
+            <div className="flex justify-end mt-4">
+                <Button type="button" onClick={handleSave}>Save Profile</Button>
+            </div>
           </Section>
+        )}
+
+        {/* --- NEW ORGANIZATION TAB --- */}
+        {activeTab === 'Organization' && isAdmin && (
+            <>
+            <Section title="Organization Details" description="Manage your company branding and details.">
+                <div className="flex items-center gap-4 mb-4">
+                    <img src={activeOrg.branding.logoUrl} alt="Logo" className="w-16 h-16 rounded-lg border dark:border-gray-700" />
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{activeOrg.name}</h3>
+                        <p className="text-sm text-gray-500">{activeOrg.industry} • {activeOrg.country}</p>
+                    </div>
+                </div>
+                <FormField label="Company Name">
+                    <input type="text" defaultValue={activeOrg.name} className="w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" />
+                </FormField>
+                <FormField label="Domain">
+                    <input type="text" defaultValue={activeOrg.domain} disabled className="w-full p-2 border bg-gray-100 rounded-md dark:bg-white/5 dark:border-dark-border dark:text-gray-400 cursor-not-allowed" />
+                </FormField>
+            </Section>
+
+            <Section title="Team Management" description="Invite new members and manage access roles.">
+                <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg border dark:border-dark-border mb-6">
+                    <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-3">Invite New Member</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <input 
+                            type="text" 
+                            placeholder="Full Name" 
+                            value={inviteName}
+                            onChange={e => setInviteName(e.target.value)}
+                            className="p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white text-sm"
+                        />
+                        <input 
+                            type="email" 
+                            placeholder="Email Address" 
+                            value={inviteEmail}
+                            onChange={e => setInviteEmail(e.target.value)}
+                            className="p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white text-sm"
+                        />
+                        <div className="flex gap-2">
+                            <select 
+                                value={inviteRole}
+                                onChange={e => setInviteRole(e.target.value as User['role'])}
+                                className="p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white text-sm flex-1"
+                            >
+                                {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                            </select>
+                            <Button onClick={handleSendInvite}>Invite</Button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-hidden border rounded-lg dark:border-dark-border">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
+                        <thead className="bg-gray-50 dark:bg-white/5">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-dark-border">
+                            {usersList.filter(u => u.org_id === activeOrg.id).map(user => (
+                                <tr key={user.id}>
+                                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{user.name}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{roles.find(r => r.key === user.role)?.label || user.role}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        <Badge color={user.status === 'active' ? 'green' : 'yellow'}>{user.status}</Badge>
+                                    </td>
+                                    <td className="px-4 py-3 text-right text-sm">
+                                        <button className="text-blue-600 hover:text-blue-800 dark:text-blue-400 mr-3">Edit</button>
+                                        <button className="text-red-600 hover:text-red-800 dark:text-red-400">Remove</button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Section>
+            </>
         )}
 
         {activeTab === 'Preferences' && (
@@ -319,12 +415,12 @@ export const Settings: React.FC<SettingsProps> = () => {
           >
             <FormField label="Language">
               <select
-                value={editedUser.preferences?.language || 'en'}
+                value={editedUser.preferences.language}
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,
                     preferences: {
-                      ...(editedUser.preferences || defaultUser.preferences),
+                      ...editedUser.preferences,
                       language: e.target.value as 'en' | 'ar',
                     },
                   })
@@ -338,12 +434,12 @@ export const Settings: React.FC<SettingsProps> = () => {
 
             <FormField label="Default Home Screen">
               <select
-                value={editedUser.preferences?.default_view || 'dashboard'}
+                value={editedUser.preferences.default_view}
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,
                     preferences: {
-                      ...(editedUser.preferences || defaultUser.preferences),
+                      ...editedUser.preferences,
                       default_view:
                         e.target.value as User['preferences']['default_view'],
                     },
@@ -359,6 +455,10 @@ export const Settings: React.FC<SettingsProps> = () => {
                 <option value="training">Trainings</option>
               </select>
             </FormField>
+            
+            <div className="flex justify-end mt-4">
+                <Button type="button" onClick={handleSave}>Save Preferences</Button>
+            </div>
           </Section>
         )}
 
@@ -470,24 +570,8 @@ export const Settings: React.FC<SettingsProps> = () => {
                 ))}
               </div>
             </FormField>
-
-            <FormField label="AI Assistance">
-              <p className="text-sm text-text-secondary dark:text-gray-400 mb-2">
-                Control whether AI suggestions are available to your users for
-                RAMS drafting, incident analysis, and inspection optimization.
-              </p>
-              <Button variant="secondary" type="button">
-                Manage AI Settings
-              </Button>
-            </FormField>
           </Section>
         )}
-      </div>
-
-      <div className="flex justify-end mt-8">
-        <Button type="button" onClick={handleSave}>
-          Save Changes
-        </Button>
       </div>
     </div>
   );
