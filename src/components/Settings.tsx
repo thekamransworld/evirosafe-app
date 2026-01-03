@@ -10,17 +10,20 @@ import { useToast } from './ui/Toast';
 
 // --- FIREBASE IMPORTS ---
 import { db } from '../firebase';
-import { writeBatch, doc, collection, updateDoc, setDoc } from 'firebase/firestore';
+import { writeBatch, doc, setDoc } from 'firebase/firestore';
 import { 
   projects, reports, inspections, checklistTemplates, 
-  users as initialUsers, organizations 
+  users as initialUsers, organizations, plans, rams, signs 
 } from '../data';
+
+// --- EMAIL SERVICE IMPORT ---
+import { sendInviteEmail } from '../services/emailService';
 
 interface SettingsProps {}
 
 type Tab =
   | 'Profile'
-  | 'Organization' // <--- NEW TAB
+  | 'Organization'
   | 'Preferences'
   | 'Security'
   | 'Notifications'
@@ -88,6 +91,7 @@ export const Settings: React.FC<SettingsProps> = () => {
   const [editedUser, setEditedUser] = useState<User>(activeUser || {} as User);
   const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
   
   // Invite State
   const [inviteEmail, setInviteEmail] = useState('');
@@ -132,12 +136,15 @@ export const Settings: React.FC<SettingsProps> = () => {
     fileInputRef.current?.click();
   };
 
+  // --- INVITE MEMBER LOGIC ---
   const handleSendInvite = async () => {
       if(!inviteEmail || !inviteName) {
           toast.error("Please fill in name and email");
           return;
       }
       
+      setIsSendingInvite(true);
+
       // Create new user object
       const newUser: User = {
           id: `user_${Date.now()}`,
@@ -155,20 +162,33 @@ export const Settings: React.FC<SettingsProps> = () => {
       };
 
       try {
-          // Save to Firestore
+          // 1. Save to Firestore (So they can log in later)
           await setDoc(doc(db, 'users', newUser.id), newUser);
-          // Update local state via context
+          
+          // 2. Update Local State
           handleInviteUser(newUser);
+          
+          // 3. Send Real Email via EmailJS
+          await sendInviteEmail(
+              inviteEmail, 
+              inviteName, 
+              inviteRole, 
+              activeOrg.name, 
+              activeUser.name
+          );
           
           setInviteEmail('');
           setInviteName('');
           toast.success(`Invitation sent to ${inviteEmail}`);
       } catch (e: any) {
           console.error(e);
-          toast.error("Failed to send invite");
+          toast.error("Failed to send invite. Check console.");
+      } finally {
+          setIsSendingInvite(false);
       }
   };
 
+  // --- DATABASE SEEDING LOGIC ---
   const handleSeedDatabase = async () => {
     if (!window.confirm("⚠️ WARNING: This will upload initial data to your database. Continue?")) return;
     
@@ -204,6 +224,21 @@ export const Settings: React.FC<SettingsProps> = () => {
         inspections.forEach(i => {
             const ref = doc(db, 'inspections', i.id);
             batch.set(ref, i);
+        });
+        
+        plans.forEach(p => {
+            const ref = doc(db, 'plans', p.id);
+            batch.set(ref, p);
+        });
+
+        rams.forEach(r => {
+            const ref = doc(db, 'rams', r.id);
+            batch.set(ref, r);
+        });
+
+        signs.forEach(s => {
+            const ref = doc(db, 'signs', s.id);
+            batch.set(ref, s);
         });
 
         await batch.commit();
@@ -320,6 +355,17 @@ export const Settings: React.FC<SettingsProps> = () => {
                 className="w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white"
               />
             </FormField>
+
+            <FormField label="Company / Contractor">
+              <input
+                type="text"
+                value={editedUser.company || ''}
+                onChange={(e) =>
+                  setEditedUser({ ...editedUser, company: e.target.value })
+                }
+                className="w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white"
+              />
+            </FormField>
             
             <div className="flex justify-end mt-4">
                 <Button type="button" onClick={handleSave}>Save Profile</Button>
@@ -327,7 +373,7 @@ export const Settings: React.FC<SettingsProps> = () => {
           </Section>
         )}
 
-        {/* --- NEW ORGANIZATION TAB --- */}
+        {/* --- ORGANIZATION TAB --- */}
         {activeTab === 'Organization' && isAdmin && (
             <>
             <Section title="Organization Details" description="Manage your company branding and details.">
@@ -372,7 +418,9 @@ export const Settings: React.FC<SettingsProps> = () => {
                             >
                                 {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
                             </select>
-                            <Button onClick={handleSendInvite}>Invite</Button>
+                            <Button onClick={handleSendInvite} disabled={isSendingInvite}>
+                                {isSendingInvite ? 'Sending...' : 'Invite'}
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -572,6 +620,12 @@ export const Settings: React.FC<SettingsProps> = () => {
             </FormField>
           </Section>
         )}
+      </div>
+
+      <div className="flex justify-end mt-8">
+        <Button type="button" onClick={handleSave}>
+          Save Changes
+        </Button>
       </div>
     </div>
   );
