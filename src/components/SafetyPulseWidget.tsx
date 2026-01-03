@@ -50,15 +50,15 @@ const KPICard: React.FC<{ title: string; value: number; color: string }> = ({ ti
 );
 
 export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand, stats }) => {
-    // Initialize with data immediately
-    const [data, setData] = useState<any[]>(generateTrendData(24));
+    // Initialize with function to ensure it runs only once
+    const [data, setData] = useState<any[]>(() => generateTrendData(24));
     const [selectedRange, setSelectedRange] = useState('Last 60m');
 
     useEffect(() => {
         const interval = setInterval(() => {
             setData(prev => {
-                // SAFETY CHECK: Ensure prev is an array
-                if (!Array.isArray(prev)) return generateTrendData(24);
+                // CRITICAL FIX: If prev is undefined/null, reset it
+                if (!prev || !Array.isArray(prev)) return generateTrendData(24);
 
                 const nextTime = new Date();
                 const newPoint = {
