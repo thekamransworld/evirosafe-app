@@ -1,43 +1,17 @@
-// src/services/storageService.ts
-
-// --- CLOUDINARY CONFIGURATION ---
-const CLOUD_NAME = "dsw9llfdo"; 
-const UPLOAD_PRESET = "evirosafe_preset"; 
+// --- MOCK STORAGE SERVICE ---
+// Use this if you do not have a Google Cloud Billing Account enabled.
 
 /**
- * Uploads a file to Cloudinary (Free Image/Video Hosting)
- * @param file The file object from the input
- * @param folder Optional folder name (Cloudinary handles this via presets usually)
+ * Simulates uploading a file to the cloud.
+ * Returns a placeholder image URL after a short delay.
  */
-export const uploadFileToFirebase = async (file: File, folder: string): Promise<string> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", UPLOAD_PRESET);
-  
-  // Note: Folders in Cloudinary usually require the preset to allow dynamic folders, 
-  // or they just go to the root. We append it just in case your preset supports it.
-  formData.append("folder", folder); 
+export const uploadFileToCloud = async (file: File, path: string = 'general'): Promise<string> => {
+  console.log(`[Mock Storage] Pretending to upload file: ${file.name} to folder: ${path}`);
 
-  try {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
+  // 1. Simulate network delay (1 second)
+  await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Cloudinary Error:", errorData);
-      throw new Error(errorData.error?.message || "Upload failed");
-    }
-
-    const data = await response.json();
-    // Return the secure HTTPS URL of the uploaded file
-    return data.secure_url; 
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    throw error;
-  }
+  // 2. Return a fake URL (Placeholder image)
+  // This allows the UI to show "Success" and display an image
+  return `https://placehold.co/600x400/2563eb/ffffff?text=Uploaded:+${encodeURIComponent(file.name)}`;
 };

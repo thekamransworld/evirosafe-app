@@ -1,63 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
-import { Activity } from 'lucide-react';
 
 interface SafetyPulseWidgetProps {
     onExpand: () => void;
+    stats?: {
+        incidents: number;
+        unsafeActs: number;
+        unsafeConditions: number;
+        positiveObs: number;
+    };
 }
 
 const seriesConfig = {
-    incident: { name: 'Incident', color: '#ef4444' },
-    unsafeAct: { name: 'Unsafe Act', color: '#f97316' },
-    unsafeCondition: { name: 'Unsafe Cond.', color: '#06b6d4' },
-    positiveObservation: { name: 'Positive Obs.', color: '#10b981' },
+    incident: { name: 'Incident', color: '#ef4444', gradient: ['#ef4444', '#7f1d1d'] },
+    unsafeAct: { name: 'Unsafe Act', color: '#f97316', gradient: ['#f97316', '#7c2d12'] },
+    unsafeCondition: { name: 'Unsafe Cond.', color: '#06b6d4', gradient: ['#06b6d4', '#164e63'] },
+    positiveObservation: { name: 'Positive Obs.', color: '#10b981', gradient: ['#10b981', '#064e3b'] },
 };
 
-const hotspots = [
-    { area: 'Tower B', count: 4, risk: 'High' },
-    { area: 'Scaffold Zone', count: 3, risk: 'Med' },
-    { area: 'Loading Bay', count: 2, risk: 'Low' },
-];
-
+// Mock Data Generator for the CHART visual (keeps the "heartbeat" look)
 const generateTrendData = (points: number) => {
     const data = [];
     const now = new Date();
     for (let i = points - 1; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 5 * 60000);
+        const time = new Date(now.getTime() - i * 5 * 60000); // 5 min intervals
         data.push({
             time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            incident: Math.random() > 0.95 ? 1 : 0,
-            unsafeAct: Math.floor(Math.random() * 5) + 1,
-            unsafeCondition: Math.floor(Math.random() * 3),
-            positiveObservation: Math.floor(Math.random() * 6) + 2,
+            incident: 0,
+            unsafeAct: Math.floor(Math.random() * 3) + 1,
+            unsafeCondition: Math.floor(Math.random() * 2),
+            positiveObservation: Math.floor(Math.random() * 4) + 1,
         });
     }
     return data;
 };
 
-const KPICard: React.FC<{ title: string; value: string; change: number; color: string }> = ({ title, value, change, color }) => (
-    <div className="flex flex-col justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+const KPICard: React.FC<{ title: string; value: number; color: string }> = ({ title, value, color }) => (
+    <div className="flex flex-col justify-between p-3 bg-white/5 border border-white/10 rounded-lg">
         <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{title}</p>
-            <p className="text-xl font-bold text-white mt-1">{value}<span className="text-xs text-slate-500 font-normal">/hr</span></p>
+            <p className="text-xl font-bold text-white mt-1">{value}</p>
         </div>
         <div className="flex items-center mt-2">
-            <span className={`text-xs font-bold ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {change > 0 ? '▲' : '▼'} {Math.abs(change)}%
-            </span>
-            <div className="ml-auto flex space-x-0.5 items-end h-4">
-                {[40, 60, 30, 80, 50].map((h, i) => (
-                    <div key={i} style={{ height: `${h}%`, backgroundColor: color }} className="w-1 rounded-t-sm opacity-60"></div>
-                ))}
+            <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+                <div style={{ width: '60%', backgroundColor: color }} className="h-full rounded-full opacity-80"></div>
             </div>
         </div>
     </div>
 );
 
-export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand }) => {
+export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand, stats }) => {
     const [data, setData] = useState(() => generateTrendData(24));
     const [selectedRange, setSelectedRange] = useState('Last 60m');
 
+    // Simulate live chart movement (Visual only)
     useEffect(() => {
         const interval = setInterval(() => {
             setData(prev => {
@@ -65,29 +61,32 @@ export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand }
                 const newPoint = {
                     time: nextTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     incident: 0,
-                    unsafeAct: Math.floor(Math.random() * 4) + 2,
+                    unsafeAct: Math.floor(Math.random() * 3),
                     unsafeCondition: Math.floor(Math.random() * 2),
-                    positiveObservation: Math.floor(Math.random() * 4) + 1,
+                    positiveObservation: Math.floor(Math.random() * 3),
                 };
                 return [...prev.slice(1), newPoint];
             });
-        }, 3000);
+        }, 4000);
         return () => clearInterval(interval);
     }, []);
 
+    // Default values if stats are loading
+    const safeStats = stats || { incidents: 0, unsafeActs: 0, unsafeConditions: 0, positiveObs: 0 };
+
     return (
-        <div className="glass-card h-full flex flex-col overflow-hidden">
+        <div className="h-full flex flex-col overflow-hidden bg-slate-900/50 rounded-xl border border-white/10 backdrop-blur-sm">
+            {/* Header */}
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
                 <div className="flex items-center space-x-3">
-                    <Activity className="w-4 h-4 text-neon-blue" />
                     <h3 className="text-sm font-bold text-white uppercase tracking-widest">Real-Time Safety Pulse</h3>
                     <div className="flex items-center space-x-2 px-2 py-1 rounded-full bg-red-500/10 border border-red-500/30">
-                        <div className="live-dot"></div>
+                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
                         <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide">LIVE</span>
                     </div>
                 </div>
                 <div className="flex space-x-1 bg-white/5 p-1 rounded-lg">
-                    {['Last 60m', '3h', '24h'].map(range => (
+                    {['Last 60m', '24h'].map(range => (
                         <button 
                             key={range}
                             onClick={() => setSelectedRange(range)}
@@ -96,21 +95,25 @@ export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand }
                             {range}
                         </button>
                     ))}
-                    <button onClick={onExpand} className="px-3 py-1 text-xs font-medium text-neon-blue hover:text-white transition-colors">
+                    <button onClick={onExpand} className="px-3 py-1 text-xs font-medium text-sky-400 hover:text-white transition-colors">
                         Expand ↗
                     </button>
                 </div>
             </div>
 
+            {/* Content Body */}
             <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 flex flex-col p-4 border-r border-white/10">
+                {/* Left: Metrics & Chart */}
+                <div className="flex-1 flex flex-col p-4">
+                    {/* KPI Strip - CONNECTED TO REAL DATA */}
                     <div className="grid grid-cols-4 gap-3 mb-4">
-                        <KPICard title="Incident" value="0.0" change={-100} color={seriesConfig.incident.color} />
-                        <KPICard title="Unsafe Acts" value="9.0" change={-20.6} color={seriesConfig.unsafeAct.color} />
-                        <KPICard title="Conditions" value="3.0" change={-12.4} color={seriesConfig.unsafeCondition.color} />
-                        <KPICard title="Positive Obs." value="6.0" change={20.1} color={seriesConfig.positiveObservation.color} />
+                        <KPICard title="Incidents" value={safeStats.incidents} color={seriesConfig.incident.color} />
+                        <KPICard title="Unsafe Acts" value={safeStats.unsafeActs} color={seriesConfig.unsafeAct.color} />
+                        <KPICard title="Conditions" value={safeStats.unsafeConditions} color={seriesConfig.unsafeCondition.color} />
+                        <KPICard title="Positive Obs." value={safeStats.positiveObs} color={seriesConfig.positiveObservation.color} />
                     </div>
 
+                    {/* Main Chart */}
                     <div className="flex-1 min-h-0 relative w-full h-full" style={{ minHeight: '150px' }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={data} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
@@ -137,35 +140,6 @@ export const SafetyPulseWidget: React.FC<SafetyPulseWidgetProps> = ({ onExpand }
                         </ResponsiveContainer>
                     </div>
                 </div>
-
-                <div className="w-48 p-4 flex flex-col bg-black/20">
-                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3 tracking-wider">Hot Spots (1h)</h4>
-                    <div className="space-y-2">
-                        {hotspots.map((spot, i) => (
-                            <div key={i} className="flex justify-between items-center p-2 rounded bg-white/5 border border-white/5">
-                                <div>
-                                    <p className="text-xs font-bold text-slate-200">{spot.area}</p>
-                                    <p className={`text-[10px] font-semibold ${spot.risk === 'High' ? 'text-red-400' : 'text-yellow-400'}`}>{spot.risk} Risk</p>
-                                </div>
-                                <div className="text-lg font-black text-white/80">{spot.count}</div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-auto">
-                         <div className="text-[10px] text-slate-500 text-center mt-2">Updated just now</div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="px-4 py-2 bg-gradient-to-r from-blue-900/40 to-transparent border-t border-white/10 flex items-center space-x-3">
-                 <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-blue opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-neon-blue"></span>
-                </span>
-                <p className="text-xs text-slate-300 font-medium truncate">
-                    <span className="text-neon-blue font-bold mr-1">AI Insight:</span> 
-                    Spike in Unsafe Acts near Substation A (10:10–10:25) linked to electrical scaffolding work.
-                </p>
             </div>
         </div>
     );
