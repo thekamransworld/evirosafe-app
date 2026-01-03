@@ -19,6 +19,7 @@ import { useToast } from './components/ui/Toast';
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { useAuth } from './contexts/AuthContext'; // <--- IMPORT AUTH CONTEXT
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -123,7 +124,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
   const handleCreateOrganization = (data: any) => setOrganizations(prev => [...prev, { ...data, id: `org_${Date.now()}`, status: 'active' }]);
-  const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); };
+  const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
   const handleSignUp = () => {};
   const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
   const t = (key: string, fallback: string = key) => translations[language]?.[key] || translations['en']?.[key] || fallback;
@@ -191,6 +192,7 @@ const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { activeOrg, activeUser } = useAppContext();
+    const { currentUser } = useAuth(); // <--- GET FIREBASE USER
     const toast = useToast();
     
     const [isLoading, setIsLoading] = useState(true);
@@ -214,6 +216,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // --- FETCH DATA FROM FIREBASE ---
     useEffect(() => {
+      // CRITICAL FIX: Only fetch if user is logged in
+      if (!currentUser) {
+          setIsLoading(false);
+          return;
+      }
+
       const fetchData = async () => {
         try {
           const fetchCol = async (name: string, setter: any) => {
@@ -228,10 +236,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('inspections', setInspectionList),
             fetchCol('ptws', setPtwList),
             fetchCol('checklist_templates', setChecklistTemplates),
+            fetchCol('checklist_runs', setChecklistRunList), // Added
             fetchCol('plans', setPlanList),
             fetchCol('rams', setRamsList),
             fetchCol('signs', setSigns),
             fetchCol('actions', setStandaloneActions),
+            fetchCol('tbt_sessions', setTbtList), // Added
+            fetchCol('training_courses', setTrainingCourseList), // Added
+            fetchCol('training_records', setTrainingRecordList), // Added
+            fetchCol('training_sessions', setTrainingSessionList), // Added
+            fetchCol('notifications', setNotifications), // Added
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -241,13 +255,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       fetchData();
-    }, []);
+    }, [currentUser]); // <--- DEPENDENCY ON CURRENTUSER
 
     // --- HELPER: UPDATE DB ---
     const updateDB = async (collectionName: string, id: string, data: any) => {
         try {
             await updateDoc(doc(db, collectionName, id), data);
-            // toast.success("Saved.");
         } catch (e) {
             console.error(`Error updating ${collectionName}:`, e);
             toast.error("Failed to save changes to database.");
@@ -311,7 +324,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
 
-    // --- UPDATE HANDLERS (NOW WITH DB PERSISTENCE) ---
+    // --- UPDATE HANDLERS ---
 
     const handleStatusChange = (id: string, status: any) => {
         setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
@@ -335,28 +348,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
         } else if (origin.type === 'standalone') {
              setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a));
-             // Note: Standalone actions are stored in 'actions' collection, but ID is stored in origin.parentId? 
-             // Actually, for standalone, the ID is the action ID.
-             // Let's assume origin.parentId holds the action ID for standalone.
-             // If not, we need to fix how ActionItem is constructed.
-             // Based on previous code: origin: { type: 'standalone', parentId: '', itemId: '' } -> Wait, parentId was empty?
-             // Let's fix the creation logic above first.
-             // FIX: In handleCreateStandaloneAction, origin should be: { type: 'standalone', parentId: newAction.id, itemId: '' }
-             // I will assume that fix is applied or I will apply it here if I can.
-             // Since I can't change the creation logic inside the component easily, I'll rely on the ID match.
-             // Actually, let's look at the creation logic in THIS file.
-             // Yes, I see it above. I will fix it there.
              updateDB('actions', origin.parentId, { status: newStatus });
         }
     };
 
     const handleUpdateInspection = (inspection: any, action?: any) => {
-        // If action is provided (e.g. 'submit', 'approve'), update status
         let updatedInspection = { ...inspection };
         if (action === 'submit') updatedInspection.status = 'Submitted';
         if (action === 'approve') updatedInspection.status = 'Approved';
         if (action === 'close') updatedInspection.status = 'Closed';
-        if (action === 'request_revision') updatedInspection.status = 'Ongoing'; // Revert to ongoing
+        if (action === 'request_revision') updatedInspection.status = 'Ongoing';
 
         setInspectionList(prev => prev.map(x => x.id === inspection.id ? updatedInspection : x));
         updateDB('inspections', inspection.id, updatedInspection);
@@ -366,7 +367,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleUpdatePtw = (ptw: any, action?: any) => {
         let updatedPtw = { ...ptw };
         if (action === 'submit') updatedPtw.status = 'SUBMITTED';
-        if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL'; // Move to HSE approval
+        if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL';
         if (action === 'approve_hse') updatedPtw.status = 'ACTIVE';
         if (action === 'reject') updatedPtw.status = 'DRAFT';
         if (action === 'suspend') updatedPtw.status = 'HOLD';
@@ -406,7 +407,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.success("TBT updated.");
     };
 
-    // --- OTHER HANDLERS ---
     const handleAcknowledgeReport = (id: string) => {
         const report = reportList.find(r => r.id === id);
         if (report) {
