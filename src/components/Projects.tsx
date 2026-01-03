@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import type { Project, User, Report, Ptw, Inspection } from '../types';
+import type { Project, User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -98,6 +98,65 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
         </div>
     );
 };
+
+// --- Project Card Component ---
+const ProjectCard: React.FC<{ 
+    project: Project; 
+    users: User[]; 
+    onView: () => void; // Added onView prop
+}> = ({ project, users, onView }) => {
+    const getStatusColor = (status: Project['status']): 'green' | 'yellow' | 'gray' => {
+        switch (status) { case 'active': return 'green'; case 'pending': return 'yellow'; case 'archived': return 'gray'; }
+    };
+
+    const crew = useMemo(() => users.filter(u => u.org_id === project.org_id), [users, project.org_id]);
+    const crewCounts = useMemo(() => ({
+        managers: crew.filter(c => c.role === 'HSE_MANAGER').length,
+        supervisors: crew.filter(c => c.role === 'SUPERVISOR').length,
+        officers: crew.filter(c => c.role === 'HSE_OFFICER').length,
+        inspectors: crew.filter(c => c.role === 'INSPECTOR').length,
+        workers: crew.filter(c => c.role === 'WORKER').length,
+    }), [crew]);
+
+    return (
+        <Card className="hover:shadow-lg transition-all cursor-pointer flex flex-col" onClick={onView}>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">{project.name} <span className="font-normal text-base text-gray-500">({project.code})</span></h3>
+                    <p className="text-sm text-gray-500">{project.location}</p>
+                </div>
+                <Badge color={getStatusColor(project.status)}>{project.status}</Badge>
+            </div>
+            <div className="mt-4 border-t border-gray-100 dark:border-dark-border pt-4">
+                <h4 className="text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Crew Overview</h4>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.managers}</strong> Managers</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.officers}</strong> HSE Officers</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.supervisors}</strong> Supervisors</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.inspectors}</strong> Inspectors</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded col-span-2 text-gray-700 dark:text-gray-300"><strong>{crewCounts.workers}</strong> Workers</div>
+                </div>
+            </div>
+             <div className="mt-4 border-t border-gray-100 dark:border-dark-border pt-4 grid grid-cols-3 gap-2 text-center">
+                 <div><p className="text-2xl font-bold text-gray-900 dark:text-white">82%</p><p className="text-xs text-gray-500">Training</p></div>
+                 <div><p className="text-2xl font-bold text-gray-900 dark:text-white">17</p><p className="text-xs text-gray-500">PTW Today</p></div>
+                 <div><p className="text-2xl font-bold text-green-600">0</p><p className="text-xs text-gray-500">Incidents</p></div>
+            </div>
+            <div className="mt-auto pt-4 flex justify-end">
+                <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent double triggering
+                        onView();
+                    }}
+                >
+                    View Dashboard
+                </Button>
+            </div>
+        </Card>
+    );
+}
 
 // --- Project Detail View ---
 const ProjectDetail: React.FC<{ 
@@ -236,7 +295,7 @@ const ProjectDetail: React.FC<{
                 <Card>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">Project Team</h3>
-                        <Button size="sm" leftIcon={<Plus className="w-4 h-4"/>}>Add Member</Button>
+                        <Button size="sm" leftIcon={<Plus className="w-4 h-4"/>}>Invite Member</Button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
@@ -351,31 +410,12 @@ export const Projects: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {orgProjects.map(project => (
-              <Card key={project.id} className="hover:shadow-lg transition-all cursor-pointer" onClick={() => setSelectedProject(project)}>
-                  <div className="flex justify-between items-start mb-4">
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                          <Briefcase className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <Badge color={project.status === 'active' ? 'green' : 'gray'}>{project.status}</Badge>
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{project.name}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{project.code}</p>
-                  
-                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-300">
-                      <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-gray-400" />
-                          {project.location}
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          {new Date(project.start_date).toLocaleDateString()} - {new Date(project.finish_date).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-gray-400" />
-                          Manager: {usersList.find(u => u.id === project.manager_id)?.name || 'Unassigned'}
-                      </div>
-                  </div>
-              </Card>
+              <ProjectCard 
+                key={project.id} 
+                project={project} 
+                users={usersList} 
+                onView={() => setSelectedProject(project)} // Pass the handler here
+              />
           ))}
       </div>
       
