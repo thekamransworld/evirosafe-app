@@ -3,14 +3,16 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Initialize Gemini
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// --- FIX: Use 'gemini-pro' which is the stable standard model ---
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
-// --- 1. GENERIC RESPONSE (Fixes build error) ---
+// --- 1. GENERIC RESPONSE ---
 export const generateResponse = async (prompt: string) => {
   if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY.";
   try {
@@ -18,7 +20,7 @@ export const generateResponse = async (prompt: string) => {
     return result.response.text();
   } catch (error) {
     console.error("AI Error:", error);
-    return "Error generating response.";
+    return "Error generating response. Please check your API Key and Quota.";
   }
 };
 
@@ -157,7 +159,6 @@ export const generateAiRiskForecast = async () => {
     };
 };
 
-// Alias for backward compatibility (Fixes build error)
 export const getPredictiveInsights = generateAiRiskForecast;
 
 
