@@ -45,7 +45,7 @@ const DashboardHeader: React.FC<{ riskLevel: string; workforceCount: number; tem
                     EviroSafe 3.0
                 </div>
                 <div className="hidden md:block w-px h-4 bg-slate-700"></div>
-                <span className="text-xs text-slate-500 font-mono uppercase tracking-wider">{activeOrg.name}</span>
+                <span className="text-xs text-slate-500 font-mono uppercase tracking-wider">{activeOrg?.name || 'Organization'}</span>
             </div>
             
             <div className="flex items-center gap-6 text-xs font-medium text-slate-400">
@@ -168,20 +168,26 @@ const WidgetCard: React.FC<{ title: string; children: React.ReactNode; className
 );
 
 export const Dashboard: React.FC = () => {
+    // FIX: Separate contexts to avoid undefined errors
     const { reportList, ptwList } = useDataContext();
-    const { usersList, setCurrentView } = useAppContext(); // <--- FIXED: usersList from AppContext
+    const { usersList, setCurrentView } = useAppContext(); 
     const { setIsReportCreationModalOpen, setIsTbtCreationModalOpen, setSelectedReport, setIsInspectionCreationModalOpen } = useModalContext();
     
     const [isSafetyPulseModalOpen, setIsSafetyPulseModalOpen] = useState(false);
     const [simulatedTemp, setSimulatedTemp] = useState(38);
 
     // --- REAL DATA CALCULATIONS ---
-    const activePermits = useMemo(() => ptwList.filter(p => p.status === 'ACTIVE').length, [ptwList]);
-    const pendingReports = useMemo(() => reportList.filter(r => r.status === 'under_review' || r.status === 'submitted'), [reportList]);
+    // Safety check: Ensure lists are arrays
+    const safePtwList = ptwList || [];
+    const safeReportList = reportList || [];
+    const safeUsersList = usersList || [];
+
+    const activePermits = useMemo(() => safePtwList.filter(p => p.status === 'ACTIVE').length, [safePtwList]);
+    const pendingReports = useMemo(() => safeReportList.filter(r => r.status === 'under_review' || r.status === 'submitted'), [safeReportList]);
     
     // Calculate Risk Level based on Open Incidents
     const riskAnalysis = useMemo(() => {
-        const openIncidents = reportList.filter(r => r.status !== 'closed');
+        const openIncidents = safeReportList.filter(r => r.status !== 'closed');
         const criticalCount = openIncidents.filter(r => (r.risk_pre_control.severity * r.risk_pre_control.likelihood) >= 15).length;
         const highCount = openIncidents.filter(r => (r.risk_pre_control.severity * r.risk_pre_control.likelihood) >= 9).length;
 
@@ -189,19 +195,18 @@ export const Dashboard: React.FC = () => {
         if (highCount > 0) return { level: 'High', summary: `${highCount} High Risk Incidents Open. Monitor closely.` };
         if (openIncidents.length > 5) return { level: 'Medium', summary: 'Multiple open reports. Review control measures.' };
         return { level: 'Low', summary: 'Site operations are stable. No major incidents.' };
-    }, [reportList]);
+    }, [safeReportList]);
 
     // Calculate Stats for Pulse Widget
     const pulseStats = useMemo(() => ({
-        incidents: reportList.filter(r => ['Incident', 'Accident', 'Fire Event'].includes(r.type)).length,
-        unsafeActs: reportList.filter(r => r.type === 'Unsafe Act').length,
-        unsafeConditions: reportList.filter(r => r.type === 'Unsafe Condition').length,
-        positiveObs: reportList.filter(r => r.type === 'Positive Observation').length,
-    }), [reportList]);
+        incidents: safeReportList.filter(r => ['Incident', 'Accident', 'Fire Event'].includes(r.type)).length,
+        unsafeActs: safeReportList.filter(r => r.type === 'Unsafe Act').length,
+        unsafeConditions: safeReportList.filter(r => r.type === 'Unsafe Condition').length,
+        positiveObs: safeReportList.filter(r => r.type === 'Positive Observation').length,
+    }), [safeReportList]);
 
     // Estimate Workforce (Users + 4 workers per active permit)
-    // FIX: Added safety check for usersList
-    const workforceCount = (usersList?.length || 0) + (activePermits * 4);
+    const workforceCount = safeUsersList.length + (activePermits * 4);
 
     // Recommendations based on Risk
     const recommendations = useMemo(() => {
