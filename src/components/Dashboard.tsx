@@ -80,6 +80,7 @@ const RiskLevelCard: React.FC<{
     const baseClass = "rounded-3xl p-6 text-slate-100 transition-all duration-300 shadow-[0_18px_45px_rgba(0,0,0,0.55)]";
     const themeClass = isHighRisk ? "hero-card-high" : "hero-card-normal";
     
+    // CRITICAL FIX: Ensure recommendations is an array
     const safeRecs = Array.isArray(recommendations) ? recommendations : [];
 
     return (
@@ -178,6 +179,7 @@ export const Dashboard: React.FC = () => {
     const [simulatedTemp, setSimulatedTemp] = useState(38);
 
     // --- REAL DATA CALCULATIONS ---
+    // CRITICAL FIX: Ensure lists are arrays
     const safePtwList = Array.isArray(ptwList) ? ptwList : [];
     const safeReportList = Array.isArray(reportList) ? reportList : [];
     const safeUsersList = Array.isArray(usersList) ? usersList : [];
@@ -185,6 +187,7 @@ export const Dashboard: React.FC = () => {
     const activePermits = useMemo(() => safePtwList.filter(p => p.status === 'ACTIVE').length, [safePtwList]);
     const pendingReports = useMemo(() => safeReportList.filter(r => r.status === 'under_review' || r.status === 'submitted'), [safeReportList]);
     
+    // Calculate Risk Level based on Open Incidents
     const riskAnalysis = useMemo(() => {
         const openIncidents = safeReportList.filter(r => r.status !== 'closed');
         const criticalCount = openIncidents.filter(r => (r.risk_pre_control.severity * r.risk_pre_control.likelihood) >= 15).length;
@@ -196,6 +199,7 @@ export const Dashboard: React.FC = () => {
         return { level: 'Low', summary: 'Site operations are stable. No major incidents.' };
     }, [safeReportList]);
 
+    // Calculate Stats for Pulse Widget
     const pulseStats = useMemo(() => ({
         incidents: safeReportList.filter(r => ['Incident', 'Accident', 'Fire Event'].includes(r.type)).length,
         unsafeActs: safeReportList.filter(r => r.type === 'Unsafe Act').length,
@@ -203,14 +207,17 @@ export const Dashboard: React.FC = () => {
         positiveObs: safeReportList.filter(r => r.type === 'Positive Observation').length,
     }), [safeReportList]);
 
+    // Estimate Workforce (Users + 4 workers per active permit)
     const workforceCount = safeUsersList.length + (activePermits * 4);
 
+    // Recommendations based on Risk
     const recommendations = useMemo(() => {
         if (riskAnalysis.level === 'Critical') return ['Stop work in affected areas', 'Conduct emergency meeting', 'Review all active permits'];
         if (riskAnalysis.level === 'High') return ['Increase inspection frequency', 'Verify all PTW controls', 'Conduct TBT on recent incidents'];
         return ['Maintain housekeeping standards', 'Ensure hydration breaks', 'Routine equipment checks'];
     }, [riskAnalysis.level]);
 
+    // Simulate temp fluctuation
     useEffect(() => {
         const interval = setInterval(() => {
             setSimulatedTemp(prev => parseFloat((prev + (Math.random() > 0.5 ? 0.1 : -0.1)).toFixed(1)));
@@ -222,6 +229,7 @@ export const Dashboard: React.FC = () => {
         <div className="dashboard-bg">
             <DashboardHeader riskLevel={riskAnalysis.level} workforceCount={workforceCount} temperature={simulatedTemp} />
 
+            {/* ROW 1: HERO & ACTIONS */}
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 mb-6">
                 <div className="xl:col-span-8">
                     <RiskLevelCard 
@@ -264,7 +272,8 @@ export const Dashboard: React.FC = () => {
                                         <span className="text-xs font-bold text-slate-200 group-hover:text-white">{r.type}</span>
                                         <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">Pending</span>
                                     </div>
-                                    <p className="text-[10px] text-slate-500 mt-1 truncate">#{r.id.slice(-6)} • {new Date(r.reported_at).toLocaleDateString()}</p>
+                                    {/* CRITICAL FIX: Safe ID slicing */}
+                                    <p className="text-[10px] text-slate-500 mt-1 truncate">#{r.id ? r.id.slice(-6) : '???'} • {new Date(r.reported_at).toLocaleDateString()}</p>
                                 </button>
                             )) : (
                                 <p className="text-xs text-slate-600 italic text-center py-4">All clear. No pending items.</p>
@@ -274,6 +283,7 @@ export const Dashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* ROW 2: SITE TWIN & ENVIRONMENT */}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
                 <div className="xl:col-span-2 h-96">
                     <WidgetCard title="3D Site Digital Twin" className="h-full p-0 overflow-hidden relative group">
@@ -334,6 +344,7 @@ export const Dashboard: React.FC = () => {
                 </div>
             </div>
 
+            {/* ROW 3: SAFETY PULSE */}
             <div className="h-80">
                  <SafetyPulseWidget onExpand={() => setIsSafetyPulseModalOpen(true)} stats={pulseStats} />
             </div>
