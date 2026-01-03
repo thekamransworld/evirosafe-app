@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
@@ -28,7 +28,7 @@ import { Settings } from './components/Settings';
 import { SiteMap } from './components/SiteMap';
 import { Housekeeping } from './components/Housekeeping';
 import { CertifiedProfile } from './components/CertifiedProfile';
-import { HseStatistics } from './components/HseStatistics'; // <--- NEW IMPORT
+import { HseStatistics } from './components/HseStatistics';
 
 // --- Import Modals ---
 import { ReportCreationModal } from './components/ReportCreationModal';
@@ -52,52 +52,73 @@ import { InspectionConductModal } from './components/InspectionConductModal';
 import { ChecklistRunModal } from './components/ChecklistRunModal';
 import { ChecklistDetailModal } from './components/ChecklistDetailModal';
 
-
-// --- Auth Sync ---
+// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
   const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!currentUser) {
       logout();
       return;
     }
+
     const uid = currentUser.uid;
     const email = currentUser.email || `user-${uid.slice(0, 6)}@evirosafe.local`;
     const displayName = currentUser.displayName || email.split('@')[0];
 
+    // Ensure user exists in local state
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
+
       const template = prev[0] || {
-        id: uid, org_id: activeOrg?.id || 'org1', email, name: displayName, avatar_url: '', role: 'ADMIN', status: 'active',
-        preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } }
+        id: uid,
+        org_id: activeOrg?.id || 'org1',
+        email,
+        name: displayName,
+        avatar_url: '',
+        role: 'ADMIN',
+        status: 'active',
+        preferences: {
+          language: 'en',
+          default_view: 'dashboard',
+          units: { temperature: 'C', distance: 'km', weight: 'kg' },
+          notifications: { email: true, push: true, sms: false },
+          date_format: 'DD/MM/YYYY',
+          time_format: '24h',
+          theme: 'system'
+        }
       };
-      return [{ ...template, id: uid, org_id: activeOrg?.id || template.org_id, email, name: displayName, status: 'active' }, ...prev];
+
+      const newUser = {
+        ...template,
+        id: uid,
+        org_id: activeOrg?.id || template.org_id,
+        email,
+        name: displayName,
+        status: 'active'
+      };
+
+      return [newUser, ...prev];
     });
+
+    // Force login to set activeUser
     login(uid);
   }, [currentUser, activeOrg?.id]);
 
   return null;
 };
 
-// --- Global Modals ---
+// --- Global Modals Component ---
 const GlobalModals = () => {
   const { activeUser } = useAppContext();
   const {
-    isReportCreationModalOpen, setIsReportCreationModalOpen,
-    selectedReport, setSelectedReport, reportInitialData,
-    isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode,
-    selectedPtw, setSelectedPtw,
-    isPlanCreationModalOpen, setIsPlanCreationModalOpen,
-    selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit,
-    isRamsCreationModalOpen, setIsRamsCreationModalOpen,
-    selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit,
-    isTbtCreationModalOpen, setIsTbtCreationModalOpen,
-    selectedTbt, setSelectedTbt,
-    isCourseModalOpen, setCourseModalOpen,
-    isSessionModalOpen, setSessionModalOpen,
-    isAttendanceModalOpen, setAttendanceModalOpen,
+    isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
+    isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
+    isPlanCreationModalOpen, setIsPlanCreationModalOpen, selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit,
+    isRamsCreationModalOpen, setIsRamsCreationModalOpen, selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit,
+    isTbtCreationModalOpen, setIsTbtCreationModalOpen, selectedTbt, setSelectedTbt,
+    isCourseModalOpen, setCourseModalOpen, isSessionModalOpen, setSessionModalOpen, isAttendanceModalOpen, setAttendanceModalOpen,
     courseForSession, sessionForAttendance,
     isActionCreationModalOpen, setIsActionCreationModalOpen,
     isInspectionCreationModalOpen, setIsInspectionCreationModalOpen
@@ -118,169 +139,76 @@ const GlobalModals = () => {
 
   return (
     <>
-      <ReportCreationModal
-        isOpen={isReportCreationModalOpen}
-        onClose={() => setIsReportCreationModalOpen(false)}
-        initialData={reportInitialData}
-      />
-      {selectedReport && (
-        <ReportDetailModal
-          report={selectedReport}
-          users={usersList}
-          activeUser={activeUser}
-          onClose={() => setSelectedReport(null)}
-          onStatusChange={handleStatusChange}
-          onCapaActionChange={handleCapaActionChange}
-          onAcknowledgeReport={handleAcknowledgeReport}
-        />
-      )}
-      <PtwCreationModal
-        isOpen={isPtwCreationModalOpen}
-        onClose={() => setIsPtwCreationModalOpen(false)}
-        onSubmit={handleCreatePtw}
-        mode={ptwCreationMode}
-      />
-      {selectedPtw && (
-        <PtwDetailModal
-          ptw={selectedPtw}
-          onClose={() => setSelectedPtw(null)}
-          onUpdate={handleUpdatePtw}
-        />
-      )}
-      <PlanCreationModal
-        isOpen={isPlanCreationModalOpen}
-        onClose={() => setIsPlanCreationModalOpen(false)}
-        onSubmit={handleCreatePlan}
-        projects={projects}
-      />
-      {selectedPlan && (
-        <PlanDetailModal
-          plan={selectedPlan}
-          onClose={() => setSelectedPlan(null)}
-          onStatusChange={handlePlanStatusChange}
-        />
-      )}
-      {selectedPlanForEdit && (
-        <PlanEditorModal
-          plan={selectedPlanForEdit}
-          onClose={() => setSelectedPlanForEdit(null)}
-          onSave={handleUpdatePlan}
-          onSubmitForReview={handlePlanStatusChange}
-        />
-      )}
-      <RamsCreationModal
-        isOpen={isRamsCreationModalOpen}
-        onClose={() => setIsRamsCreationModalOpen(false)}
-        onSubmit={handleCreateRams}
-        projects={projects}
-        activeUser={activeUser}
-      />
-      {selectedRams && (
-        <RamsDetailModal
-          rams={selectedRams}
-          onClose={() => setSelectedRams(null)}
-          onStatusChange={handleRamsStatusChange}
-        />
-      )}
-      {selectedRamsForEdit && (
-        <RamsEditorModal
-          rams={selectedRamsForEdit}
-          onClose={() => setSelectedRamsForEdit(null)}
-          onSave={handleUpdateRams}
-          onSubmitForReview={handleRamsStatusChange}
-        />
-      )}
-      <TbtCreationModal
-        isOpen={isTbtCreationModalOpen}
-        onClose={() => setIsTbtCreationModalOpen(false)}
-        onSubmit={handleCreateTbt}
-        projects={projects}
-        activeUser={activeUser}
-      />
-      {selectedTbt && (
-        <TbtSessionModal
-          session={selectedTbt}
-          onClose={() => setSelectedTbt(null)}
-          onUpdate={handleUpdateTbt}
-          users={usersList}
-        />
-      )}
-      <TrainingCourseModal
-        isOpen={isCourseModalOpen}
-        onClose={() => setCourseModalOpen(false)}
-        courses={trainingCourseList}
-        onUpdateCourse={handleCreateOrUpdateCourse}
-      />
-      {courseForSession && (
-        <TrainingSessionModal
-          isOpen={isSessionModalOpen}
-          onClose={() => setSessionModalOpen(false)}
-          onSubmit={handleScheduleSession}
-          course={courseForSession}
-          projects={projects}
-          users={usersList}
-        />
-      )}
-      {sessionForAttendance && (
-        <SessionAttendanceModal
-          isOpen={isAttendanceModalOpen}
-          onClose={() => setAttendanceModalOpen(false)}
-          onSubmit={handleCloseSession}
-          session={sessionForAttendance}
-          users={usersList}
-        />
-      )}
-      
-      <ActionCreationModal
-        isOpen={isActionCreationModalOpen}
-        onClose={() => setIsActionCreationModalOpen(false)}
-        onSubmit={handleCreateStandaloneAction}
-        users={usersList}
-        projects={projects}
-      />
-
-      <InspectionCreationModal
-        isOpen={isInspectionCreationModalOpen}
-        onClose={() => setIsInspectionCreationModalOpen(false)}
-        onSubmit={handleCreateInspection}
-        projects={projects}
-        users={usersList}
-        checklistTemplates={checklistTemplates}
-      />
+      <ReportCreationModal isOpen={isReportCreationModalOpen} onClose={() => setIsReportCreationModalOpen(false)} initialData={reportInitialData} />
+      {selectedReport && <ReportDetailModal report={selectedReport} users={usersList} activeUser={activeUser} onClose={() => setSelectedReport(null)} onStatusChange={handleStatusChange} onCapaActionChange={handleCapaActionChange} onAcknowledgeReport={handleAcknowledgeReport} />}
+      <PtwCreationModal isOpen={isPtwCreationModalOpen} onClose={() => setIsPtwCreationModalOpen(false)} onSubmit={handleCreatePtw} mode={ptwCreationMode} />
+      {selectedPtw && <PtwDetailModal ptw={selectedPtw} onClose={() => setSelectedPtw(null)} onUpdate={handleUpdatePtw} />}
+      <PlanCreationModal isOpen={isPlanCreationModalOpen} onClose={() => setIsPlanCreationModalOpen(false)} onSubmit={handleCreatePlan} projects={projects} />
+      {selectedPlan && <PlanDetailModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onStatusChange={handlePlanStatusChange} />}
+      {selectedPlanForEdit && <PlanEditorModal plan={selectedPlanForEdit} onClose={() => setSelectedPlanForEdit(null)} onSave={handleUpdatePlan} onSubmitForReview={handlePlanStatusChange} />}
+      <RamsCreationModal isOpen={isRamsCreationModalOpen} onClose={() => setIsRamsCreationModalOpen(false)} onSubmit={handleCreateRams} projects={projects} activeUser={activeUser} />
+      {selectedRams && <RamsDetailModal rams={selectedRams} onClose={() => setSelectedRams(null)} onStatusChange={handleRamsStatusChange} />}
+      {selectedRamsForEdit && <RamsEditorModal rams={selectedRamsForEdit} onClose={() => setSelectedRamsForEdit(null)} onSave={handleUpdateRams} onSubmitForReview={handleRamsStatusChange} />}
+      <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={activeUser} />
+      {selectedTbt && <TbtSessionModal session={selectedTbt} onClose={() => setSelectedTbt(null)} onUpdate={handleUpdateTbt} users={usersList} />}
+      <TrainingCourseModal isOpen={isCourseModalOpen} onClose={() => setCourseModalOpen(false)} courses={trainingCourseList} onUpdateCourse={handleCreateOrUpdateCourse} />
+      {courseForSession && <TrainingSessionModal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} onSubmit={handleScheduleSession} course={courseForSession} projects={projects} users={usersList} />}
+      {sessionForAttendance && <SessionAttendanceModal isOpen={isAttendanceModalOpen} onClose={() => setAttendanceModalOpen(false)} onSubmit={handleCloseSession} session={sessionForAttendance} users={usersList} />}
+      <ActionCreationModal isOpen={isActionCreationModalOpen} onClose={() => setIsActionCreationModalOpen(false)} onSubmit={handleCreateStandaloneAction} users={usersList} projects={projects} />
+      <InspectionCreationModal isOpen={isInspectionCreationModalOpen} onClose={() => setIsInspectionCreationModalOpen(false)} onSubmit={handleCreateInspection} projects={projects} users={usersList} checklistTemplates={checklistTemplates} />
     </>
   );
 };
 
-// --- App Content ---
+// --- Main App Content ---
 const AppContent = () => {
   const { currentView, setCurrentView, activeUser, isLoading } = useAppContext();
   const { currentUser } = useAuth();
-  const { projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList } = useDataContext();
+
+  const {
+    projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
+  } = useDataContext();
+
   const {
     setSelectedPlan, setSelectedPlanForEdit, setIsPlanCreationModalOpen,
     setSelectedRams, setSelectedRamsForEdit, setIsRamsCreationModalOpen,
     setCourseModalOpen, setSessionModalOpen, setCourseForSession, setAttendanceModalOpen, setSessionForAttendance,
-    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw
+    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw,
   } = useModalContext();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  if (!currentUser) return <LoginScreen />;
-  if (isLoading) return <div className="flex h-screen items-center justify-center bg-slate-900 text-white">Loading EviroSafe...</div>;
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
+  if (isLoading)
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-white">
+        Loading EviroSafe...
+      </div>
+    );
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 transition-all duration-300">
-      <Sidebar currentView={currentView} setCurrentView={setCurrentView} isOpen={sidebarOpen} setOpen={setSidebarOpen} />
+      <Sidebar
+        currentView={currentView}
+        setCurrentView={setCurrentView}
+        isOpen={sidebarOpen}
+        setOpen={setSidebarOpen}
+      />
+
       <main className="flex-1 min-h-screen flex flex-col transition-all duration-300">
         <DemoBanner />
         <div className="flex-1 p-8 overflow-y-auto">
           {currentView === 'dashboard' && <Dashboard />}
-          {currentView === 'hse-statistics' && <HseStatistics />} {/* <--- ADDED THIS */}
           {currentView === 'site-map' && <div className="h-[calc(100vh-8rem)]"><SiteMap /></div>}
           {currentView === 'reports' && <Reports />}
           {currentView === 'ptw' && (
             <Ptw
-              ptws={ptwList} users={[]} projects={projects}
+              ptws={ptwList}
+              users={[]}
+              projects={projects}
               onCreatePtw={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }}
               onAddExistingPtw={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}
               onSelectPtw={setSelectedPtw}
@@ -304,8 +232,11 @@ const AppContent = () => {
           {currentView === 'tbt' && <Tbt />}
           {currentView === 'training' && (
             <Trainings
-              courses={trainingCourseList} records={trainingRecordList} sessions={trainingSessionList}
-              users={[]} projects={projects}
+              courses={trainingCourseList}
+              records={trainingRecordList}
+              sessions={trainingSessionList}
+              users={[]}
+              projects={projects}
               onManageCourses={() => setCourseModalOpen(true)}
               onScheduleSession={(course) => { setCourseForSession(course); setSessionModalOpen(true); }}
               onManageAttendance={(session) => { setSessionForAttendance(session); setAttendanceModalOpen(true); }}
@@ -320,6 +251,7 @@ const AppContent = () => {
           {currentView === 'settings' && <Settings />}
           {currentView === 'housekeeping' && <Housekeeping />}
           {currentView === 'certification' && <CertifiedProfile />}
+          {currentView === 'hse-statistics' && <HseStatistics />}
         </div>
       </main>
       <GlobalModals />

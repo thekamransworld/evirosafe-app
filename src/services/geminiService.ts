@@ -4,8 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use 'gemini-1.5-flash' (Most stable & free tier friendly) ---
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// --- FIX: Use 'gemini-pro' (Standard Model) ---
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
@@ -14,13 +14,12 @@ const cleanJson = (text: string) => {
 
 // --- 1. GENERIC RESPONSE ---
 export const generateResponse = async (prompt: string) => {
-  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY in .env.local";
+  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY.";
   try {
     const result = await model.generateContent(prompt);
     return result.response.text();
-  } catch (error: any) {
+  } catch (error) {
     console.error("AI Error:", error);
-    if (error.message?.includes("404")) return "Error: Model not found. Check API Key permissions.";
     return "Error generating response. Please check your API Key.";
   }
 };
