@@ -9,6 +9,7 @@ import {
     AlertTriangle, FileText, CheckSquare, ArrowLeft, 
     Plus, Settings, MoreVertical 
 } from 'lucide-react';
+import { roles } from '../config';
 
 // --- Project Creation/Edit Modal ---
 interface ProjectModalProps {
@@ -99,11 +100,55 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
     );
 };
 
+// --- Invite Member Modal ---
+const InviteMemberModal: React.FC<{ isOpen: boolean; onClose: () => void; onInvite: (data: any) => void }> = ({ isOpen, onClose, onInvite }) => {
+    const [formData, setFormData] = useState({ name: '', email: '', role: 'WORKER' });
+
+    const handleSubmit = () => {
+        if (!formData.name || !formData.email) return;
+        onInvite(formData);
+        setFormData({ name: '', email: '', role: 'WORKER' });
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-dark-border" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b dark:border-dark-border">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite Team Member</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="John Doe" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
+                        <input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="john@company.com" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                        <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
+                            {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end space-x-3 border-t dark:border-dark-border rounded-b-xl">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Send Invite</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- Project Card Component ---
 const ProjectCard: React.FC<{ 
     project: Project; 
     users: User[]; 
-    onView: () => void; // Added onView prop
+    onView: () => void; 
 }> = ({ project, users, onView }) => {
     const getStatusColor = (status: Project['status']): 'green' | 'yellow' | 'gray' => {
         switch (status) { case 'active': return 'green'; case 'pending': return 'yellow'; case 'archived': return 'gray'; }
@@ -147,7 +192,7 @@ const ProjectCard: React.FC<{
                     variant="secondary" 
                     size="sm" 
                     onClick={(e) => {
-                        e.stopPropagation(); // Prevent double triggering
+                        e.stopPropagation(); 
                         onView();
                     }}
                 >
@@ -164,16 +209,17 @@ const ProjectDetail: React.FC<{
     onBack: () => void; 
     onEdit: () => void;
 }> = ({ project, onBack, onEdit }) => {
-    const { usersList } = useAppContext();
+    const { usersList, handleInviteUser, activeOrg } = useAppContext();
     const { reportList, ptwList, inspectionList } = useDataContext();
     const [activeTab, setActiveTab] = useState<'Overview' | 'Team' | 'Activities'>('Overview');
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
     // Filter data for this project
     const projectReports = reportList.filter(r => r.project_id === project.id);
     const projectPtws = ptwList.filter(p => p.project_id === project.id);
     const projectInspections = inspectionList.filter(i => i.project_id === project.id);
     
-    // Mock Team (In real app, filter by project assignment)
+    // Filter users belonging to the same organization as the project
     const team = usersList.filter(u => u.org_id === project.org_id); 
 
     const stats = {
@@ -181,6 +227,13 @@ const ProjectDetail: React.FC<{
         activePermits: projectPtws.filter(p => p.status === 'ACTIVE').length,
         openIncidents: projectReports.filter(r => r.status !== 'closed').length,
         inspectionsDone: projectInspections.filter(i => i.status === 'Closed' || i.status === 'Approved').length
+    };
+
+    const handleInvite = (data: any) => {
+        handleInviteUser({
+            ...data,
+            org_id: activeOrg.id
+        });
     };
 
     return (
@@ -295,7 +348,7 @@ const ProjectDetail: React.FC<{
                 <Card>
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">Project Team</h3>
-                        <Button size="sm" leftIcon={<Plus className="w-4 h-4"/>}>Invite Member</Button>
+                        <Button size="sm" leftIcon={<Plus className="w-4 h-4"/>} onClick={() => setIsInviteModalOpen(true)}>Invite Member</Button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
@@ -346,6 +399,12 @@ const ProjectDetail: React.FC<{
                     <p>Activity timeline coming soon.</p>
                 </div>
             )}
+
+            <InviteMemberModal 
+                isOpen={isInviteModalOpen} 
+                onClose={() => setIsInviteModalOpen(false)} 
+                onInvite={handleInvite} 
+            />
         </div>
     );
 };
@@ -414,7 +473,7 @@ export const Projects: React.FC = () => {
                 key={project.id} 
                 project={project} 
                 users={usersList} 
-                onView={() => setSelectedProject(project)} // Pass the handler here
+                onView={() => setSelectedProject(project)} 
               />
           ))}
       </div>
