@@ -4,8 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use 'gemini-pro' which is the stable standard model ---
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+// --- FIX: Use 'gemini-1.5-flash' (Most stable & free tier friendly) ---
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
@@ -14,13 +14,14 @@ const cleanJson = (text: string) => {
 
 // --- 1. GENERIC RESPONSE ---
 export const generateResponse = async (prompt: string) => {
-  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY.";
+  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY in .env.local";
   try {
     const result = await model.generateContent(prompt);
     return result.response.text();
-  } catch (error) {
+  } catch (error: any) {
     console.error("AI Error:", error);
-    return "Error generating response. Please check your API Key and Quota.";
+    if (error.message?.includes("404")) return "Error: Model not found. Check API Key permissions.";
+    return "Error generating response. Please check your API Key.";
   }
 };
 
@@ -160,7 +161,6 @@ export const generateAiRiskForecast = async () => {
 };
 
 export const getPredictiveInsights = generateAiRiskForecast;
-
 
 // --- FALLBACK MOCKS ---
 const mockSafetyReport = (prompt: string) => ({
