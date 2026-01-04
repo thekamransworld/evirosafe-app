@@ -266,8 +266,8 @@ export const Dashboard: React.FC = () => {
                             <span className="text-sky-400">{pendingReports.length}</span>
                         </h2>
                         <div className="space-y-2 flex-1 overflow-y-auto pr-1 custom-scrollbar">
-                            {pendingReports.length > 0 ? pendingReports.slice(0, 3).map(r => (
-                                <button key={r.id} onClick={() => setSelectedReport(r)} className="w-full text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group">
+                            {pendingReports.length > 0 ? pendingReports.slice(0, 3).map((r, idx) => (
+                                <button key={r.id || idx} onClick={() => setSelectedReport(r)} className="w-full text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group">
                                     <div className="flex justify-between items-start">
                                         <span className="text-xs font-bold text-slate-200 group-hover:text-white">{r.type}</span>
                                         <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">Pending</span>
