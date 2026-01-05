@@ -54,8 +54,8 @@ export class PtwWorkflowEngine {
   static validateRolePermission(
     currentStage: PtwWorkflowStage,
     userRole: string,
-    userId: string,
-    ptw: Ptw
+    _userId: string,
+    _ptw: Ptw
   ): { allowed: boolean; message: string } {
     // In a real app, you'd check against ptw.roles.issuer_id etc.
     // For demo purposes, we check roles generally

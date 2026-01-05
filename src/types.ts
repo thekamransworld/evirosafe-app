@@ -39,6 +39,7 @@ export interface User {
       weight: 'kg' | 'lbs';
     };
   };
+  project_ids?: string[]; // Added to support project assignment
 }
 
 export interface Project {
@@ -52,6 +53,10 @@ export interface Project {
   finish_date: string;
   manager_id: string;
   type: string;
+  safety_score?: number;
+  progress?: number;
+  budget?: number;
+  budget_spent?: number;
 }
 
 // UPDATED RESOURCE TYPE
@@ -77,7 +82,7 @@ export type Resource =
   | 'actions' 
   | 'site-map' 
   | 'certification'
-  | 'hse-statistics'; // <--- ADDED THIS
+  | 'hse-statistics';
 
 export type View = Resource | 'ai-insights';
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
@@ -216,6 +221,7 @@ export interface Report {
     details: ReportDetails;
     identification?: { was_fire: boolean; was_injury: boolean; was_environment: boolean; };
     classification_codes?: string[];
+    created_at?: string;
 }
 
 // Inspection types
@@ -248,13 +254,14 @@ export interface Inspection {
     findings: InspectionFinding[];
     overall_comments?: string;
     audit_trail: AuditLogEntry[];
+    inspection_id?: string;
 }
 
 // Checklist types
-export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; }
-export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; }
+export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
+export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
-export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
+export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score: number; results: ChecklistRunResult[]; }
 
 // Plan types
 export type PlanStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
@@ -321,7 +328,8 @@ export interface TrainingRecord { id: string; org_id: string; user_id: string; c
 
 // PTW Types
 export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work';
-export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED';
+export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED';
+
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
 export interface PtwSafetyRequirement { id: string; text: string; response: 'Yes' | 'No' | 'N/A'; is_critical?: boolean; comment?: string; evidence_urls?: string[]; }
 export interface PtwSignature { signature: string; signed_at: string; }
@@ -347,14 +355,57 @@ export interface PersonnelEntryLogEntry { name: string; time_in: string; time_ou
 export interface PtwConfinedSpacePayload extends CanonicalPtwPayload { gas_tests: GasTestLogEntry[]; entry_log: PersonnelEntryLogEntry[]; }
 export interface PtwExcavationPayload extends CanonicalPtwPayload { soil_type: 'A' | 'B' | 'C'; cave_in_protection: any[]; }
 export interface PtwRoadClosurePayload extends CanonicalPtwPayload { closure_type: 'full' | 'partial' | 'rolling'; }
-export interface PtwLiftingPayload extends CanonicalPtwPayload { load_calculation: { load_weight: number; crane_capacity: number; utilization_percent: number; hook_rigging_weight?: number; crane_capacity_at_radius?: number; total_weight?: number; }; equipment_details?: { crane_reg_no: string; crane_capacity: number; operator_name: string; rigger_name: string; }; }
+export interface PtwLiftingPayload extends CanonicalPtwPayload { load_calculation: { load_weight: number; crane_capacity: number; utilization_percent: number; hook_rigging_weight?: number; crane_capacity_at_radius?: number; total_weight?: number; lift_plan_ref?: string; boom_length?: number; max_working_radius?: number; }; equipment_details?: { crane_reg_no: string; crane_capacity: number; operator_name: string; rigger_name: string; }; }
 export interface PtwNightWorkPayload extends CanonicalPtwPayload {}
 export interface PtwElectricalWorkPayload extends CanonicalPtwPayload {}
 export interface PtwUtilityWorkPayload extends CanonicalPtwPayload {}
 export interface PtwGeneralWorkPayload extends CanonicalPtwPayload {}
 
 export type PtwPayload = CanonicalPtwPayload | PtwHotWorkPayload | PtwWorkAtHeightPayload | PtwConfinedSpacePayload | PtwExcavationPayload | PtwRoadClosurePayload | PtwLiftingPayload;
-export interface Ptw { id: string; org_id: string; project_id: string; type: PtwType; status: PtwStatus; title: string; payload: PtwPayload; approvals: any[]; audit_log: AuditLogEntry[]; compliance_level?: 'FULL' | 'PARTIAL' | 'NONE'; updated_at: string; }
+
+// --- NEW TYPES FOR WORKFLOW ---
+export type PtwWorkflowStage = PtwStatus;
+
+export interface PtwWorkflowLog {
+  stage: PtwWorkflowStage;
+  action: string;
+  user_id: string;
+  timestamp: string;
+  comments?: string;
+  signoff_type?: 'digital' | 'manual';
+}
+
+export interface PtwRiskAnalysis {
+  base_score: number;
+  complexity_factor: number;
+  weather_factor: number;
+  time_factor: number;
+  total_risk_score: number;
+  risk_level: 'Low' | 'Medium' | 'High' | 'Critical';
+  auto_controls: string[];
+}
+
+export interface SimopsConflict {
+  conflicting_ptw_id: string;
+  conflict_type: 'Spatial' | 'Temporal' | 'Resource';
+  description: string;
+}
+
+export interface Ptw { 
+  id: string; 
+  org_id: string; 
+  project_id: string; 
+  type: PtwType; 
+  status: PtwStatus; 
+  title: string; 
+  payload: PtwPayload; 
+  approvals: any[]; 
+  audit_log: AuditLogEntry[]; 
+  compliance_level?: 'FULL' | 'PARTIAL' | 'NONE'; 
+  updated_at: string;
+  // Added for workflow engine
+  workflow_log?: PtwWorkflowLog[];
+}
 
 // Certification
 export type CertificationLevel = 'Beginner' | 'Competent' | 'Advanced' | 'Expert' | 'Certified Professional';

@@ -35,7 +35,7 @@ export const sendDocumentEmail = async (
   toEmail: string,
   documentTitle: string,
   documentLink: string,
-  message: string
+  _message: string // Prefixed with _ to indicate unused
 ) => {
   try {
     const templateParams = {

@@ -85,7 +85,7 @@ export const checkSimopsConflicts = (
 };
 
 // 3. Competency Check (Mock)
-export const verifyCompetency = (userId: string, role: string, ptwType: string): boolean => {
+export const verifyCompetency = (_userId: string, role: string, _ptwType: string): boolean => {
     // In a real app, check database for valid certificates
     // For demo, we assume everyone is competent except "Guest"
     return role !== 'GUEST';
