@@ -31,6 +31,7 @@ const icons: Record<string, JSX.Element> = {
   people: <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
   settings: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />,
   certification: <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+  organizations: <path d="M3 21h18v-2H3v2zm6-4h12v-2H9v2zm-6-4h18v-2H3v2zm6-4h12V7H9v2zM3 3v2h18V3H3z" />, // Simple list icon
 };
 
 const NavItem: React.FC<{
@@ -89,10 +90,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { logout, currentUser } = useAuth();
   const { notifications } = useDataContext();
-  const { activeUser } = useAppContext(); // <--- FIXED: activeUser from AppContext
+  const { activeUser } = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Calculate unread notifications for the current user
   const unreadCount = notifications.filter(n => n.user_id === activeUser?.id && !n.is_read).length;
 
   const menuItems = [
@@ -113,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { label: 'Training', view: 'training' },
     { label: 'People', view: 'people' },
     { label: 'Organizations', view: 'organizations' },
-    { label: 'Projects', view: 'projects' },
+    // Projects removed from here
     { label: 'Settings', view: 'settings' },
   ];
 
@@ -126,7 +126,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ${isOpen ? 'w-64' : 'w-20'}
       `}
     >
-      {/* Header / Logo */}
       <div
         className={`flex items-center h-16 border-b border-slate-800/60 shrink-0
           ${isOpen ? 'px-6' : 'justify-center'}
@@ -140,7 +139,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
         {menuItems.map((item) => (
           <NavItem
@@ -154,10 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ))}
       </nav>
 
-      {/* Notification & Toggle */}
       <div className="p-2 border-t border-slate-800/60 bg-slate-950/70 flex flex-col gap-2">
-        
-        {/* Notification Button */}
         <button
           onClick={() => setShowNotifications(true)}
           className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors relative"
@@ -194,7 +189,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
 
-      {/* User Footer */}
       <div
         className={`p-4 border-t border-slate-800/60 bg-slate-950/80 ${
           !isOpen && 'flex flex-col items-center'
@@ -226,7 +220,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </div>
 
-    {/* Notification Panel Overlay */}
     {showNotifications && (
         <NotificationsPanel onClose={() => setShowNotifications(false)} />
     )}

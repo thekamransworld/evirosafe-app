@@ -63,8 +63,6 @@ const complianceLabels: Array<{ key: HseComplianceKey; label: string; critical?:
   { key: 'stop_work_authority_confirmed', label: 'Stop Work Authority communicated', critical: true },
 ];
 
-const stdRefs: StdRef[] = ['ISO 45001', 'OSHA', 'ISO 14001', 'ILO', 'NFPA', 'NEOM', 'Local Regs'];
-
 // Icons
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>;
 const XMarkIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
@@ -78,7 +76,7 @@ export const InspectionCreationModal: React.FC<{
   users: User[];
   checklistTemplates: ChecklistTemplate[];
 }> = ({ isOpen, onClose, onSubmit, projects, users, checklistTemplates }) => {
-  const { language, t } = useAppContext();
+  const { language } = useAppContext();
 
   // Base form
   const [title, setTitle] = useState('');
@@ -169,11 +167,13 @@ export const InspectionCreationModal: React.FC<{
       if (!projectId) return 'Select a Project';
       if (!checklistTemplateId) return 'Select a Checklist';
       if (!scheduleAt) return 'Set a Date/Time';
+      // Note: We allow creation even if readiness isn't 100%, but warn about criticals
       if (readiness.criticalMissing.length > 0) return `${readiness.criticalMissing.length} Critical Checks Missing`;
       return 'ready';
   }, [projectId, checklistTemplateId, scheduleAt, readiness.criticalMissing]);
 
-  const canCreate = validationStatus === 'ready';
+  // Allow creation if basic fields are there, even if readiness is low (user choice, but we warn)
+  const canCreate = !!projectId && !!checklistTemplateId && !!scheduleAt;
 
   const toggleArray = (arr: string[], v: string) => (arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
 
@@ -210,18 +210,14 @@ export const InspectionCreationModal: React.FC<{
 
     const finalTitle = title.trim() || autoTitle;
 
-    // Fake uploading for demo (In real app, use storageService)
+    // Fake uploading for demo
     const fakeUrls = evidenceFiles.map(() => `https://source.unsplash.com/random/200x200?sig=${Math.random()}`);
 
     const meta = [
-      `Scope / Location: ${locationArea || 'N/A'}`,
+      `Scope: ${locationArea || 'N/A'}`,
       `Contractor: ${contractorName || 'N/A'}`,
-      `Frequency: ${frequency}`,
       `Standards: ${selectedStandards.join(', ')}`,
-      `Pre-brief: ${preInspectionBriefing || 'N/A'}`,
-      `PPE: ${ppeRequirements || 'N/A'}`,
-      `Readiness Score: ${readiness.score}%`,
-      `Evidence Count: ${evidenceFiles.length}`,
+      `Readiness: ${readiness.score}%`,
     ].join('\n');
 
     const newInspection = {
@@ -236,11 +232,10 @@ export const InspectionCreationModal: React.FC<{
       observers,
       findings: [],
       overall_comments: meta,
-      // @ts-ignore
-      hse_compliance: hseCompliance,
       evidence_urls: fakeUrls,
     };
 
+    // @ts-ignore
     onSubmit(newInspection);
     onClose();
   };
@@ -249,16 +244,16 @@ export const InspectionCreationModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-dark-card w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="p-5 border-b dark:border-dark-border flex items-start justify-between shrink-0 bg-white dark:bg-dark-card sticky top-0 z-10">
+        <div className="p-5 border-b dark:border-gray-700 flex items-start justify-between shrink-0 bg-white dark:bg-slate-900 sticky top-0 z-10">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
               Create Modern Inspection
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Planning → Readiness → Evidence → Checklist
+              Planning â†’ Readiness â†’ Evidence â†’ Checklist
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
@@ -276,7 +271,7 @@ export const InspectionCreationModal: React.FC<{
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder={autoTitle}
-                className="mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-dark-background dark:border-dark-border dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -285,7 +280,7 @@ export const InspectionCreationModal: React.FC<{
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as Inspection['type'])}
-                className="mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-dark-background dark:border-dark-border dark:text-white"
+                className="mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
               >
                 <option value="Safety">Safety</option>
                 <option value="Quality">Quality</option>
@@ -300,7 +295,7 @@ export const InspectionCreationModal: React.FC<{
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className={`mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-dark-background dark:text-white ${!projectId ? 'border-red-400 bg-red-50 dark:bg-red-900/10' : 'dark:border-dark-border'}`}
+                className={`mt-1 w-full rounded-lg border px-3 py-2.5 dark:bg-gray-800 dark:text-white ${!projectId ? 'border-red-400 bg-red-50 dark:bg-red-900/10' : 'dark:border-gray-700'}`}
               >
                 <option value="">Select project...</option>
                 {projects.map(p => (
@@ -376,7 +371,7 @@ export const InspectionCreationModal: React.FC<{
                     {evidenceFiles.map((file, i) => (
                         <div key={i} className="relative group bg-gray-100 dark:bg-white/10 p-2 rounded-lg flex items-center gap-2">
                              <div className="w-8 h-8 bg-gray-300 rounded flex-shrink-0"></div>
-                             <span className="text-xs truncate flex-1">{file.name}</span>
+                             <span className="text-xs truncate flex-1 dark:text-white">{file.name}</span>
                              <button 
                                 onClick={() => handleRemoveFile(i)}
                                 className="text-gray-400 hover:text-red-500"
@@ -398,7 +393,7 @@ export const InspectionCreationModal: React.FC<{
                   <select
                     value={checklistTemplateId}
                     onChange={(e) => setChecklistTemplateId(e.target.value)}
-                    className="mt-1 w-full rounded-lg border px-3 py-2 dark:bg-dark-background dark:border-dark-border dark:text-white"
+                    className="mt-1 w-full rounded-lg border px-3 py-2 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                   >
                     <option value="">Select checklist template</option>
                     {filteredTemplates.map(tpl => (
@@ -418,7 +413,7 @@ export const InspectionCreationModal: React.FC<{
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                                 teamMemberIds.includes(u.id)
                                 ? 'bg-emerald-600 text-white border-emerald-600'
-                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-dark-background dark:border-dark-border dark:text-gray-400'
+                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400'
                             }`}
                             >
                             {u.name}
@@ -431,15 +426,15 @@ export const InspectionCreationModal: React.FC<{
 
         </div>
 
-        <div className="p-5 border-t dark:border-dark-border bg-gray-50 dark:bg-black/20 flex items-center justify-between gap-3 shrink-0">
-          <div className="text-sm text-gray-500">
+        <div className="p-5 border-t dark:border-gray-700 bg-gray-50 dark:bg-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <div className="text-sm">
             {selectedProject ? (
-              <span className="flex items-center gap-2">
+              <span className="flex items-center gap-2 text-gray-600 dark:text-gray-300">
                   <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Linked to: <span className="font-bold text-gray-900 dark:text-white">{selectedProject.name}</span>
+                  Linked to: <span className="font-bold">{selectedProject.name}</span>
               </span>
             ) : (
-               <span className="flex items-center gap-2 text-red-500 animate-pulse">
+               <span className="flex items-center gap-2 text-red-500 animate-pulse font-bold">
                   <span className="w-2 h-2 rounded-full bg-red-500"></span>
                   Action Required: Select a Project
               </span>
@@ -448,8 +443,8 @@ export const InspectionCreationModal: React.FC<{
 
           <div className="flex gap-3 items-center">
             {!canCreate && (
-                <span className="text-xs font-bold text-red-500 mr-2">
-                    {validationStatus}
+                <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded border border-red-200 mr-2">
+                    MISSING: {validationStatus}
                 </span>
             )}
             <Button variant="secondary" onClick={onClose}>

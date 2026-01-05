@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
@@ -21,7 +21,7 @@ import { Trainings } from './components/Trainings';
 import { People } from './components/People';
 import { Roles } from './components/Roles';
 import { Organizations } from './components/Organizations';
-import { Projects } from './components/Projects';
+// Projects component is no longer needed here as it's inside Organizations
 import { Signage } from './components/Signage';
 import { AiInsights } from './components/AiInsights';
 import { Settings } from './components/Settings';
@@ -49,15 +49,13 @@ import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
-import { ChecklistRunModal } from './components/ChecklistRunModal';
-import { ChecklistDetailModal } from './components/ChecklistDetailModal';
 
-// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" ---
+// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" (demo data) ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
   const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!currentUser) {
       logout();
       return;
@@ -67,7 +65,6 @@ const AuthSync: React.FC = () => {
     const email = currentUser.email || `user-${uid.slice(0, 6)}@evirosafe.local`;
     const displayName = currentUser.displayName || email.split('@')[0];
 
-    // Ensure user exists in local state
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
 
@@ -102,7 +99,6 @@ const AuthSync: React.FC = () => {
       return [newUser, ...prev];
     });
 
-    // Force login to set activeUser
     login(uid);
   }, [currentUser, activeOrg?.id]);
 
@@ -245,7 +241,8 @@ const AppContent = () => {
           {currentView === 'people' && <People />}
           {currentView === 'roles' && <Roles roles={rolesConfig} />}
           {currentView === 'organizations' && <Organizations />}
-          {currentView === 'projects' && <Projects />}
+          {/* Fallback for old links */}
+          {currentView === 'projects' && <Organizations />} 
           {currentView === 'signage' && <Signage />}
           {currentView === 'ai-insights' && <AiInsights />}
           {currentView === 'settings' && <Settings />}

@@ -1,4 +1,3 @@
-// src/utils/riskUtils.ts
 import type { RiskMatrix } from '../types';
 
 export const getRiskLevel = (matrix: RiskMatrix): { level: 'Low' | 'Medium' | 'High' | 'Critical', color: 'green' | 'yellow' | 'red' } => {

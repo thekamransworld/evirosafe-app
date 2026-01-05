@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Organization } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
+import { OrganizationDetails } from './OrganizationDetails';
+import { Search, Plus } from 'lucide-react';
 
 // --- Organization Creation Modal ---
 interface OrganizationCreationModalProps {
@@ -63,7 +65,10 @@ const OrganizationCreationModal: React.FC<OrganizationCreationModalProps> = ({ i
 export const Organizations: React.FC = () => {
   const { organizations, usersList, activeUser, handleCreateOrganization } = useAppContext();
   const { projects } = useDataContext();
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
 
   const getStatusColor = (status: Organization['status']): 'green' | 'gray' => {
     switch (status) {
@@ -73,34 +78,67 @@ export const Organizations: React.FC = () => {
     }
   };
 
+  const filteredOrgs = useMemo(() => {
+    return organizations.filter(org => 
+      org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      org.domain.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [organizations, searchQuery]);
+
   const handleSubmit = (data: { name: string, industry: string, country: string }) => {
     handleCreateOrganization(data);
     setIsModalOpen(false);
   }
 
+  // --- RENDER DETAILS VIEW IF ORG SELECTED ---
+  if (selectedOrg) {
+      return <OrganizationDetails org={selectedOrg} onBack={() => setSelectedOrg(null)} />;
+  }
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
-        {activeUser?.role === 'ADMIN' && (
-            <Button onClick={() => setIsModalOpen(true)}>
-                <PlusIcon className="w-5 h-5 mr-2" />
-                New Organization
-            </Button>
-        )}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+            <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
+            <p className="text-gray-500 dark:text-gray-400">Manage companies and their projects</p>
+        </div>
+        <div className="flex gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:flex-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                    type="text" 
+                    placeholder="Search organizations..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900 text-sm w-full md:w-64 focus:ring-2 focus:ring-primary-500 outline-none dark:text-white"
+                />
+            </div>
+            {activeUser?.role === 'ADMIN' && (
+                <Button onClick={() => setIsModalOpen(true)}>
+                    <Plus className="w-5 h-5 mr-2" />
+                    New Org
+                </Button>
+            )}
+        </div>
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {organizations.map(org => {
+        {filteredOrgs.map(org => {
           const projectCount = projects.filter(p => p.org_id === org.id).length;
           const userCount = usersList.filter(u => u.org_id === org.id).length;
 
           return (
-            <Card key={org.id} className="flex flex-col">
+            <Card 
+                key={org.id} 
+                className="flex flex-col hover:border-primary-500 cursor-pointer transition-all hover:shadow-lg"
+                onClick={() => setSelectedOrg(org)}
+            >
               <div className="flex-1">
                   <div className="flex justify-between items-start">
                       <div className="flex items-center space-x-4">
-                        <img src={org.branding?.logoUrl || 'https://via.placeholder.com/50'} alt={org.name} className="h-12 w-12 rounded-lg" />
+                        <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center p-2">
+                             <img src={org.branding?.logoUrl || '/logo.svg'} alt={org.name} className="max-h-full max-w-full" />
+                        </div>
                         <div>
                           <h3 className="text-lg font-bold text-text-primary dark:text-white">{org.name}</h3>
                           <p className="text-sm text-text-secondary dark:text-gray-400 font-mono">{org.domain}</p>
@@ -110,19 +148,19 @@ export const Organizations: React.FC = () => {
                           {org.status.charAt(0).toUpperCase() + org.status.slice(1)}
                       </Badge>
                   </div>
-                  <div className="mt-4 flex space-x-6 text-sm text-gray-600 dark:text-gray-300">
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white">{projectCount}</div>
-                      <div>Projects</div>
+                  <div className="mt-6 grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 dark:bg-white/5 p-3 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{projectCount}</div>
+                      <div className="text-xs text-gray-500 uppercase font-bold">Projects</div>
                     </div>
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white">{userCount}</div>
-                      <div>Users</div>
+                    <div className="bg-gray-50 dark:bg-white/5 p-3 rounded-lg text-center">
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">{userCount}</div>
+                      <div className="text-xs text-gray-500 uppercase font-bold">Users</div>
                     </div>
                   </div>
               </div>
-              <div className="mt-6 border-t dark:border-dark-border pt-4 flex justify-end space-x-2">
-                  <Button variant="secondary" size="sm">Settings</Button>
+              <div className="mt-6 border-t dark:border-dark-border pt-4 flex justify-center">
+                  <span className="text-sm font-medium text-primary-600 dark:text-primary-400">View Details & Projects â†’</span>
               </div>
             </Card>
           )
@@ -137,9 +175,3 @@ export const Organizations: React.FC = () => {
     </div>
   );
 };
-
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-    </svg>
-);
