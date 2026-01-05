@@ -233,7 +233,9 @@ export interface Report {
 }
 
 // Inspection types
-export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'Pending Review';
+// UPDATED: Added 'In Progress', 'Scheduled', 'Pending Review', 'Overdue' to match usage
+export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue';
+
 export interface InspectionFinding {
     id: string;
     checklist_item_id?: string;
@@ -270,7 +272,7 @@ export interface ChecklistItem {
     id: string; 
     text: Record<string, string>; 
     description: Record<string, string>; 
-    riskLevel?: string; // Added optional riskLevel
+    riskLevel?: string; 
 }
 export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
@@ -351,7 +353,7 @@ export interface PtwWorkflowLog {
   user_id: string;
   timestamp: string;
   comments?: string;
-  signoff_type?: 'digital' | 'wet_ink'; // Made optional
+  signoff_type?: 'digital' | 'wet_ink';
 }
 
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
@@ -415,8 +417,8 @@ export interface PtwLiftingPayload extends CanonicalPtwPayload {
         crane_capacity: number; 
         utilization_percent: number; 
         lift_plan_ref?: string; 
-        crane_certification_no?: string; // Made optional
-        operator_certification_no?: string; // Made optional
+        crane_certification_no?: string; 
+        operator_certification_no?: string; 
     }; 
     equipment_details?: { crane_reg_no: string; crane_capacity: number; operator_name: string; rigger_name: string; }; 
 }

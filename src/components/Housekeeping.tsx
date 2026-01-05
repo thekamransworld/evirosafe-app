@@ -6,7 +6,7 @@ import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { ChecklistRunModal } from './ChecklistRunModal';
 import { ChecklistDetailModal } from './ChecklistDetailModal';
-import { ChecklistLibraryModal } from './ChecklistLibraryModal'; // Import the new modal
+import { ChecklistLibraryModal } from './ChecklistLibraryModal';
 
 const StatCard: React.FC<{ title: string; value: string | number; change?: string }> = ({ title, value, change }) => (
     <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-white/10 rounded-2xl shadow-lg p-4">
@@ -18,11 +18,11 @@ const StatCard: React.FC<{ title: string; value: string | number; change?: strin
 
 export const Housekeeping: React.FC = () => {
     const { activeOrg, activeUser, language } = useAppContext();
-    const { checklistRunList, setChecklistRunList, projects, checklistTemplates } = useDataContext();
+    const { checklistRunList, setChecklistRunList, projects, checklistTemplates, handleCreateChecklistTemplate } = useDataContext();
 
     const [isRunModalOpen, setRunModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
-    const [isLibraryOpen, setIsLibraryOpen] = useState(false); // State for library modal
+    const [isLibraryOpen, setIsLibraryOpen] = useState(false);
     const [selectedTemplate, setSelectedTemplate] = useState<ChecklistTemplate | null>(null);
 
     const housekeepingTemplates = useMemo(() => checklistTemplates.filter(t => t.category === 'Housekeeping'), [checklistTemplates]);
@@ -47,6 +47,7 @@ export const Housekeeping: React.FC = () => {
     }
     
     const handleSubmitRun = (data: Omit<ChecklistRun, 'id' | 'org_id' | 'executed_by_id' | 'executed_at'>) => {
+        if (!activeUser) return;
         const newRun: ChecklistRun = {
             ...data,
             id: `cr_${Date.now()}`,
@@ -122,6 +123,7 @@ export const Housekeeping: React.FC = () => {
                         <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-700">
                             {housekeepingRuns.slice(0, 5).map(run => {
                                 const template = housekeepingTemplates.find(t => t.id === run.template_id);
+                                // @ts-ignore
                                 const user = usersList.find(u => u.id === run.executed_by_id);
                                 return (
                                 <tr key={run.id}>
@@ -143,7 +145,7 @@ export const Housekeeping: React.FC = () => {
                 </div>
             </Card>
 
-            {isRunModalOpen && selectedTemplate && projects[0] && (
+            {isRunModalOpen && selectedTemplate && projects[0] && activeUser && (
                 <ChecklistRunModal
                     template={selectedTemplate}
                     project={projects.find(p => p.org_id === activeOrg.id) || projects[0]}
@@ -153,7 +155,7 @@ export const Housekeeping: React.FC = () => {
                 />
             )}
             
-            {isDetailModalOpen && selectedTemplate && projects[0] && (
+            {isDetailModalOpen && selectedTemplate && projects[0] && activeUser && (
                  <ChecklistDetailModal
                     template={selectedTemplate}
                     organization={activeOrg}
@@ -167,6 +169,7 @@ export const Housekeeping: React.FC = () => {
             <ChecklistLibraryModal 
                 isOpen={isLibraryOpen} 
                 onClose={() => setIsLibraryOpen(false)} 
+                onImport={handleCreateChecklistTemplate}
             />
 
         </div>
@@ -177,4 +180,3 @@ const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
-);
