@@ -9,8 +9,7 @@ import type {
   PtwConfinedSpacePayload,
   PtwExcavationPayload,
   PtwRoadClosurePayload,
-  PtwLiftingPayload,
-  PtwPpe
+  PtwLiftingPayload
 } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails, emptySignoff, emptySignature, emptyExtension, emptyClosure, ptwChecklistData } from '../config';
@@ -190,14 +189,18 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
              payload = { ...basePayload, load_calculation: { load_weight: 0, crane_capacity: 0, utilization_percent: 0 } } as PtwLiftingPayload;
         }
 
-        const newPtw: Omit<Ptw, 'id' | 'org_id' | 'approvals' | 'audit_log'> = {
+        const newPtw: Omit<Ptw, 'id' | 'org_id'> = {
             project_id: formData.project_id,
             type: selectedType,
             status: 'DRAFT',
             title: formData.work_description,
             payload: payload,
+            updated_at: new Date().toISOString(),
+            audit_log: [],
+            approvals: []
         }
         
+        // @ts-ignore
         onSubmit(newPtw);
         handleClose();
     };
@@ -247,7 +250,7 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
                              {/* GLOBAL COMPLIANCE */}
                              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <h3 className="font-bold text-blue-900 dark:text-blue-200 mb-3 flex items-center">
-                                    <span className="mr-2">🌍</span> Mandatory Safety Checks
+                                    <span className="mr-2">🌐</span> Mandatory Safety Checks
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     {GLOBAL_PTW_REQUIREMENTS.mandatoryForAll.map((req, idx) => (
