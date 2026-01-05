@@ -145,7 +145,7 @@ export const Housekeeping: React.FC = () => {
                 </div>
             </Card>
 
-            {isRunModalOpen && selectedTemplate && projects[0] && activeUser && (
+            {isRunModalOpen && selectedTemplate && projects.length > 0 && activeUser && (
                 <ChecklistRunModal
                     template={selectedTemplate}
                     project={projects.find(p => p.org_id === activeOrg.id) || projects[0]}
@@ -155,7 +155,7 @@ export const Housekeeping: React.FC = () => {
                 />
             )}
             
-            {isDetailModalOpen && selectedTemplate && projects[0] && activeUser && (
+            {isDetailModalOpen && selectedTemplate && projects.length > 0 && activeUser && (
                  <ChecklistDetailModal
                     template={selectedTemplate}
                     organization={activeOrg}
@@ -165,7 +165,6 @@ export const Housekeeping: React.FC = () => {
                 />
             )}
 
-            {/* Library Modal */}
             <ChecklistLibraryModal 
                 isOpen={isLibraryOpen} 
                 onClose={() => setIsLibraryOpen(false)} 
@@ -180,3 +179,4 @@ const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
+);
