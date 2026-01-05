@@ -5,14 +5,13 @@ import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { useToast } from './ui/Toast';
 import { 
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
   Users, Shield, MapPin, TrendingUp, TrendingDown, 
-  BarChart3, Activity as ActivityIcon, ShieldAlert, Wrench, 
-  Download, Share2, Printer, Thermometer, Droplets, Wind,
+  BarChart3, Activity as ActivityIcon, ShieldAlert, 
+  Download, Share2, Printer,
   Clock, MessageSquare, Eye, Plus, MoreVertical, 
   List, Search, Mail, Phone, Briefcase, X, FileCheck
 } from 'lucide-react';
@@ -279,12 +278,12 @@ const ActivityFeedItem: React.FC<{ activity: any }> = ({ activity }) => {
         <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors group">
             <div className="flex-shrink-0">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
-                    {activity.user?.name?.charAt(0) || '?'}
+                    {activity.user.name.charAt(0)}
                 </div>
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-white">{activity.user?.name || 'Unknown User'}</span>
+                    <span className="font-semibold text-white">{activity.user.name}</span>
                     <Badge color="blue" size="sm">{activity.type}</Badge>
                 </div>
                 <p className="text-white font-medium mb-1">{activity.title}</p>

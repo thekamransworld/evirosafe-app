@@ -5,7 +5,6 @@ import { useAppContext, useDataContext } from '../contexts';
 import { 
     Briefcase, Plus
 } from 'lucide-react';
-import { roles } from '../config';
 import { ProjectDetails } from './ProjectDetails';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
