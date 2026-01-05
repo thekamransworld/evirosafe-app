@@ -3,23 +3,29 @@ import type { Ptw, PtwWorkflowStage, PtwWorkflowLog } from '../types';
 export class PtwWorkflowEngine {
   // Define valid transitions
   private static transitions: Record<PtwWorkflowStage, PtwWorkflowStage[]> = {
-    DRAFT: ['REQUESTED'],
+    DRAFT: ['REQUESTED', 'SUBMITTED'],
+    SUBMITTED: ['PRE_SCREEN', 'DRAFT'],
+    PRE_SCREEN: ['SITE_INSPECTION', 'REJECTED'],
+    SITE_INSPECTION: ['APPROVAL', 'REJECTED'],
     REQUESTED: ['ISSUER_REVIEW', 'DRAFT'],
     ISSUER_REVIEW: ['ISSUER_SIGNED', 'DRAFT'],
     ISSUER_SIGNED: ['IV_REVIEW', 'PENDING_APPROVAL'],
     IV_REVIEW: ['PENDING_APPROVAL', 'DRAFT'],
     PENDING_APPROVAL: ['APPROVAL'],
-    APPROVAL: ['APPROVER_SIGNED', 'DRAFT'],
+    APPROVAL: ['APPROVER_SIGNED', 'DRAFT', 'ACTIVE'],
     APPROVER_SIGNED: ['AUTHORIZATION'],
     AUTHORIZATION: ['HANDOVER_PENDING'],
     HANDOVER_PENDING: ['SITE_HANDOVER'],
     SITE_HANDOVER: ['ACTIVE'],
-    ACTIVE: ['SUSPENDED', 'COMPLETION_PENDING'],
+    ACTIVE: ['SUSPENDED', 'COMPLETION_PENDING', 'HOLD', 'COMPLETED'],
+    HOLD: ['ACTIVE', 'CANCELLED'],
     SUSPENDED: ['ACTIVE', 'CANCELLED'],
     COMPLETION_PENDING: ['JOINT_INSPECTION'],
+    COMPLETED: ['CLOSED'],
     JOINT_INSPECTION: ['CLOSED', 'ACTIVE'],
     CLOSED: ['ARCHIVED'],
     CANCELLED: ['ARCHIVED'],
+    REJECTED: ['ARCHIVED'],
     ARCHIVED: []
   };
 
@@ -72,12 +78,15 @@ export class PtwWorkflowEngine {
         return { allowed: true, message: '' }; // Anyone can submit
       
       case 'REQUESTED':
+      case 'SUBMITTED':
         return { allowed: isIssuer || isHSE, message: 'Only issuer can review requested permits' };
       
       case 'ISSUER_REVIEW':
+      case 'PRE_SCREEN':
         return { allowed: isIssuer, message: 'Only issuer can sign off on review' };
       
       case 'ISSUER_SIGNED':
+      case 'SITE_INSPECTION':
         return { allowed: true, message: '' }; // System transition usually
       
       case 'PENDING_APPROVAL':
@@ -95,6 +104,7 @@ export class PtwWorkflowEngine {
         return { allowed: isReceiver || isIssuer, message: 'Only receiver can update work status' };
       
       case 'COMPLETION_PENDING':
+      case 'COMPLETED':
         return { allowed: isReceiver || isIssuer, message: 'Only receiver can mark work complete' };
       
       case 'JOINT_INSPECTION':

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import type { Ptw, PtwWorkflowStage } from '../types';
 import { PtwWorkflowEngine } from '../utils/workflowEngine';
 
@@ -64,6 +64,9 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
   const getStageResponsibilities = (stage: PtwWorkflowStage): string[] => {
     const responsibilities: Record<PtwWorkflowStage, string[]> = {
       DRAFT: ['Requester: Complete application details'],
+      SUBMITTED: ['Requester: Await review'],
+      PRE_SCREEN: ['Issuer: Initial check'],
+      SITE_INSPECTION: ['Issuer: Verify site conditions'],
       REQUESTED: ['Issuer: Review application', 'HSE: Verify risk assessment'],
       ISSUER_REVIEW: ['Issuer: Verify site conditions', 'Issuer: Confirm isolations'],
       ISSUER_SIGNED: ['IV Provider: Independent verification (if critical)'],
@@ -75,11 +78,14 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
       HANDOVER_PENDING: ['Issuer: Conduct pre-job briefing'],
       SITE_HANDOVER: ['Receiver: Accept responsibility', 'Receiver: Verify site conditions'],
       ACTIVE: ['Receiver: Supervise work', 'Safety Watch: Monitor conditions'],
+      HOLD: ['Receiver: Stop work', 'Issuer: Verify safety'],
       SUSPENDED: ['Receiver: Secure work area', 'Issuer: Review suspension reason'],
       COMPLETION_PENDING: ['Receiver: Clean work area', 'Receiver: Remove tools'],
+      COMPLETED: ['Issuer: Verify completion'],
       JOINT_INSPECTION: ['Issuer & Receiver: Inspect work area', 'Issuer: Verify isolations removed'],
       CLOSED: ['Issuer: Archive documents', 'System: Update asset records'],
       CANCELLED: ['Issuer: Document cancellation reason'],
+      REJECTED: ['Requester: Review rejection reasons'],
       ARCHIVED: ['System: Retention period compliance']
     };
 

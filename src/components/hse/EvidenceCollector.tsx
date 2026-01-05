@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Camera, Video, Mic, FileText, MapPin,
-  X, Upload, ZoomIn, RotateCw, Trash2, Eye, Download,
-  WifiOff, Battery, Clock
+  Camera, Video, Mic, FileText,
+  X, Upload, ZoomIn, RotateCw, Trash2, Eye
 } from 'lucide-react';
-import { Evidence, EvidenceType } from '../../types/hse-inspection';
+import { Evidence } from '../../types/hse-inspection';
+
+// Define locally since it wasn't exported from types
+type EvidenceType = 'photograph' | 'video_recording' | 'audio_note' | 'document_scan';
 
 interface EvidenceCollectorProps {
   inspectionId: string;
@@ -16,12 +18,12 @@ interface EvidenceCollectorProps {
 }
 
 export const EvidenceCollector: React.FC<EvidenceCollectorProps> = ({
-  inspectionId,
+  inspectionId: _inspectionId, // Prefix with _ to ignore unused
   onEvidenceCaptured,
   onEvidenceRemoved,
   existingEvidence = [],
   maxFiles = 20,
-  allowedTypes = ['photograph', 'video_recording', 'audio_note', 'document_scan']
+  allowedTypes: _allowedTypes // Prefix with _ to ignore unused
 }) => {
   const [capturing, setCapturing] = useState<'photo' | 'video' | 'audio' | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -382,6 +384,8 @@ export const EvidenceCollector: React.FC<EvidenceCollectorProps> = ({
             </div>
           </div>
         )}
+        
+        {uploading && <div className="text-center mt-2 text-sm text-blue-500">Uploading...</div>}
       </div>
       
       {existingEvidence.length > 0 ? (

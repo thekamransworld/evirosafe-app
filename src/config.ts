@@ -1,4 +1,4 @@
-import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, PtwType, Sign, PtwSafetyRequirement, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory } from './types';
+import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, PtwType, PtwSafetyRequirement, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory } from './types';
 
 // Logo Source - pointing to local file
 export const logoSrc = '/logo.svg';

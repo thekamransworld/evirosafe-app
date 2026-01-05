@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { PtwWorkAtHeightPayload } from '../types';
 
@@ -52,7 +51,7 @@ export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload,
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
             {(Object.keys(EQUIPMENT_LABELS) as Array<keyof typeof EQUIPMENT_LABELS>).filter(k => k !== 'other').map(key => (
                 <div 
-                    key={key} 
+                    key={key as string} 
                     onClick={() => handleToggle(key)}
                     className={`
                         flex items-center p-3 rounded-lg border transition-all cursor-pointer select-none
