@@ -6,7 +6,7 @@ import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { CompetencyMatrix } from './training/CompetencyMatrix';
 import { TrainingAnalytics } from './training/TrainingAnalytics';
-import { GraduationCap, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 interface TrainingsProps {
   courses: TrainingCourse[];

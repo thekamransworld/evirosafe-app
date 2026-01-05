@@ -6,16 +6,10 @@ import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { TrainingMatrixView } from './TrainingMatrixView';
 import { TrainingAnalytics } from './TrainingAnalytics';
-// FIX: Swapped Heroicons for Lucide React (already installed)
 import { 
     GraduationCap, Calendar, Users, 
     BarChart3, Table, Plus 
 } from 'lucide-react';
-
-// Import Modals
-import { TrainingCourseModal } from './TrainingCourseModal';
-import { TrainingSessionModal } from './TrainingSessionModal';
-import { SessionAttendanceModal } from './SessionAttendanceModal';
 
 interface TrainingManagementProps {
   courses: TrainingCourse[];
@@ -29,7 +23,7 @@ interface TrainingManagementProps {
 }
 
 export const EnhancedTrainings: React.FC<TrainingManagementProps> = (props) => {
-  const { courses, records, sessions, users, projects, onManageCourses, onScheduleSession, onManageAttendance } = props;
+  const { courses, records, sessions, users, onManageCourses, onScheduleSession, onManageAttendance } = props;
   const { can } = useAppContext();
   const [activeTab, setActiveTab] = useState<'Overview' | 'Matrix' | 'Sessions' | 'Courses'>('Overview');
 
@@ -114,7 +108,7 @@ export const EnhancedTrainings: React.FC<TrainingManagementProps> = (props) => {
           )}
 
           {activeTab === 'Matrix' && (
-              <TrainingMatrixView users={users} courses={courses} records={records} />
+              <TrainingMatrixView users={users} courses={courses} records={records} requirements={[]} />
           )}
 
           {activeTab === 'Sessions' && (

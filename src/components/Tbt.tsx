@@ -6,7 +6,7 @@ import { useAppContext, useDataContext, useModalContext } from '../contexts';
 import { 
   Plus, Search, Calendar, MapPin, 
   Users, CheckCircle, Clock, FileText, 
-  Megaphone, PenTool, Hash, Filter
+  Megaphone, PenTool, Hash
 } from 'lucide-react';
 
 // === GEN 4 STYLES ===

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { User } from '../types';
 import { Card } from './ui/Card';
@@ -15,6 +14,7 @@ export const Users: React.FC<UsersProps> = ({ users }) => {
       case 'active': return 'green';
       case 'invited': return 'yellow';
       case 'inactive': return 'gray';
+      default: return 'gray';
     }
   };
 

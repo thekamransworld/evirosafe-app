@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { TrainingCourse } from '../types';
 import { Button } from './ui/Button';
 import { generateCourseContent } from '../services/geminiService';
-// FIX: Use Lucide React instead of Heroicons
 import { Sparkles } from 'lucide-react';
 
 interface TrainingCourseModalProps {
@@ -19,7 +18,7 @@ const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
     </div>
 );
 
-export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen, onClose, courses, onUpdateCourse }) => {
+export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen, onClose, onUpdateCourse }) => {
   const [newCourse, setNewCourse] = useState<Omit<TrainingCourse, 'id' | 'org_id'>>({
     title: '',
     category: '',
@@ -41,9 +40,7 @@ export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen
     setIsGenerating(true);
     
     try {
-        // Fallback category if empty
-        const cat = newCourse.category || "General Safety";
-        const content = await generateCourseContent(newCourse.title, cat);
+        const content = await generateCourseContent(newCourse.title);
         setNewCourse(prev => ({
             ...prev,
             syllabus: content.syllabus,

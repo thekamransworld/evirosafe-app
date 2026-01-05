@@ -41,7 +41,7 @@ export const TrainingAnalytics: React.FC<TrainingAnalyticsProps> = ({ records, c
                 paddingAngle={5}
                 dataKey="value"
               >
-                {statusData.map((entry, index) => (
+                {statusData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
