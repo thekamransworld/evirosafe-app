@@ -117,6 +117,7 @@ export interface AuditLogEntry {
   details?: string;
 }
 
+// --- ACTION TRACKER ---
 export interface ActionItem {
   id: string;
   action: string;
@@ -137,6 +138,7 @@ export interface ActionItem {
   }
 }
 
+// --- HSE MODULES ---
 export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed';
 export type ReportClassification = 'To Be Determined' | 'Minor' | 'Moderate' | 'Major' | 'Fatal';
 export type ImpactedParty = 'Employee' | 'Contractor' | 'Visitor' | 'Public' | 'Environment';
@@ -315,8 +317,35 @@ export interface TrainingCourse { id: string; org_id: string; title: string; cat
 export interface TrainingSession { id: string; course_id: string; project_id: string; scheduled_at: string; trainer_id: string; status: 'scheduled' | 'completed' | 'cancelled'; roster: string[]; attendance: { user_id: string; attended: boolean; score?: number; }[]; }
 export interface TrainingRecord { id: string; org_id: string; user_id: string; course_id: string; session_id: string; issued_at: string; expires_at: string; score?: number; status: 'valid' | 'expiring_soon' | 'expired'; }
 
+// --- PERMIT TO WORK V2 ---
 export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work';
-export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
+
+// FIX: Added REJECTED to PtwStatus
+export type PtwStatus = 
+  | 'DRAFT' 
+  | 'SUBMITTED' 
+  | 'PRE_SCREEN' 
+  | 'SITE_INSPECTION' 
+  | 'APPROVAL' 
+  | 'ACTIVE' 
+  | 'HOLD' 
+  | 'COMPLETED' 
+  | 'CLOSED' 
+  | 'REQUESTED' 
+  | 'ISSUER_REVIEW' 
+  | 'ISSUER_SIGNED' 
+  | 'IV_REVIEW' 
+  | 'PENDING_APPROVAL' 
+  | 'APPROVER_SIGNED' 
+  | 'AUTHORIZATION' 
+  | 'HANDOVER_PENDING' 
+  | 'SITE_HANDOVER' 
+  | 'SUSPENDED' 
+  | 'COMPLETION_PENDING' 
+  | 'JOINT_INSPECTION' 
+  | 'CANCELLED' 
+  | 'ARCHIVED' 
+  | 'REJECTED';
 
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
 export interface PtwSafetyRequirement { id: string; text: string; response: 'Yes' | 'No' | 'N/A'; is_critical?: boolean; comment?: string; evidence_urls?: string[]; }
@@ -392,6 +421,7 @@ export interface Ptw {
   workflow_log?: PtwWorkflowLog[];
 }
 
+// Certification
 export type CertificationLevel = 'Beginner' | 'Competent' | 'Advanced' | 'Expert' | 'Certified Professional';
 export interface Qualification { id: string; title: string; issuer: string; date_obtained: string; expiry_date?: string; verification_status: 'Pending' | 'Verified' | 'Rejected'; attachment_url?: string; }
 export interface CertificationProfile { user_id: string; org_id: string; level: CertificationLevel; role_title: string; safe_working_hours: number; total_years_experience: number; last_incident_date?: string; qualifications: Qualification[]; requirements_met: { training: boolean; experience: boolean; safe_hours: boolean; behavior: boolean; }; certificate_id?: string; certificate_issued_at?: string; supervisor_approval?: { name: string; approved_at: string; comments: string; }; }

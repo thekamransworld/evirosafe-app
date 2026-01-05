@@ -1,103 +1,118 @@
-import React, { createContext, useContext, ReactNode } from 'react';
-import type { Ptw, PtwWorkflowStage } from '../types';
-import { PtwWorkflowEngine } from '../utils/workflowEngine';
+import type { Ptw, PtwWorkflowStage, PtwWorkflowLog } from '../types';
 
-interface PtwWorkflowContextType {
-  moveToNextStage: (ptw: Ptw, userId: string, comments?: string) => Ptw | null;
-  getNextPossibleStages: (ptw: Ptw) => PtwWorkflowStage[];
-  validateUserPermission: (ptw: Ptw, userId: string, userRole: string) => boolean;
-  getStageResponsibilities: (stage: PtwWorkflowStage) => string[];
-}
+export class PtwWorkflowEngine {
+  // Define valid transitions
+  private static transitions: Record<PtwWorkflowStage, PtwWorkflowStage[]> = {
+    DRAFT: ['REQUESTED', 'SUBMITTED'],
+    SUBMITTED: ['PRE_SCREEN', 'DRAFT'],
+    PRE_SCREEN: ['SITE_INSPECTION', 'REJECTED'],
+    SITE_INSPECTION: ['APPROVAL', 'REJECTED'],
+    REQUESTED: ['ISSUER_REVIEW', 'DRAFT'],
+    ISSUER_REVIEW: ['ISSUER_SIGNED', 'DRAFT'],
+    ISSUER_SIGNED: ['IV_REVIEW', 'PENDING_APPROVAL'],
+    IV_REVIEW: ['PENDING_APPROVAL', 'DRAFT'],
+    PENDING_APPROVAL: ['APPROVAL'],
+    APPROVAL: ['APPROVER_SIGNED', 'DRAFT', 'ACTIVE'],
+    APPROVER_SIGNED: ['AUTHORIZATION'],
+    AUTHORIZATION: ['HANDOVER_PENDING'],
+    HANDOVER_PENDING: ['SITE_HANDOVER'],
+    SITE_HANDOVER: ['ACTIVE'],
+    ACTIVE: ['SUSPENDED', 'COMPLETION_PENDING', 'HOLD', 'COMPLETED'],
+    HOLD: ['ACTIVE', 'CANCELLED'],
+    SUSPENDED: ['ACTIVE', 'CANCELLED'],
+    COMPLETION_PENDING: ['JOINT_INSPECTION'],
+    COMPLETED: ['CLOSED'],
+    JOINT_INSPECTION: ['CLOSED', 'ACTIVE'],
+    CLOSED: ['ARCHIVED'],
+    CANCELLED: ['ARCHIVED'],
+    REJECTED: ['ARCHIVED'],
+    ARCHIVED: []
+  };
 
-const PtwWorkflowContext = createContext<PtwWorkflowContextType | undefined>(undefined);
-
-export const usePtwWorkflow = () => {
-  const context = useContext(PtwWorkflowContext);
-  if (!context) {
-    throw new Error('usePtwWorkflow must be used within a PtwWorkflowProvider');
+  // Check if transition is valid
+  static canTransition(from: PtwWorkflowStage, to: PtwWorkflowStage): boolean {
+    return this.transitions[from]?.includes(to) || false;
   }
-  return context;
-};
 
-export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const moveToNextStage = (ptw: Ptw, userId: string, comments?: string): Ptw | null => {
-    const nextStages = PtwWorkflowEngine.getNextStages(ptw.status);
-    if (nextStages.length === 0) return null;
+  // Get next possible stages
+  static getNextStages(current: PtwWorkflowStage): PtwWorkflowStage[] {
+    return this.transitions[current] || [];
+  }
 
-    const nextStage = nextStages[0];
-    
-    const updatedPtw: Ptw = {
-      ...ptw,
-      status: nextStage,
-      workflow_log: [
-        ...(ptw.workflow_log || []),
-        {
-          stage: nextStage,
-          action: `Moved to ${nextStage}`,
-          user_id: userId,
-          timestamp: new Date().toISOString(),
-          comments
-        }
-      ],
-      updated_at: new Date().toISOString()
+  // Create workflow log entry
+  static createLogEntry(
+    stage: PtwWorkflowStage,
+    action: string,
+    userId: string,
+    comments?: string
+  ): PtwWorkflowLog {
+    return {
+      stage,
+      action,
+      user_id: userId,
+      timestamp: new Date().toISOString(),
+      comments,
+      signoff_type: 'digital'
     };
+  }
 
-    return updatedPtw;
-  };
+  // Validate role permissions for transition
+  static validateRolePermission(
+    currentStage: PtwWorkflowStage,
+    userRole: string,
+    _userId: string,
+    _ptw: Ptw
+  ): { allowed: boolean; message: string } {
+    const isAdmin = userRole === 'ADMIN';
+    const isHSE = userRole === 'HSE_MANAGER';
+    const isIssuer = userRole === 'SUPERVISOR' || userRole === 'HSE_MANAGER';
+    const isApprover = userRole === 'HSE_MANAGER' || userRole === 'ORG_ADMIN';
+    const isReceiver = true;
 
-  const getNextPossibleStages = (ptw: Ptw): PtwWorkflowStage[] => {
-    return PtwWorkflowEngine.getNextStages(ptw.status);
-  };
+    if (isAdmin) return { allowed: true, message: 'Admin Override' };
 
-  const validateUserPermission = (ptw: Ptw, userId: string, userRole: string): boolean => {
-    const permission = PtwWorkflowEngine.validateRolePermission(
-      ptw.status,
-      userRole,
-      userId,
-      ptw
-    );
-    return permission.allowed;
-  };
-
-  const getStageResponsibilities = (stage: PtwWorkflowStage): string[] => {
-    const responsibilities: Record<PtwWorkflowStage, string[]> = {
-      DRAFT: ['Requester: Complete application details'],
-      SUBMITTED: ['Requester: Await review'],
-      PRE_SCREEN: ['Issuer: Initial check'],
-      SITE_INSPECTION: ['Issuer: Verify site conditions'],
-      REQUESTED: ['Issuer: Review application', 'HSE: Verify risk assessment'],
-      ISSUER_REVIEW: ['Issuer: Verify site conditions', 'Issuer: Confirm isolations'],
-      ISSUER_SIGNED: ['IV Provider: Independent verification (if critical)'],
-      IV_REVIEW: ['IV Provider: Conduct safety review', 'IV Provider: Verify controls'],
-      PENDING_APPROVAL: ['Approver: Review and authorize'],
-      APPROVAL: ['Approver: Final safety check', 'Approver: Budget/scope verification'],
-      APPROVER_SIGNED: ['Issuer: Prepare for handover'],
-      AUTHORIZATION: ['Issuer: Generate permit documents'],
-      HANDOVER_PENDING: ['Issuer: Conduct pre-job briefing'],
-      SITE_HANDOVER: ['Receiver: Accept responsibility', 'Receiver: Verify site conditions'],
-      ACTIVE: ['Receiver: Supervise work', 'Safety Watch: Monitor conditions'],
-      HOLD: ['Receiver: Stop work', 'Issuer: Verify safety'],
-      SUSPENDED: ['Receiver: Secure work area', 'Issuer: Review suspension reason'],
-      COMPLETION_PENDING: ['Receiver: Clean work area', 'Receiver: Remove tools'],
-      COMPLETED: ['Issuer: Verify completion'],
-      JOINT_INSPECTION: ['Issuer & Receiver: Inspect work area', 'Issuer: Verify isolations removed'],
-      CLOSED: ['Issuer: Archive documents', 'System: Update asset records'],
-      CANCELLED: ['Issuer: Document cancellation reason'],
-      REJECTED: ['Requester: Review rejection reasons'],
-      ARCHIVED: ['System: Retention period compliance']
-    };
-
-    return responsibilities[stage] || [];
-  };
-
-  return (
-    <PtwWorkflowContext.Provider value={{
-      moveToNextStage,
-      getNextPossibleStages,
-      validateUserPermission,
-      getStageResponsibilities
-    }}>
-      {children}
-    </PtwWorkflowContext.Provider>
-  );
-};
+    switch (currentStage) {
+      case 'DRAFT':
+        return { allowed: true, message: '' };
+      
+      case 'REQUESTED':
+      case 'SUBMITTED':
+        return { allowed: isIssuer || isHSE, message: 'Only issuer can review requested permits' };
+      
+      case 'ISSUER_REVIEW':
+      case 'PRE_SCREEN':
+        return { allowed: isIssuer, message: 'Only issuer can sign off on review' };
+      
+      case 'ISSUER_SIGNED':
+      case 'SITE_INSPECTION':
+        return { allowed: true, message: '' };
+      
+      case 'PENDING_APPROVAL':
+      case 'APPROVAL':
+        return { allowed: isApprover, message: 'Only approver can review and sign' };
+      
+      case 'AUTHORIZATION':
+        return { allowed: isIssuer, message: 'Only issuer can authorize permit' };
+      
+      case 'HANDOVER_PENDING':
+      case 'SITE_HANDOVER':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can accept handover' };
+      
+      case 'ACTIVE':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can update work status' };
+      
+      case 'COMPLETION_PENDING':
+      case 'COMPLETED':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can mark work complete' };
+      
+      case 'JOINT_INSPECTION':
+        return { allowed: isIssuer || isHSE, message: 'Joint inspection requires issuer' };
+      
+      case 'CLOSED':
+        return { allowed: isIssuer, message: 'Only issuer can close permit' };
+      
+      default:
+        return { allowed: false, message: 'Action not allowed' };
+    }
+  }
+}
