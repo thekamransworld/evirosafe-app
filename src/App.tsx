@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LoginScreen } from './components/LoginScreen';
@@ -6,6 +6,7 @@ import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
 import { roles as rolesConfig } from './config';
+import type { View, User } from './types'; // Import types
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -21,7 +22,6 @@ import { Trainings } from './components/Trainings';
 import { People } from './components/People';
 import { Roles } from './components/Roles';
 import { Organizations } from './components/Organizations';
-// Projects component is no longer needed here as it's inside Organizations
 import { Signage } from './components/Signage';
 import { AiInsights } from './components/AiInsights';
 import { Settings } from './components/Settings';
@@ -48,14 +48,14 @@ import { TrainingSessionModal } from './components/TrainingSessionModal';
 import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
-import { InspectionConductModal } from './components/InspectionConductModal';
+// Removed unused InspectionConductModal import
 
-// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" (demo data) ---
+// --- Auth Sync ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
-  const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
+  const { setUsersList, login, logout, activeOrg } = useAppContext();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!currentUser) {
       logout();
       return;
@@ -87,13 +87,13 @@ const AuthSync: React.FC = () => {
         }
       };
 
-      const newUser = {
+      const newUser: User = {
         ...template,
         id: uid,
         org_id: activeOrg?.id || template.org_id,
         email,
         name: displayName,
-        status: 'active'
+        status: 'active' as const // FIX: Explicit type assertion
       };
 
       return [newUser, ...prev];
@@ -107,7 +107,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser } = useAppContext();
+  const { activeUser, usersList } = useAppContext(); // FIX: usersList moved here
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
@@ -121,14 +121,14 @@ const GlobalModals = () => {
   } = useModalContext();
 
   const {
-    handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
+    handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
     handleCreatePtw, handleUpdatePtw,
     handleCreatePlan, handlePlanStatusChange, handleUpdatePlan,
     handleCreateRams, handleRamsStatusChange, handleUpdateRams,
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
     handleCreateStandaloneAction, handleCreateInspection,
-    projects, usersList, trainingCourseList, checklistTemplates
+    projects, trainingCourseList, checklistTemplates
   } = useDataContext();
 
   if (!activeUser) return null;
@@ -158,12 +158,9 @@ const GlobalModals = () => {
 
 // --- Main App Content ---
 const AppContent = () => {
-  const { currentView, setCurrentView, activeUser, isLoading } = useAppContext();
+  const { currentView, setCurrentView } = useAppContext();
+  const { isLoading, projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList } = useDataContext(); // FIX: isLoading moved here
   const { currentUser } = useAuth();
-
-  const {
-    projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
-  } = useDataContext();
 
   const {
     setSelectedPlan, setSelectedPlanForEdit, setIsPlanCreationModalOpen,
@@ -189,7 +186,7 @@ const AppContent = () => {
     <div className="flex min-h-screen bg-slate-950 text-slate-100 transition-all duration-300">
       <Sidebar
         currentView={currentView}
-        setCurrentView={setCurrentView}
+        setCurrentView={(view: string) => setCurrentView(view as View)} // FIX: Type casting
         isOpen={sidebarOpen}
         setOpen={setSidebarOpen}
       />
@@ -241,7 +238,6 @@ const AppContent = () => {
           {currentView === 'people' && <People />}
           {currentView === 'roles' && <Roles roles={rolesConfig} />}
           {currentView === 'organizations' && <Organizations />}
-          {/* Fallback for old links */}
           {currentView === 'projects' && <Organizations />} 
           {currentView === 'signage' && <Signage />}
           {currentView === 'ai-insights' && <AiInsights />}

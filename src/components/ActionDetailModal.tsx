@@ -18,17 +18,17 @@ export const ActionDetailModal: React.FC<ActionDetailModalProps> = ({ actionItem
   const owner = users.find(u => u.id === actionItem.owner_id);
   
   // Mock History Generator
-  // In a real backend, this would come from actionItem.audit_trail
   const history = [
     { date: new Date().toISOString(), user: activeUser?.name || 'System', text: `Viewing action details`, type: 'view' },
     { date: actionItem.due_date, user: 'System', text: 'Action due date set', type: 'system' },
     { date: new Date(Date.now() - 86400000).toISOString(), user: 'System', text: 'Action created', type: 'create' },
   ];
 
-  const getPriorityColor = (p?: string) => {
+  // FIX: Ensure returned colors match BadgeProps
+  const getPriorityColor = (p?: string): 'red' | 'yellow' | 'green' => {
       switch(p) {
           case 'Critical': return 'red';
-          case 'High': return 'orange';
+          case 'High': return 'red'; // Changed from orange to red
           case 'Medium': return 'yellow';
           default: return 'green';
       }
