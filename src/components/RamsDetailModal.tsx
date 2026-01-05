@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import type { Rams as RamsType, RamsStatus, RamsStep, User } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';

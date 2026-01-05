@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import type { Rams as RamsType, RamsStatus, RamsStep } from '../types';
 import { Button } from './ui/Button';
 import ReactMarkdown from 'react-markdown';
-import { RiskMatrixDisplay } from './RiskMatrixDisplay';
 import { Badge } from './ui/Badge';
 import { translateText } from '../services/geminiService';
 import { RamsStepEditor } from './RamsStepEditor';
@@ -89,7 +88,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
   const [showStepModal, setShowStepModal] = useState(false);
   const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
 
-  // Auto-save functionality
   useEffect(() => {
     if (autoSaveTimer) {
       clearTimeout(autoSaveTimer);
@@ -99,7 +97,7 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
       if (!isSaving && JSON.stringify(editedRams) !== JSON.stringify(rams)) {
         handleAutoSave();
       }
-    }, 5000); // Auto-save after 5 seconds of inactivity
+    }, 5000);
 
     setAutoSaveTimer(timer);
     
@@ -111,9 +109,7 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
   const handleAutoSave = async () => {
     setIsSaving(true);
     try {
-      // In a real app, this would be a silent save without closing
       console.log('Auto-saving...', editedRams);
-      // onSave(editedRams); // Uncomment if onSave doesn't close modal
     } catch (error) {
       console.error('Auto-save failed:', error);
     } finally {
@@ -408,7 +404,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
           </header>
 
           <div className="flex-grow flex overflow-hidden">
-            {/* Left Navigation */}
             <nav className="w-60 bg-white dark:bg-dark-card border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0">
               <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">Sections</h3>
               <ul className="space-y-1">
@@ -433,7 +428,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
                 ))}
               </ul>
               
-              {/* Risk Summary */}
               <div className="mt-6 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
                 <h4 className="font-semibold text-sm mb-3 text-gray-900 dark:text-white">Risk Summary</h4>
                 <div className="space-y-3">
@@ -458,12 +452,10 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
               </div>
             </nav>
 
-            {/* Center Content Editor */}
             <main className="flex-1 p-6 overflow-y-auto">
               {renderSection()}
             </main>
 
-            {/* Right Metadata Rail */}
             <aside className="w-80 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-4 overflow-y-auto flex-shrink-0 space-y-6">
               <RightRailSection title="Overall Risk Score">
                 <div className="grid grid-cols-2 gap-4 text-center">
@@ -571,7 +563,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
         </div>
       </div>
 
-      {/* Step Editor Modal */}
       {showStepModal && editingStep && (
         <RamsStepEditor
           step={editingStep}
@@ -588,7 +579,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
         />
       )}
 
-      {/* Delete Confirmation Dialog - Inline Implementation since component might be missing */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4" onClick={() => setShowDeleteConfirm(false)}>
             <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
