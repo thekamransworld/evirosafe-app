@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { User } from '../../types';
 import { Button } from './Button';
-import { sendDocumentEmail } from '../../services/emailService'; // <--- Import Service
+import { sendDocumentEmail } from '../../services/emailService';
 
 interface EmailModalProps {
     isOpen: boolean;
@@ -12,7 +12,7 @@ interface EmailModalProps {
 }
 
 export const EmailModal: React.FC<EmailModalProps> = ({ isOpen, onClose, documentTitle, documentLink, defaultRecipients }) => {
-    const [recipients, setRecipients] = useState<string[]>(defaultRecipients.map(u => u.email).filter(Boolean) as string[]);
+    const [recipients] = useState<string[]>(defaultRecipients.map(u => u.email).filter(Boolean) as string[]);
     const [additionalEmails, setAdditionalEmails] = useState('');
     const [message, setMessage] = useState(`Hello,\n\nPlease review the attached document.\n\nThank you.`);
     const [isSending, setIsSending] = useState(false);
@@ -21,12 +21,10 @@ export const EmailModal: React.FC<EmailModalProps> = ({ isOpen, onClose, documen
     const handleSend = async () => {
         setIsSending(true);
         
-        // Combine all emails
         const extra = additionalEmails.split(',').map(e => e.trim()).filter(e => e);
         const allEmails = [...new Set([...recipients, ...extra])];
 
         try {
-            // Send email to each recipient
             const promises = allEmails.map(email => 
                 sendDocumentEmail(email, documentTitle, documentLink, message)
             );

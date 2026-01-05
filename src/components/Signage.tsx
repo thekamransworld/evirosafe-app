@@ -180,7 +180,6 @@ const PrintableSignView: React.FC<{ sign: SignDef }> = ({ sign }) => {
 }
 
 export const Signage: React.FC = () => {
-  const { can } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [signToPrint, setSignToPrint] = useState<SignDef | null>(null);

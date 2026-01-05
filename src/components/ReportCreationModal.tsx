@@ -4,9 +4,7 @@ import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
-import { uploadFileToCloud } from '../services/storageService'; // <--- NEW IMPORT
-
-// --- IMPORTS FOR AI ---
+import { uploadFileToCloud } from '../services/storageService';
 import { generateSafetyReport } from '../services/geminiService';
 
 interface ReportCreationModalProps {
@@ -41,7 +39,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const { activeUser, usersList, activeOrg } = useAppContext();
   
   const defaultDetails = useMemo(() => ({
-    injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '' } as AccidentDetails,
+    injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '', days_lost: 0, medical_report_urls: [] } as AccidentDetails,
     incident: { property_damage_details: '', environmental_impact: null } as IncidentDetails,
     nearMiss: { potential_consequence: '' } as NearMissDetails,
     unsafeAct: { act_category: 'PPE Non-Compliance', coaching_given: false, coaching_notes: '' } as UnsafeActDetails,
@@ -90,13 +88,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
 
-  const stakeholders = useMemo(() => {
-    const projectManager = projects.find(p => p.id === formData.project_id)?.manager_id;
-    const supervisors = usersList.filter(u => u.org_id === activeOrg.id && u.role === 'SUPERVISOR').map(u => u.id);
-    const hseManagers = usersList.filter(u => u.org_id === activeOrg.id && u.role === 'HSE_MANAGER').map(u => u.id);
-    return { projectManager, supervisors, hseManagers };
-  }, [formData.project_id, projects, usersList, activeOrg.id]);
-  
   useEffect(() => {
     if (!formData.project_id && projects.length > 0) {
         setFormData(prev => ({ ...prev, project_id: projects[0].id }));

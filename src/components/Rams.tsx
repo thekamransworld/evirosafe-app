@@ -3,9 +3,9 @@ import type { Rams as RamsType, RamsStatus } from '../types';
 import { Button } from './ui/Button';
 import { useDataContext, useAppContext } from '../contexts';
 import { 
-  Plus, Search, Filter, FileText, 
+  Plus, Search, FileText, 
   ShieldAlert, CheckCircle, Clock, 
-  AlertTriangle, Calendar, User as UserIcon,
+  Calendar, User as UserIcon,
   ArrowUpRight, Layers
 } from 'lucide-react';
 
@@ -109,7 +109,7 @@ const FilterChip: React.FC<{label: string, active: boolean, onClick: () => void}
 )
 
 export const Rams: React.FC<{ onSelectRams: (r: RamsType) => void, onNewRams: () => void }> = ({ onSelectRams, onNewRams }) => {
-  const { ramsList, projects } = useDataContext();
+  const { ramsList } = useDataContext();
   const { can } = useAppContext();
   const [statusFilter, setStatusFilter] = useState<RamsStatus | 'All'>('All');
   const [search, setSearch] = useState('');

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, AlertTriangle, Trash2, AlertCircle } from 'lucide-react';
-import { HSEInspection, HSEFinding, RiskMatrix } from '../../../types/hse-inspection';
+import { HSEInspection, HSEFinding } from '../../../types/hse-inspection';
 import { Button } from '../../ui/Button';
 
 interface Step6Props {

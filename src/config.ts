@@ -1,4 +1,4 @@
-import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, ChecklistItem, PtwType, Sign, PtwSafetyRequirement, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory } from './types';
+import type { Role, Resource, Action, Scope, PlanType, PlanContentSection, Rams as RamsType, PtwType, Sign, PtwSafetyRequirement, PtwSignoff, PtwSignature, PtwExtension, PtwClosure, SignCategory } from './types';
 
 // Logo Source - pointing to local file
 export const logoSrc = '/logo.svg';
@@ -169,7 +169,7 @@ export const ptwTypeDetails: Record<PtwType, { icon: string; description: string
     'General Work': { icon: '🔹', description: 'Baseline, low-risk work', color: 'blue-500', hex: '#3B82F6' },
     'Hot Work': { icon: '🔥', description: 'Welding, cutting, sparks', color: 'red-500', hex: '#EF4444' },
     'Electrical Work': { icon: '⚡', description: 'Live electrical systems', color: 'amber-500', hex: '#F59E0B' },
-    'Excavation': { icon: '⛏️', description: 'Ground works, trenching', color: 'brown-500', hex: '#78350F' },
+    'Excavation': { icon: ⛏️', description: 'Ground works, trenching', color: 'brown-500', hex: '#78350F' },
     'Lifting': { icon: '🏗️', description: 'Crane lifts, suspended loads', color: 'orange-500', hex: '#F97316' },
     'Work at Height': { icon: '🧗', description: 'Scaffolds, ladders, fall risks', color: 'sky-500', hex: '#0EA5E9' },
     'Confined Space Entry': { icon: '🕳️', description: 'Tanks, pits, enclosed areas', color: 'purple-500', hex: '#8B5CF6' },

@@ -174,7 +174,7 @@ export const Settings: React.FC<SettingsProps> = () => {
               inviteName, 
               inviteRole, 
               activeOrg.name, 
-              activeUser.name
+              activeUser?.name || 'Admin'
           );
           
           setInviteEmail('');

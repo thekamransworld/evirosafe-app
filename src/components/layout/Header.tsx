@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import type { Organization, User, Notification } from '../../types';
+import type { Organization, User } from '../../types';
 import { useDataContext, useAppContext } from '../../contexts';
 import { useAuth } from '../../contexts/AuthContext';
 import { supportedLanguages } from '../../config';

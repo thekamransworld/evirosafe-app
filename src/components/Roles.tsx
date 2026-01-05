@@ -35,7 +35,7 @@ const PermissionRow: React.FC<{ resource: Resource, actions: Action[], scopes: S
 
 export const Roles: React.FC<RolesProps> = ({ roles: initialRoles }) => {
   const { can } = useAppContext();
-  const [roles, setRoles] = useState(initialRoles);
+  const [roles] = useState(initialRoles);
   const [selectedRole, setSelectedRole] = useState<Role>(roles[0]);
 
   const handlePermissionChange = (resource: Resource, action: Action, checked: boolean) => {

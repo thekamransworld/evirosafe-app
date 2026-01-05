@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { generateRamsContent } from '../services/geminiService';
-import ReactMarkdown from 'react-markdown';
 
 // Define the shape of the AI response
 type AiContent = { 

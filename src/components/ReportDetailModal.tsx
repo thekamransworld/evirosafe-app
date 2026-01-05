@@ -5,7 +5,7 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import ReactMarkdown from 'react-markdown';
 import { generateReportSummary } from '../services/geminiService';
-import { getRiskLevel } from '../utils/riskUtils'; // Imported from utils
+import { getRiskLevel } from '../utils/riskUtils';
 import { RiskMatrixDisplay } from './RiskMatrixDisplay';
 import { AuditTrail } from './AuditTrail';
 import { useAppContext } from '../contexts';
@@ -22,7 +22,6 @@ interface ReportDetailModalProps {
   onAcknowledgeReport: (reportId: string) => void;
 }
 
-const ALL_STATUSES: ReportStatus[] = ['draft', 'submitted', 'under_review', 'closed'];
 const ALL_CAPA_STATUSES: CapaAction['status'][] = ['Open', 'In Progress', 'Closed'];
 
 type Tab = 'details' | 'capa' | 'distribution' | 'audit';

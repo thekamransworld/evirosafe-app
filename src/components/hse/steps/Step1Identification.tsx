@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect } from 'react';
-import { HSEInspection, InspectionType, InspectionScope } from '../../../types/hse-inspection';
-import { Building, Hash, Shield, Globe, Users, Target, FileText, AlertTriangle } from 'lucide-react';
+import React from 'react';
+import { HSEInspection, InspectionType } from '../../../types/hse-inspection';
+import { Shield, Globe, Users, Target, FileText, AlertTriangle } from 'lucide-react';
 
 interface Step1Props {
   formData: Partial<HSEInspection>;
