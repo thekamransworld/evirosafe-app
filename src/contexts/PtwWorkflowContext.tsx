@@ -24,10 +24,8 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextStages = PtwWorkflowEngine.getNextStages(ptw.status);
     if (nextStages.length === 0) return null;
 
-    // Get the next logical stage (usually first in array)
     const nextStage = nextStages[0];
     
-    // Create updated PTW
     const updatedPtw: Ptw = {
       ...ptw,
       status: nextStage,

@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { useAppContext, useDataContext, useModalContext } from '../contexts';
+import { useDataContext, useModalContext } from '../contexts';
 import type { Ptw, Report, Project } from '../types';
 import { ptwTypeDetails } from '../config';
-import { getRiskLevel } from '../utils/riskUtils'; // Imported from utils
+import { getRiskLevel } from '../utils/riskUtils';
 
 interface MarkerProps {
     x: number;
@@ -40,13 +40,12 @@ const Marker: React.FC<MarkerProps> = ({ x, y, type, data, onClick }) => {
 };
 
 const MapZone: React.FC<{ 
-    id: string; 
     d: string; 
     label: string; 
     isActive: boolean;
     riskScore: number; 
     onClick: () => void 
-}> = ({ id, d, label, isActive, riskScore, onClick }) => {
+}> = ({ d, label, isActive, riskScore, onClick }) => {
     const getRiskFill = (score: number) => {
         if (score === 0) return 'rgba(255, 255, 255, 0.02)';
         if (score < 5) return 'rgba(250, 204, 21, 0.1)';
@@ -91,7 +90,7 @@ export const SiteMap: React.FC<SiteMapProps> = ({ embedded = false }) => {
     const { ptwList, reportList } = useDataContext();
     const { setSelectedPtw, setSelectedReport } = useModalContext();
     
-    const [selectedProject, setSelectedProject] = useState<Project | null>(projects[0] || null);
+    const [selectedProject] = useState<Project | null>(projects[0] || null);
     const [selectedZone, setSelectedZone] = useState<string | null>(null);
     const [showHeatmap, setShowHeatmap] = useState(true);
     const [showPtws, setShowPtws] = useState(true);
@@ -178,7 +177,6 @@ export const SiteMap: React.FC<SiteMapProps> = ({ embedded = false }) => {
                             {zones.map(zone => (
                                 <MapZone 
                                     key={zone.id}
-                                    id={zone.id}
                                     d={zone.d}
                                     label={zone.label}
                                     isActive={selectedZone === zone.id}

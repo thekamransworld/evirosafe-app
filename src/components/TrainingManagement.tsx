@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { TrainingCourse, TrainingRecord, TrainingSession, User, Project } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { TrainingMatrixView } from './TrainingMatrixView';
 import { TrainingAnalytics } from './TrainingAnalytics';
@@ -108,7 +107,7 @@ export const EnhancedTrainings: React.FC<TrainingManagementProps> = (props) => {
           )}
 
           {activeTab === 'Matrix' && (
-              <TrainingMatrixView users={users} courses={courses} records={records} requirements={[]} />
+              <TrainingMatrixView users={users} courses={courses} records={records} />
           )}
 
           {activeTab === 'Sessions' && (
@@ -127,15 +126,17 @@ export const EnhancedTrainings: React.FC<TrainingManagementProps> = (props) => {
                         {sessions.map(s => (
                             <tr key={s.id}>
                                 <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">{getCourseTitle(s.course_id)}</td>
-                                <td className="px-6 py-4 text-gray-500">{new Date(s.scheduled_at).toLocaleString()}</td>
+                                <td className="px-6 py-4 text-gray-500">{new Date(s.scheduled_at).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 text-gray-500">{getUserName(s.trainer_id)}</td>
                                 <td className="px-6 py-4">
                                     <Badge color={s.status === 'completed' ? 'green' : 'blue'}>{s.status}</Badge>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <Button size="sm" variant="ghost" onClick={() => onManageAttendance(s)}>
-                                        {s.status === 'scheduled' ? 'Mark Attendance' : 'View Report'}
-                                    </Button>
+                                    {can('update', 'training') && (
+                                        <Button size="sm" variant="ghost" onClick={() => onManageAttendance(s)}>
+                                            {s.status === 'scheduled' ? 'Manage' : 'View'}
+                                        </Button>
+                                    )}
                                 </td>
                             </tr>
                         ))}

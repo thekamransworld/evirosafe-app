@@ -17,10 +17,10 @@ export const SignageCreationModal: React.FC<SignageCreationModalProps> = ({ isOp
   const [formData, setFormData] = useState({
     title: '',
     category: 'Mandatory' as SignCategory,
-    icon_url: '⚠️', // Default emoji
+    icon_url: '⚠️',
     description: '',
-    matched_activities: [] as string[],
-    hazards: [] as string[],
+    matched_activities: [] as PtwType[],
+    hazards: [] as HazardType[],
   });
 
   useEffect(() => {
@@ -34,7 +34,6 @@ export const SignageCreationModal: React.FC<SignageCreationModalProps> = ({ isOp
         hazards: initialData.hazards,
       });
     } else {
-        // Reset
         setFormData({
             title: '',
             category: 'Mandatory',
@@ -67,6 +66,7 @@ export const SignageCreationModal: React.FC<SignageCreationModalProps> = ({ isOp
 
   const toggleSelection = (list: string[], item: string, field: 'matched_activities' | 'hazards') => {
       const newList = list.includes(item) ? list.filter(i => i !== item) : [...list, item];
+      // @ts-ignore
       setFormData(prev => ({ ...prev, [field]: newList }));
   };
 
@@ -150,7 +150,7 @@ export const SignageCreationModal: React.FC<SignageCreationModalProps> = ({ isOp
                             key={act}
                             onClick={() => toggleSelection(formData.matched_activities, act, 'matched_activities')}
                             className={`px-2 py-1 text-xs rounded-full border transition-colors ${
-                                formData.matched_activities.includes(act) 
+                                formData.matched_activities.includes(act as PtwType) 
                                 ? 'bg-blue-100 border-blue-500 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
                                 : 'bg-gray-50 border-gray-200 text-gray-600 dark:bg-white/5 dark:border-white/10 dark:text-gray-400'
                             }`}
