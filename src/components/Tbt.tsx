@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { TbtSession } from '../types';
 import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext, useModalContext } from '../contexts';
 import { 
   Plus, Search, Calendar, MapPin, 

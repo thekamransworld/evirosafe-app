@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { TrainingCourse, TrainingRecord, TrainingSession, User, Project } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { Badge } from './ui/Badge'; // <--- Added this import
 import { useAppContext } from '../contexts';
 import { TrainingMatrixView } from './TrainingMatrixView';
 import { TrainingAnalytics } from './TrainingAnalytics';

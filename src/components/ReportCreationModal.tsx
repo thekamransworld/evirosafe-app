@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
+import type { Report, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, ImpactedParty, ReportDistribution, ReportType, ReportDetails } from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
@@ -11,6 +11,28 @@ interface ReportCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialData?: Partial<Omit<Report, 'id' | 'org_id' | 'reporter_id'>> | null;
+}
+
+// Explicit interface to handle the Union Type for 'details'
+interface ReportFormData {
+    project_id: string;
+    type: ReportType;
+    occurred_at: string;
+    location: { text: string; specific_area: string; geo?: { lat: number; lng: number } };
+    description: string;
+    evidence_urls: string[];
+    risk_pre_control: { severity: Severity; likelihood: Likelihood };
+    work_related: boolean;
+    impacted_party: ImpactedParty[];
+    conditions: string;
+    immediate_actions: string;
+    further_corrective_action_required: boolean;
+    details: ReportDetails; // <--- This allows any of the detail types
+    distribution: ReportDistribution;
+    identification: { was_fire: boolean; was_injury: boolean; was_environment: boolean };
+    classification_codes: string[];
+    ai_evidence_summary: string;
+    ai_suggested_evidence: string[];
 }
 
 const REPORT_TYPES: { type: ReportType; icon: string; description: string; color: string }[] = [
@@ -36,7 +58,7 @@ const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} x
 
 export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen, onClose, initialData }) => {
   const { projects, handleCreateReport } = useDataContext();
-  const { activeUser, usersList, activeOrg } = useAppContext();
+  const { activeUser } = useAppContext();
   
   const defaultDetails = useMemo(() => ({
     injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '', days_lost: 0, medical_report_urls: [] } as AccidentDetails,
@@ -47,17 +69,17 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     leadership: { event_type_code: 'TBD', leader_name: activeUser?.name || '', attendees_count: 0, key_observations: '' } as LeadershipEventDetails,
   }), [activeUser?.name]);
 
-  const getInitialState = () => {
-    const defaultState = {
+  const getInitialState = (): ReportFormData => {
+    const defaultState: ReportFormData = {
         project_id: projects[0]?.id || '',
-        type: 'Unsafe Condition' as ReportType,
+        type: 'Unsafe Condition',
         occurred_at: new Date().toISOString().slice(0, 16),
         location: { text: '', specific_area: '', geo: undefined },
         description: '',
-        evidence_urls: [] as string[],
-        risk_pre_control: { severity: 1 as Severity, likelihood: 1 as Likelihood },
+        evidence_urls: [],
+        risk_pre_control: { severity: 1, likelihood: 1 },
         work_related: true,
-        impacted_party: [] as ImpactedParty[],
+        impacted_party: [],
         conditions: '',
         immediate_actions: '',
         further_corrective_action_required: false,
@@ -67,19 +89,19 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
             additional_recipients: [],
             send_alert_on_submit: true,
             notify_on_update: true,
-        } as ReportDistribution,
+        },
         identification: { was_fire: false, was_injury: false, was_environment: false },
-        classification_codes: [] as string[],
+        classification_codes: [],
         ai_evidence_summary: '',
-        ai_suggested_evidence: [] as string[],
+        ai_suggested_evidence: [],
     };
     if (initialData) {
-      return { ...defaultState, ...initialData };
+      return { ...defaultState, ...initialData } as ReportFormData;
     }
     return defaultState;
   };
 
-  const [formData, setFormData] = useState(getInitialState);
+  const [formData, setFormData] = useState<ReportFormData>(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   
@@ -95,7 +117,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   }, [projects, formData.project_id]);
 
   const handleTypeSelect = (newType: ReportType) => {
-      let newDetails = defaultDetails.unsafeCondition;
+      let newDetails: ReportDetails = defaultDetails.unsafeCondition;
       if (['First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)', 'Restricted Work Case (RWC)', 'Accident', 'Incident'].includes(newType)) {
           newDetails = defaultDetails.injury;
       } else if (['Property / Asset Damage', 'Fire Event', 'Environmental Incident'].includes(newType)) {
