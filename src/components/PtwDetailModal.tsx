@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, PtwSafetyRequirement, PtwSignoff, PtwStoppage, User, CanonicalPtwPayload, PtwLiftingPayload, PtwWorkAtHeightPayload
+  Ptw, PtwSafetyRequirement, PtwStoppage, User, CanonicalPtwPayload, PtwLiftingPayload, PtwWorkAtHeightPayload
 } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';

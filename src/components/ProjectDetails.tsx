@@ -12,7 +12,7 @@ import {
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
   Users, Shield, MapPin, TrendingUp, TrendingDown, 
   BarChart3, Activity as ActivityIcon, ShieldAlert, Wrench, 
-  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
+  Download, Share2, Printer, Thermometer, Droplets, Wind,
   Clock, MessageSquare, Eye, Plus, MoreVertical, 
   List, Search, Mail, Phone, Briefcase, X, FileCheck
 } from 'lucide-react';
@@ -637,8 +637,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
                 <DashboardWidget title="Activity Feed" className="lg:col-span-2">
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                         {filteredActivities.length > 0 ? (
-                            filteredActivities.map((activity, index) => (
-                                <ActivityFeedItem key={activity.id || index} activity={activity} />
+                            filteredActivities.map(activity => (
+                                <ActivityFeedItem key={activity.id} activity={activity} />
                             ))
                         ) : (
                             <div className="text-center py-12">
