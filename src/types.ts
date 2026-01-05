@@ -233,7 +233,7 @@ export interface Report {
 }
 
 // Inspection types
-export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived';
+export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'Pending Review';
 export interface InspectionFinding {
     id: string;
     checklist_item_id?: string;
@@ -266,10 +266,15 @@ export interface Inspection {
 }
 
 // Checklist types
-export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; }
-export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; }
+export interface ChecklistItem { 
+    id: string; 
+    text: Record<string, string>; 
+    description: Record<string, string>; 
+    riskLevel?: string; // Added optional riskLevel
+}
+export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
-export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
+export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score: number; results: ChecklistRunResult[]; }
 
 // Plan types
 export type PlanStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
@@ -346,7 +351,7 @@ export interface PtwWorkflowLog {
   user_id: string;
   timestamp: string;
   comments?: string;
-  signoff_type: 'digital' | 'wet_ink';
+  signoff_type?: 'digital' | 'wet_ink'; // Made optional
 }
 
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
@@ -380,10 +385,10 @@ export interface CanonicalPtwPayload {
         description: string; 
         coverage: { start_date: string; end_date: string; start_time: string; end_time: string; }; 
         associated_permits?: string[];
-        number_of_workers?: number; // Added
+        number_of_workers?: number; 
         work_method_statement?: string;
-        emergency_contact?: string; // Added
-        risk_assessment_ref?: string; // Added
+        emergency_contact?: string; 
+        risk_assessment_ref?: string; 
         environmental_concerns?: string;
     };
     safety_requirements: PtwSafetyRequirement[]; ppe: PtwPpe;
@@ -410,8 +415,8 @@ export interface PtwLiftingPayload extends CanonicalPtwPayload {
         crane_capacity: number; 
         utilization_percent: number; 
         lift_plan_ref?: string; 
-        crane_certification_no: string; // Added
-        operator_certification_no: string; // Added
+        crane_certification_no?: string; // Made optional
+        operator_certification_no?: string; // Made optional
     }; 
     equipment_details?: { crane_reg_no: string; crane_capacity: number; operator_name: string; rigger_name: string; }; 
 }

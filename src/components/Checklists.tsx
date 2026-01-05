@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { ChecklistDetailModal } from './ChecklistDetailModal';
 import { ChecklistRunModal } from './ChecklistRunModal';
-import { ChecklistLibraryModal } from './ChecklistLibraryModal'; // <--- Import
+import { ChecklistLibraryModal } from './ChecklistLibraryModal';
 import { useAppContext, useDataContext } from '../contexts';
 import { Plus, Download } from 'lucide-react';
 
@@ -19,7 +19,7 @@ export const Checklists: React.FC = () => {
   const [isDetailModalOpen, setDetailModalOpen] = useState(false);
   const [isSetupModalOpen, setSetupModalOpen] = useState(false);
   const [isRunModalOpen, setRunModalOpen] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false); // <--- New State
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   
   const getTranslated = (textRecord: Record<string, string> | string) => {
       if (typeof textRecord === 'string') return textRecord;
@@ -31,7 +31,7 @@ export const Checklists: React.FC = () => {
     if (!template) return 'Unknown Template';
     return getTranslated(template.title);
   };
-  const getUserName = (userId: string) => 'User'; // Simplified
+  const getUserName = (userId: string) => 'User';
 
   const handleViewTemplate = (template: ChecklistTemplate) => {
     setSelectedTemplate(template);
@@ -54,6 +54,7 @@ export const Checklists: React.FC = () => {
   };
   
   const handleSubmitRun = (data: any) => {
+    if (!activeUser) return;
     const newRun = { 
         ...data, 
         id: `cr_${Date.now()}`, 
@@ -150,7 +151,7 @@ export const Checklists: React.FC = () => {
       </div>
       
       {/* Modals */}
-      {isDetailModalOpen && selectedTemplate && (
+      {isDetailModalOpen && selectedTemplate && activeUser && (
         <ChecklistDetailModal 
             template={selectedTemplate}
             onClose={() => setDetailModalOpen(false)}
@@ -187,7 +188,7 @@ export const Checklists: React.FC = () => {
          </div>
       )}
       
-      {isRunModalOpen && selectedTemplate && projectForRun && (
+      {isRunModalOpen && selectedTemplate && projectForRun && activeUser && (
         <ChecklistRunModal
             template={selectedTemplate}
             project={projectForRun}

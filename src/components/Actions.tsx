@@ -8,19 +8,14 @@ import {
   Calendar, 
   Eye, 
   Search, 
-  User as UserIcon, 
   Plus, 
   AlertTriangle,
   CheckCircle,
   Clock,
   FileText,
   TrendingUp,
-  Filter,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Download,
   Upload,
+  Download,
   History
 } from 'lucide-react';
 import { ActionCreationModal } from './ActionCreationModal';
@@ -58,23 +53,6 @@ function priorityPill(priority: ActionPriority) {
     case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800';
     default: return 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
   }
-}
-
-function StatusBadge({ status, overdue }: { status: ActionStatus; overdue: boolean }) {
-  const baseClasses = "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium";
-  
-  if (overdue && status !== 'Closed') {
-    return <span className={`${baseClasses} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300`}>Overdue</span>;
-  }
-
-  const config: Record<string, string> = {
-    'Open': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-    'In Progress': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-    'Closed': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-    'Pending Review': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  };
-
-  return <span className={`${baseClasses} ${config[status] || 'bg-gray-100 text-gray-800'}`}>{status}</span>;
 }
 
 const StatCard: React.FC<{ title: string, value: number, color?: string, icon?: React.ReactNode }> = ({ title, value, color, icon }) => (

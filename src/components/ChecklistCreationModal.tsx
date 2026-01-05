@@ -15,13 +15,13 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('General');
   const [items, setItems] = useState<ChecklistItem[]>([
-    { id: '1', text: '', description: '', riskLevel: 'Low' }
+    { id: '1', text: { en: '' }, description: { en: '' }, riskLevel: 'Low' }
   ]);
 
   const handleAddItem = () => {
     setItems(prev => [
       ...prev, 
-      { id: Date.now().toString(), text: '', description: '', riskLevel: 'Low' }
+      { id: Date.now().toString(), text: { en: '' }, description: { en: '' }, riskLevel: 'Low' }
     ]);
   };
 
@@ -32,15 +32,20 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
   const handleItemChange = (index: number, field: keyof ChecklistItem, value: string) => {
     setItems(prev => {
       const newItems = [...prev];
-      // @ts-ignore
-      newItems[index][field] = value;
+      if (field === 'text' || field === 'description') {
+          // @ts-ignore
+          newItems[index][field] = { en: value };
+      } else {
+          // @ts-ignore
+          newItems[index][field] = value;
+      }
       return newItems;
     });
   };
 
   const handleSubmit = () => {
     if (!title.trim()) return alert("Title is required");
-    const validItems = items.filter(i => typeof i.text === 'string' && i.text.trim() !== '');
+    const validItems = items.filter(i => i.text.en && i.text.en.trim() !== '');
     if (validItems.length === 0) return alert("Add at least one checklist item");
 
     const newTemplate: ChecklistTemplate = {
@@ -59,7 +64,7 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
     // Reset form
     setTitle('');
     setCategory('General');
-    setItems([{ id: '1', text: '', description: '', riskLevel: 'Low' }]);
+    setItems([{ id: '1', text: { en: '' }, description: { en: '' }, riskLevel: 'Low' }]);
   };
 
   if (!isOpen) return null;
@@ -117,14 +122,14 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
                   <div className="flex-1 space-y-2">
                     <input 
                       placeholder="Requirement / Question" 
-                      value={item.text as string} 
+                      value={item.text.en} 
                       onChange={e => handleItemChange(idx, 'text', e.target.value)}
                       className="w-full p-2 text-sm border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white"
                     />
                     <div className="flex gap-2">
                       <input 
                         placeholder="Description / Guidance (Optional)" 
-                        value={item.description as string} 
+                        value={item.description.en} 
                         onChange={e => handleItemChange(idx, 'description', e.target.value)}
                         className="flex-1 p-2 text-xs border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white"
                       />

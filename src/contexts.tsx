@@ -12,14 +12,15 @@ import { translations, supportedLanguages, roles } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
+  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction,
+  Equipment, Subcontractor
 } from './types';
 import { useToast } from './components/ui/Toast';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { useAuth } from './contexts/AuthContext'; // <--- IMPORT AUTH CONTEXT
+import { useAuth } from './contexts/AuthContext';
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -159,6 +160,9 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
+  equipmentList: Equipment[];
+  trainingList: any[]; // Placeholder
+  subcontractors: Subcontractor[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -186,18 +190,18 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
+  handleCreateChecklistTemplate: (data: any) => void; // Added
 }
 
 const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { activeOrg, activeUser } = useAppContext();
-    const { currentUser } = useAuth(); // <--- GET FIREBASE USER
+    const { currentUser } = useAuth();
     const toast = useToast();
     
     const [isLoading, setIsLoading] = useState(true);
     
-    // Initialize with local data first (Instant Load)
     const [projects, setProjects] = useState<Project[]>(initialProjects || []);
     const [reportList, setReportList] = useState<Report[]>([]);
     const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
@@ -213,10 +217,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
+    const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+    const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
 
-    // --- FETCH DATA FROM FIREBASE ---
     useEffect(() => {
-      // CRITICAL FIX: Only fetch if user is logged in
       if (!currentUser) {
           setIsLoading(false);
           return;
@@ -236,16 +240,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('inspections', setInspectionList),
             fetchCol('ptws', setPtwList),
             fetchCol('checklist_templates', setChecklistTemplates),
-            fetchCol('checklist_runs', setChecklistRunList), // Added
+            fetchCol('checklist_runs', setChecklistRunList),
             fetchCol('plans', setPlanList),
             fetchCol('rams', setRamsList),
             fetchCol('signs', setSigns),
             fetchCol('actions', setStandaloneActions),
-            fetchCol('tbt_sessions', setTbtList), // Added
-            fetchCol('training_courses', setTrainingCourseList), // Added
-            fetchCol('training_records', setTrainingRecordList), // Added
-            fetchCol('training_sessions', setTrainingSessionList), // Added
-            fetchCol('notifications', setNotifications), // Added
+            fetchCol('tbt_sessions', setTbtList),
+            fetchCol('training_courses', setTrainingCourseList),
+            fetchCol('training_records', setTrainingRecordList),
+            fetchCol('training_sessions', setTrainingSessionList),
+            fetchCol('notifications', setNotifications),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -255,9 +259,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       fetchData();
-    }, [currentUser]); // <--- DEPENDENCY ON CURRENTUSER
+    }, [currentUser]);
 
-    // --- HELPER: UPDATE DB ---
     const updateDB = async (collectionName: string, id: string, data: any) => {
         try {
             await updateDoc(doc(db, collectionName, id), data);
@@ -267,7 +270,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // --- CREATE HANDLERS ---
     const handleCreateReport = async (reportData: any) => {
         const newReport = {
             ...reportData,
@@ -324,7 +326,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
 
-    // --- UPDATE HANDLERS ---
+    const handleCreateChecklistTemplate = async (data: any) => {
+        const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
+        setChecklistTemplates(prev => [newTemplate, ...prev]);
+        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
+    };
 
     const handleStatusChange = (id: string, status: any) => {
         setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
@@ -451,13 +457,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems,
+        actionItems, equipmentList, trainingList: [], subcontractors,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction 
+        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction, handleCreateChecklistTemplate
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

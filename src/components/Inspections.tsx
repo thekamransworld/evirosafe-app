@@ -25,6 +25,7 @@ const InspectionCard: React.FC<{
             case 'Closed':
             case 'Approved': return 'green';
             case 'In Progress': return 'blue';
+            case 'Ongoing': return 'blue';
             case 'Scheduled': return 'blue';
             case 'Pending Review': return 'yellow';
             case 'Draft': return 'gray';
@@ -47,6 +48,7 @@ const InspectionCard: React.FC<{
                         <p className="text-xs text-text-secondary">{inspection.inspection_id || 'ID Pending'}</p>
                     </div>
                 </div>
+                {/* @ts-ignore */}
                 <Badge color={getStatusColor(inspection.status)}>{inspection.status}</Badge>
             </div>
             
@@ -74,8 +76,8 @@ const InspectionCard: React.FC<{
 };
 
 export const Inspections: React.FC = () => {
-  const { activeOrg, usersList, can } = useAppContext();
-  const { inspectionList, setInspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection } = useDataContext();
+  const { usersList, can } = useAppContext();
+  const { inspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection } = useDataContext();
   const { isInspectionCreationModalOpen, setIsInspectionCreationModalOpen } = useModalContext();
 
   const [isConductModalOpen, setConductModalOpen] = useState(false);
@@ -85,14 +87,14 @@ export const Inspections: React.FC = () => {
     let inspectionToConduct = inspection;
     // Auto-transition status when starting
     if (inspection.status === 'Draft' || inspection.status === 'Scheduled') {
-        inspectionToConduct = { ...inspection, status: 'In Progress' };
+        inspectionToConduct = { ...inspection, status: 'Ongoing' };
         handleUpdateInspection(inspectionToConduct);
     }
     setSelectedInspection(inspectionToConduct);
     setConductModalOpen(true);
   };
 
-  const handleUpdateAndCloseConduct = (inspection: Inspection, action?: 'submit' | 'save' | 'approve' | 'close') => {
+  const handleUpdateAndCloseConduct = (inspection: Inspection, action?: 'submit' | 'save' | 'approve' | 'close' | 'request_revision') => {
     // Logic to handle status transitions based on action
     let newStatus = inspection.status;
     if (action === 'submit') newStatus = 'Pending Review';
@@ -100,7 +102,7 @@ export const Inspections: React.FC = () => {
     if (action === 'close') newStatus = 'Closed';
 
     const updated = { ...inspection, status: newStatus };
-    handleUpdateInspection(updated);
+    handleUpdateInspection(updated, action);
     
     if (action !== 'save') {
         setConductModalOpen(false);
@@ -158,6 +160,7 @@ export const Inspections: React.FC = () => {
             projects={projects}
             users={usersList}
             checklistTemplates={checklistTemplates}
+            onConvertToReport={() => {}}
         />
       )}
     </div>
