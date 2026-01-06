@@ -42,7 +42,6 @@ const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChan
 const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
     const { can } = useAppContext();
     const canApprove = can('approve', 'ptw');
-    // Removed unused isCreator check to fix TS error
 
     return (
         <div className="flex items-center space-x-2">
@@ -275,7 +274,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                     {/* Type-specific sections */}
                     {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
-                            // FIX: Ensure all required fields are present to satisfy type definition
                             loadCalc={{
                                 ...formData.payload.load_calculation,
                                 lift_plan_ref: formData.payload.load_calculation.lift_plan_ref || '',

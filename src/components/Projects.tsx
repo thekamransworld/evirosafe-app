@@ -5,11 +5,8 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { 
-    Briefcase, Calendar, MapPin, Users, Activity, 
-    AlertTriangle, FileText, CheckSquare, ArrowLeft, 
-    Plus, Settings, MoreVertical 
+    Briefcase, MapPin, Plus 
 } from 'lucide-react';
-import { roles } from '../config';
 
 // --- Project Creation/Edit Modal ---
 interface ProjectModalProps {
@@ -106,50 +103,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
     );
 };
 
-// --- Invite Member Modal ---
-const InviteMemberModal: React.FC<{ isOpen: boolean; onClose: () => void; onInvite: (data: any) => void }> = ({ isOpen, onClose, onInvite }) => {
-    const [formData, setFormData] = useState({ name: '', email: '', role: 'WORKER' });
-
-    const handleSubmit = () => {
-        if (!formData.name || !formData.email) return;
-        onInvite(formData);
-        setFormData({ name: '', email: '', role: 'WORKER' });
-        onClose();
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-dark-border" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite Team Member</h3>
-                </div>
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
-                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="John Doe" />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
-                        <input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="john@company.com" />
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
-                        <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                            {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                        </select>
-                    </div>
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end space-x-3 border-t dark:border-dark-border rounded-b-xl">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Send Invite</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 // --- Project Card Component ---
 const ProjectCard: React.FC<{ 
     project: Project; 
@@ -215,8 +168,6 @@ export const Projects: React.FC = () => {
   const { projects, handleCreateProject, isLoading } = useDataContext();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
 
   const orgProjects = useMemo(() => projects.filter(p => p.org_id === activeOrg.id), [projects, activeOrg]);
   const canCreate = can('create', 'projects');
@@ -226,16 +177,6 @@ export const Projects: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const handleEditSubmit = (data: any) => {
-      // In a real app, call updateProject here
-      console.log("Update project", data);
-      setIsModalOpen(false);
-      setIsEditMode(false);
-  };
-
-  // Removed ProjectDetail rendering here as it's handled in OrganizationDetails.tsx now
-  // This component is mainly for the list view if used standalone
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -244,7 +185,7 @@ export const Projects: React.FC = () => {
             <p className="text-text-secondary dark:text-gray-400">{activeOrg.name}</p>
         </div>
         {canCreate && (
-            <Button onClick={() => { setIsEditMode(false); setIsModalOpen(true); }}>
+            <Button onClick={() => setIsModalOpen(true)}>
                 <Plus className="w-5 h-5 mr-2" />
                 New Project
             </Button>
@@ -257,7 +198,7 @@ export const Projects: React.FC = () => {
                 key={project.id} 
                 project={project} 
                 users={usersList} 
-                onView={() => setSelectedProject(project)} 
+                onView={() => {}} // No-op for list view, drill-down is in OrganizationDetails
               />
           ))}
       </div>
