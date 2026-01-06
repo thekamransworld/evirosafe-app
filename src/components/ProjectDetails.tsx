@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Project, User } from '../types';
+import type { Project, User, ActivityItem } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
@@ -11,8 +11,8 @@ import {
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
   Users, Shield, MapPin, TrendingUp, TrendingDown, 
-  BarChart3, Activity as ActivityIcon, ShieldAlert, Wrench, 
-  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
+  BarChart3, Activity as ActivityIcon, ShieldAlert, 
+  Download, Share2, Printer, 
   Clock, MessageSquare, Eye, Plus, MoreVertical, 
   List, Search, Mail, Phone, Briefcase, X, FileCheck
 } from 'lucide-react';
@@ -53,7 +53,6 @@ const AddMemberModal: React.FC<{
         if (!selectedUserId) return;
         const user = usersList.find(u => u.id === selectedUserId);
         if (user) {
-            // In a real app, this would be an API call to link user_project table
             toast.success(`${user.name} added to ${project.name}`);
             onClose();
         }
@@ -67,7 +66,7 @@ const AddMemberModal: React.FC<{
             name,
             role,
             org_id: activeOrg.id,
-            project_id: project.id // Pass project ID to link them immediately
+            project_id: project.id
         });
         onClose();
     };

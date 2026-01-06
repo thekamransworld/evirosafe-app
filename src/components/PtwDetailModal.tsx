@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, PtwSafetyRequirement, PtwWorkAtHeightPayload, PtwStoppage, PtwLiftingPayload 
+  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
+  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage 
 } from '../types';
 import { Button } from './ui/Button';
+import { ptwTypeDetails } from '../config';
 import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
+import { useToast } from './ui/Toast';
+import { ActionsBar } from './ui/ActionsBar';
+import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
 import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
@@ -40,8 +45,10 @@ const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChan
 );
 
 const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
-    const { can } = useAppContext();
+    const { activeUser, can } = useAppContext();
     const canApprove = can('approve', 'ptw');
+    const isCreator = ptw.payload.creator_id === activeUser?.id;
+    const selfApprovalBlocked = false; 
 
     return (
         <div className="flex items-center space-x-2">
@@ -51,7 +58,7 @@ const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () =>
             {ptw.status === 'SUBMITTED' && canApprove && (
                 <>
                     <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
-                    <Button onClick={() => onAction('approve_proponent')}>Approve (Proponent)</Button>
+                    <Button onClick={() => onAction('approve_proponent')} disabled={selfApprovalBlocked}>Approve (Proponent)</Button>
                 </>
             )}
             
@@ -86,23 +93,8 @@ const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => v
             onChange={e => onChange(e.target.value)}
             className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm read-only:bg-gray-100 dark:read-only:bg-white/5"
             required={required}
-            read-only={disabled}
+            readOnly={disabled}
         />
-    </div>
-);
-
-const FormSelect: React.FC<{ label: string, value: any, onChange: (val: any) => void, options: string[], disabled?: boolean }> = ({ label, value, onChange, options, disabled = false }) => (
-    <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
-        <select
-            value={value || ''}
-            onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:bg-gray-100 dark:disabled:bg-white/5"
-            disabled={disabled}
-        >
-            <option value="">Select...</option>
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
     </div>
 );
 
@@ -124,6 +116,8 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   const { ptw, onClose, onUpdate } = props;
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const toast = useToast();
   
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
@@ -271,15 +265,9 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
             const isChecklistDisabled = !isEditable;
             return (
                 <div className="space-y-6">
-                    {/* Type-specific sections */}
                     {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
-                            loadCalc={{
-                                ...formData.payload.load_calculation,
-                                lift_plan_ref: formData.payload.load_calculation.lift_plan_ref || '',
-                                crane_certification_no: formData.payload.load_calculation.crane_certification_no || '',
-                                operator_certification_no: formData.payload.load_calculation.operator_certification_no || ''
-                            } as PtwLiftingPayload['load_calculation']}
+                            loadCalc={formData.payload.load_calculation as PtwLiftingPayload['load_calculation']}
                             onChange={(calc) => handlePayloadChange('load_calculation', calc)}
                             disabled={!isEditable}
                         />
@@ -309,7 +297,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                         />
                     )}
                     
-                    {/* Checklist Table */}
                     <div className="border rounded-lg overflow-hidden">
                         <div className="bg-gray-100 dark:bg-gray-800 p-3 border-b">
                             <h4 className="font-bold text-gray-800 dark:text-gray-200">Safety Requirements Checklist</h4>
@@ -340,7 +327,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                         </div>
                     </div>
                     
-                    {/* PPE Requirements */}
                     <div className="border rounded-lg p-4">
                         <h4 className="font-bold mb-3 text-base text-gray-800 dark:text-gray-200">Personal Protective Equipment (PPE)</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -498,7 +484,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                         <div className="mt-6 border-t pt-4 dark:border-dark-border">
                             <h4 className="font-semibold mb-2 text-gray-800 dark:text-gray-200">Log a New Work Stoppage</h4>
                              <div className="grid grid-cols-2 gap-4">
-                                <FormSelect label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} options={['Unsafe Condition', 'Unsafe Act', 'Emergency', 'Weather', 'Client Instruction', 'Other']} />
+                                <FormInput label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} />
                                 <FormInput label="Stopped By" value={stoppageFormData.stopped_by} onChange={val => setStoppageFormData(p => ({...p, stopped_by: val}))} />
                                 <div className="col-span-2"><FormInput label="Informed To" value={stoppageFormData.informed_to} onChange={val => setStoppageFormData(p => ({...p, informed_to: val}))} /></div>
                             </div>
@@ -579,6 +565,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} downloadOptions={[{ label: 'Download PDF', handler: () => window.print() }]} />
               <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
             </div>
           </header>
@@ -614,6 +601,23 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
           </footer>
         </div>
       </div>
+
+      <EmailModal 
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        documentTitle={`PTW: ${ptw.payload.permit_no || ptw.id}`}
+        documentLink={`${window.location.href}?ptw=${ptw.id}`}
+        defaultRecipients={[...Object.values(ptw.payload.signoffs ?? {}).flat(), ptw.payload.requester, ptw.payload.contractor_safety_personnel].filter(Boolean) as Partial<User>[]}
+      />
+
+      <style>{`
+          @media print {
+              body * { visibility: hidden; }
+              #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
+              #ptw-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+              @page { size: A4; margin: 1.5cm; }
+          }
+      `}</style>
     </>
   );
 };

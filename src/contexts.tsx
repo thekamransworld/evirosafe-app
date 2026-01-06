@@ -15,10 +15,13 @@ import type {
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
 import { useToast } from './components/ui/Toast';
+
+// --- FIREBASE IMPORTS ---
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
+// --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
@@ -138,6 +141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 export const useAppContext = () => useContext(AppContext);
 
+// --- DATA CONTEXT ---
 interface DataContextType {
   isLoading: boolean;
   projects: Project[];
@@ -155,6 +159,8 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
+  equipmentList: any[]; // Added
+  subcontractors: any[]; // Added
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -182,7 +188,6 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
-  handleCreateChecklistTemplate: (data: any) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -209,6 +214,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
+    const [equipmentList, setEquipmentList] = useState<any[]>([]); // Added
+    const [subcontractors, setSubcontractors] = useState<any[]>([]); // Added
 
     useEffect(() => {
       if (!currentUser) {
@@ -314,12 +321,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newPtw = { ...data, id: `ptw_${Date.now()}`, status: 'DRAFT' };
         setPtwList(prev => [newPtw, ...prev]);
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
-    };
-
-    const handleCreateChecklistTemplate = async (data: any) => {
-        const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
-        setChecklistTemplates(prev => [newTemplate, ...prev]);
-        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
     };
 
     const handleStatusChange = (id: string, status: any) => {
@@ -445,13 +446,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems,
+        actionItems, equipmentList, subcontractors,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction, handleCreateChecklistTemplate
+        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction 
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -1,3 +1,6 @@
+// src/types.ts
+
+// --- CORE ---
 export interface Organization {
   id: string;
   name: string;
@@ -36,7 +39,7 @@ export interface User {
       weight: 'kg' | 'lbs';
     };
   };
-  project_ids?: string[];
+  project_ids?: string[]; // Added to fix ProjectDetails error
 }
 
 export interface Project {
@@ -56,6 +59,7 @@ export interface Project {
   budget_spent?: number;
 }
 
+// UPDATED RESOURCE TYPE
 export type Resource = 
   | 'dashboard' 
   | 'reports' 
@@ -190,6 +194,7 @@ export interface ReportAcknowledgement {
   acknowledged_at: string;
 }
 
+// Report Details Interfaces
 export interface AccidentDetails { person_name: string; designation: string; nature_of_injury: string; body_part_affected: string; treatment_given: string; days_lost?: number; medical_report_urls?: string[]; }
 export interface IncidentDetails { property_damage_details?: string; environmental_impact: { type_of_impact: string; quantity_extent: string; containment_action: string; authority_notified: boolean; notification_ref?: string; } | null; }
 export interface NearMissDetails { potential_consequence: string; }
@@ -233,9 +238,7 @@ export interface Report {
 }
 
 // Inspection types
-// UPDATED: Added 'In Progress', 'Scheduled', 'Pending Review', 'Overdue' to match usage
-export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue';
-
+export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived';
 export interface InspectionFinding {
     id: string;
     checklist_item_id?: string;
@@ -268,15 +271,10 @@ export interface Inspection {
 }
 
 // Checklist types
-export interface ChecklistItem { 
-    id: string; 
-    text: Record<string, string>; 
-    description: Record<string, string>; 
-    riskLevel?: string; 
-}
-export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
+export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; }
+export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
-export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score: number; results: ChecklistRunResult[]; }
+export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
 
 // Plan types
 export type PlanStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
@@ -353,7 +351,7 @@ export interface PtwWorkflowLog {
   user_id: string;
   timestamp: string;
   comments?: string;
-  signoff_type?: 'digital' | 'wet_ink';
+  signoff_type: string;
 }
 
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
@@ -363,36 +361,10 @@ export interface PtwSignoff { name: string; designation: string; email: string; 
 export interface PtwStoppage { time: string; reason: string; stopped_by: string; informed_to: string; restarted_time: string; signature: string; }
 export interface PtwExtension { is_requested: boolean; reason: string; days: { from: string; to: string }; hours: { from: string; to: string }; requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; }
 export interface PtwClosure { note: string; permit_requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; }
-
 export interface CanonicalPtwPayload {
     creator_id: string; permit_no: string; category: PtwCategory;
-    requester: {
-        name: string;
-        email: string;
-        mobile: string;
-        designation: string;
-        contractor: string;
-        signature: string;
-        hse_certified?: boolean;
-    };
-    contractor_safety_personnel?: {
-        name: string;
-        email: string;
-        mobile: string;
-        designation: string;
-        signature: string;
-    };
-    work: { 
-        location: string; 
-        description: string; 
-        coverage: { start_date: string; end_date: string; start_time: string; end_time: string; }; 
-        associated_permits?: string[];
-        number_of_workers?: number; 
-        work_method_statement?: string;
-        emergency_contact?: string; 
-        risk_assessment_ref?: string; 
-        environmental_concerns?: string;
-    };
+    requester: any; contractor_safety_personnel?: any;
+    work: { location: string; description: string; coverage: { start_date: string; end_date: string; start_time: string; end_time: string; }; associated_permits?: string[]; };
     safety_requirements: PtwSafetyRequirement[]; ppe: PtwPpe;
     signoffs?: { client_proponent: PtwSignoff; other_stakeholders: PtwSignoff[]; client_hs: PtwSignoff; };
     joint_inspection?: { remarks: string; requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; };
@@ -416,11 +388,10 @@ export interface PtwLiftingPayload extends CanonicalPtwPayload {
         crane_capacity_at_radius?: number; 
         crane_capacity: number; 
         utilization_percent: number; 
-        lift_plan_ref?: string; 
-        crane_certification_no?: string; 
-        operator_certification_no?: string; 
+        lift_plan_ref?: string; // Made optional
+        crane_certification_no?: string; // Made optional
+        operator_certification_no?: string; // Made optional
     }; 
-    equipment_details?: { crane_reg_no: string; crane_capacity: number; operator_name: string; rigger_name: string; }; 
 }
 export interface PtwNightWorkPayload extends CanonicalPtwPayload {}
 export interface PtwElectricalWorkPayload extends CanonicalPtwPayload {}
@@ -434,9 +405,3 @@ export interface Ptw { id: string; org_id: string; project_id: string; type: Ptw
 export type CertificationLevel = 'Beginner' | 'Competent' | 'Advanced' | 'Expert' | 'Certified Professional';
 export interface Qualification { id: string; title: string; issuer: string; date_obtained: string; expiry_date?: string; verification_status: 'Pending' | 'Verified' | 'Rejected'; attachment_url?: string; }
 export interface CertificationProfile { user_id: string; org_id: string; level: CertificationLevel; role_title: string; safe_working_hours: number; total_years_experience: number; last_incident_date?: string; qualifications: Qualification[]; requirements_met: { training: boolean; experience: boolean; safe_hours: boolean; behavior: boolean; }; certificate_id?: string; certificate_issued_at?: string; supervisor_approval?: { name: string; approved_at: string; comments: string; }; }
-
-// Equipment
-export interface Equipment { id: string; project_id: string; name: string; type: string; status: string; }
-export interface Subcontractor { id: string; name: string; }
-export interface PtwRiskAnalysis { base_score: number; complexity_factor: number; weather_factor: number; time_factor: number; total_risk_score: number; risk_level: 'Low' | 'Medium' | 'High' | 'Critical'; auto_controls: string[]; }
-export interface SimopsConflict { conflicting_ptw_id: string; conflict_type: string; description: string; }
