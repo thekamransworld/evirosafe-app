@@ -7,82 +7,145 @@ import { certificationProfile as mockProfile } from '../data';
 import { generateCertificationInsight } from '../services/geminiService';
 import { generatePdf } from '../services/pdfService';
 import type { CertificationProfile } from '../types';
+import { 
+  Globe, ShieldCheck, FileText, Clock, Award, 
+  CheckCircle, XCircle, AlertTriangle, Download, 
+  BookOpen, Target, BarChart, ExternalLink, Copy, 
+  Shield, Database, Plus, FileSearch
+} from 'lucide-react';
 
 // ================================
-// TYPES & STANDARDS
+// 1. TYPES & STANDARDS
 // ================================
-type EducationLevel =
-  | 'Below Secondary'
-  | 'Secondary' // (Intermediate)
-  | 'Diploma'
-  | 'Bachelor'
-  | 'Master'
-  | 'Doctorate';
+type EducationLevel = 'Below Secondary' | 'Secondary' | 'Diploma' | 'Bachelor' | 'Master' | 'Doctorate';
+type CertApplicationStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'rejected' | 'suspended' | 'renewal_pending' | 'expired';
+type CertificateLevel = 'Trainee' | 'Basic' | 'Professional' | 'Expert' | 'Master' | 'Fellow';
 
-type CertApplicationStatus =
-  | 'draft'
-  | 'submitted'
-  | 'under_review'
-  | 'approved'
-  | 'rejected'
-  | 'suspended';
+type InternationalCertType = 
+  | 'NEBOSH' | 'IOSH' | 'OSHA' | 'ISO45001' | 'ISO14001' 
+  | 'CSP' | 'CRSP' | 'CMIOSH' | 'CERTIOSH' | 'NVQ'
+  | 'RSP' | 'DipNEBOSH' | 'Other';
 
-type CertificateLevel = 'Basic' | 'Professional' | 'Expert' | 'Master';
+type CompetencyLevel = 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
 
-type CertificateApplication = {
+interface InternationalCert {
+  type: InternationalCertType;
+  certificateNumber: string;
+  issuingBody: string;
+  issueDate: string;
+  expiryDate: string;
+  level: string;
+  verificationStatus: 'pending' | 'verified' | 'rejected' | 'expired';
+  verifiedBy?: string;
+  verifiedAt?: string;
+  documentUrl?: string;
+  creditHours?: number;
+}
+
+interface CPDActivity {
+  id: string;
+  title: string;
+  provider: string;
+  date: string;
+  hours: number;
+  category: 'training' | 'conference' | 'publication' | 'mentoring' | 'examination';
+  verificationStatus: 'pending' | 'verified';
+  description?: string;
+}
+
+interface CertificateApplication {
   status: CertApplicationStatus;
   joinedEviroSafeDate: string;
   educationLevel: EducationLevel;
   educationInstitute: string;
   educationYear: string;
-  educationField?: string;
+  professionalMemberships: string[];
   hseExperienceMonths: number;
   currentPosition: string;
   organizationType: string;
-  idType: 'National ID'; 
+  industrySector: string;
+  previousPositions: Array<{title: string; organization: string; duration: string}>;
+  idType: 'National ID' | 'Passport' | 'Driving License';
   idNumber: string;
   idIssuingCountry: string;
-  idExpiryDate?: string;
+  idExpiryDate: string;
+  internationalCerts: InternationalCert[];
+  competencies: {
+    riskAssessment: CompetencyLevel;
+    incidentInvestigation: CompetencyLevel;
+    auditConduction: CompetencyLevel;
+    emergencyResponse: CompetencyLevel;
+    legalCompliance: CompetencyLevel;
+    environmentalManagement: CompetencyLevel;
+    trainingDelivery: CompetencyLevel;
+    behavioralSafety: CompetencyLevel;
+  };
   docs: {
     idProof?: string;
     educationProof?: string;
     professionalPhoto?: string;
     employerLetter?: string;
+    experienceLetters?: string[];
+    cvResume?: string;
+    passportPhoto?: string;
+    backgroundCheck?: string;
   };
-  competencies: {
-    riskAssessment: boolean;
-    incidentInvestigation: boolean;
-    auditConduction: boolean;
-    emergencyResponse: boolean;
-    legalCompliance: boolean;
-  };
+  cpdActivities: CPDActivity[];
+  cpdHoursCurrentYear: number;
+  cpdHoursPreviousYear: number;
   acceptedTerms: boolean;
   acceptedPrivacy: boolean;
   acceptedCodeOfConduct: boolean;
   acceptedContinuousEducation: boolean;
   confirmedTrueInfo: boolean;
+  consentForVerification: boolean;
   submittedAt?: string;
   reviewedAt?: string;
   approvedAt?: string;
   rejectedAt?: string;
   approvalNotes?: string;
+  reviewerId?: string;
   certificateId?: string;
   certificateLevel?: CertificateLevel;
   certificateIssuedAt?: string;
   certificateValidUntil?: string;
-};
+  certificateQRCode?: string;
+  accreditationBody?: string;
+  certificateVersion?: string;
+}
+
+type AccreditationBody = 'IOSH' | 'NEBOSH' | 'BCSP' | 'OHSAS' | 'ANSI' | 'ISO' | 'EviroSafe Global';
 
 const GLOBAL_STANDARDS = {
-  MIN_SERVICE_MONTHS: 6,
-  MIN_EDUCATION: 'Secondary' as EducationLevel,
-  MIN_HSE_EXPERIENCE_MONTHS: 6,
-  REQUIRED_DOCS: ['ID Proof', 'Education Proof', 'Professional Photo', 'Employer Letter'],
-  VALIDITY_YEARS: {
-    Basic: 2,
-    Professional: 3,
-    Expert: 4,
-    Master: 5,
-  } as Record<CertificateLevel, number>,
+  MIN_SERVICE_MONTHS: { Trainee: 0, Basic: 6, Professional: 24, Expert: 60, Master: 120, Fellow: 180 },
+  MIN_HSE_EXPERIENCE: { Trainee: 0, Basic: 6, Professional: 24, Expert: 60, Master: 120, Fellow: 180 },
+  MIN_EDUCATION: { 
+    Trainee: 'Secondary', 
+    Basic: 'Secondary', 
+    Professional: 'Diploma', 
+    Expert: 'Bachelor', 
+    Master: 'Master', 
+    Fellow: 'Master' 
+  } as Record<CertificateLevel, EducationLevel>,
+  CPD_REQUIREMENTS: { Trainee: 10, Basic: 20, Professional: 30, Expert: 40, Master: 50, Fellow: 60 },
+  SAFE_HOURS_REQUIREMENTS: { Trainee: 0, Basic: 1000, Professional: 5000, Expert: 15000, Master: 30000, Fellow: 50000 },
+  VALIDITY_PERIODS: { Trainee: 1, Basic: 2, Professional: 3, Expert: 4, Master: 5, Fellow: 5 },
+  RECOGNIZED_CERTS: {
+    NEBOSH: { level: 'Professional', credit: 40 },
+    IOSH: { level: 'Professional', credit: 35 },
+    OSHA: { level: 'Basic', credit: 20 },
+    CSP: { level: 'Expert', credit: 60 },
+    CRSP: { level: 'Expert', credit: 60 },
+    CMIOSH: { level: 'Master', credit: 80 },
+    'DipNEBOSH': { level: 'Expert', credit: 70 },
+    ISO45001: { level: 'Professional', credit: 30 },
+  } as Record<string, { level: string; credit: number }>,
+};
+
+const ACCREDITATION_REQUIREMENTS = {
+  IOSH: { name: 'Institution of Occupational Safety and Health', requirements: ['Continuous CPD', 'Code of Conduct', 'Experience Portfolio', 'Peer Review'], validity: 'Annual renewal', website: 'https://iosh.com' },
+  NEBOSH: { name: 'National Examination Board in Occupational Safety and Health', requirements: ['Examination', 'Practical Assessment', 'Experience Evidence'], validity: 'Lifetime with CPD', website: 'https://nebosh.org.uk' },
+  BCSP: { name: 'Board of Certified Safety Professionals', requirements: ['Examination', 'Degree Requirement', 'Experience Verification'], validity: '5 years', website: 'https://bcsp.org' }
 };
 
 const DEFAULT_APP: CertificateApplication = {
@@ -91,67 +154,42 @@ const DEFAULT_APP: CertificateApplication = {
   educationLevel: 'Secondary',
   educationInstitute: '',
   educationYear: '',
-  educationField: '',
+  professionalMemberships: [],
   hseExperienceMonths: 0,
   currentPosition: '',
   organizationType: 'Other',
+  industrySector: '',
+  previousPositions: [],
   idType: 'National ID',
   idNumber: '',
   idIssuingCountry: '',
-  docs: {},
+  idExpiryDate: '',
+  internationalCerts: [],
   competencies: {
-    riskAssessment: false,
-    incidentInvestigation: false,
-    auditConduction: false,
-    emergencyResponse: false,
-    legalCompliance: false,
+    riskAssessment: 'Beginner',
+    incidentInvestigation: 'Beginner',
+    auditConduction: 'Beginner',
+    emergencyResponse: 'Beginner',
+    legalCompliance: 'Beginner',
+    environmentalManagement: 'Beginner',
+    trainingDelivery: 'Beginner',
+    behavioralSafety: 'Beginner'
   },
+  docs: {},
+  cpdActivities: [],
+  cpdHoursCurrentYear: 0,
+  cpdHoursPreviousYear: 0,
   acceptedTerms: false,
   acceptedPrivacy: false,
   acceptedCodeOfConduct: false,
   acceptedContinuousEducation: false,
   confirmedTrueInfo: false,
+  consentForVerification: false
 };
 
 // ================================
-// HELPERS
+// 2. HELPER FUNCTIONS
 // ================================
-function monthsBetween(startISO: string, endISO: string) {
-  const start = new Date(startISO);
-  const end = new Date(endISO);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
-  const ms = end.getTime() - start.getTime();
-  const approxMonths = Math.floor(ms / (1000 * 60 * 60 * 24 * 30));
-  return Math.max(0, approxMonths);
-}
-
-function formatDateLong(dateStr: string) {
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-}
-
-function calcCertificateLevel(profile: CertificationProfile, app: CertificateApplication): CertificateLevel {
-  const score =
-    profile.safe_working_hours / 1000 +
-    profile.total_years_experience * 10 +
-    (profile.qualifications?.length || 0) * 5 +
-    (app.hseExperienceMonths / 12) * 15;
-
-  if (score >= 110) return 'Master';
-  if (score >= 80) return 'Expert';
-  if (score >= 55) return 'Professional';
-  return 'Basic';
-}
-
-function generateCertificateId(level: CertificateLevel, countryCode: string) {
-  const prefix = 'EVS';
-  const levelCode = level.charAt(0);
-  const year = new Date().getFullYear();
-  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const cc = (countryCode || 'XX').toUpperCase().slice(0, 2);
-  return `${prefix}-${levelCode}-${cc}-${year}-${random}`;
-}
 
 function statusColor(status: CertApplicationStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' {
   switch (status) {
@@ -164,48 +202,168 @@ function statusColor(status: CertApplicationStatus): 'green' | 'blue' | 'yellow'
   }
 }
 
-const ProgressBar: React.FC<{ current: number; target: number; label: string }> = ({ current, target, label }) => {
-  const percentage = Math.min(100, Math.max(0, (current / target) * 100));
-  return (
-    <div className="w-full">
-      <div className="flex justify-between text-xs mb-1 text-gray-400">
-        <span>{label}</span>
-        <span>{current} / {target}</span>
-      </div>
-      <div className="w-full bg-gray-700 rounded-full h-2.5">
-        <div
-          className="bg-neon-green h-2.5 rounded-full transition-all duration-500"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
-  );
-};
+function monthsBetween(startISO: string, endISO: string) {
+  const start = new Date(startISO);
+  const end = new Date(endISO);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  const ms = end.getTime() - start.getTime();
+  return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24 * 30)));
+}
+
+function formatDateLong(dateStr: string) {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+function determineCertificateLevel(profile: CertificationProfile, app: CertificateApplication): CertificateLevel {
+  let score = 0;
+  score += (app.hseExperienceMonths / 12) * 15;
+  score += (profile.safe_working_hours / 1000) * 10;
+  
+  const educationScores: Record<EducationLevel, number> = {
+    'Below Secondary': 0, 'Secondary': 10, 'Diploma': 25, 'Bachelor': 40, 'Master': 60, 'Doctorate': 80
+  };
+  score += educationScores[app.educationLevel] || 0;
+  
+  app.internationalCerts.forEach(cert => {
+    if (cert.verificationStatus === 'verified') {
+      score += GLOBAL_STANDARDS.RECOGNIZED_CERTS[cert.type]?.credit || 10;
+    }
+  });
+  
+  score += (app.cpdHoursCurrentYear / 10);
+  
+  if (score >= 300) return 'Fellow';
+  if (score >= 200) return 'Master';
+  if (score >= 140) return 'Expert';
+  if (score >= 90) return 'Professional';
+  if (score >= 50) return 'Basic';
+  return 'Trainee';
+}
+
+function generateCertificateId(level: CertificateLevel, countryCode: string, accreditationBody?: string): string {
+  const prefix = accreditationBody ? accreditationBody.substring(0, 3).toUpperCase() : 'EVS';
+  const levelCode = level.charAt(0);
+  const year = new Date().getFullYear();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const cc = (countryCode || 'XX').toUpperCase().slice(0, 2);
+  return `${prefix}-${levelCode}-${cc}-${year}-${random}`;
+}
+
+function getAccreditationBody(level: CertificateLevel): AccreditationBody {
+  if (level === 'Fellow' || level === 'Master') return 'BCSP';
+  if (level === 'Expert' || level === 'Professional') return 'IOSH';
+  return 'EviroSafe Global';
+}
+
+function calculateCertificateValidity(level: CertificateLevel, issueDate: string): { validUntil: string; renewalDate: string } {
+  const validityYears = GLOBAL_STANDARDS.VALIDITY_PERIODS[level];
+  const issue = new Date(issueDate);
+  const validUntil = new Date(issue);
+  validUntil.setFullYear(issue.getFullYear() + validityYears);
+  const renewalDate = new Date(validUntil);
+  renewalDate.setMonth(renewalDate.getMonth() - 3);
+  return {
+    validUntil: validUntil.toISOString().split('T')[0],
+    renewalDate: renewalDate.toISOString().split('T')[0]
+  };
+}
+
+function verifyInternationalCert(cert: InternationalCert): { isValid: boolean; issues: string[]; creditPoints: number; } {
+  const issues: string[] = [];
+  let creditPoints = 0;
+  if (new Date(cert.expiryDate) < new Date()) issues.push('Certificate has expired');
+  if (!cert.certificateNumber || !cert.issuingBody || !cert.issueDate) issues.push('Missing required certificate information');
+  creditPoints = GLOBAL_STANDARDS.RECOGNIZED_CERTS[cert.type]?.credit || 10;
+  return { isValid: issues.length === 0 && cert.verificationStatus === 'verified', issues, creditPoints };
+}
+
+function generateQRCodeData(certificateId: string, name: string, level: CertificateLevel, issueDate: string, expiryDate: string): string {
+  return JSON.stringify({ certId: certificateId, name, level, issueDate, expiryDate, verificationUrl: `https://verify.evirosafe.org/${certificateId}` });
+}
 
 // ================================
-// CERTIFICATE VISUALS
+// 3. VISUAL COMPONENTS
 // ================================
 
-const SecurityPattern = () => (
-  <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
-    style={{
-      backgroundImage: `repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)`,
-      backgroundSize: '12px 12px'
-    }}
-  />
+const GlobalStandardsBadge: React.FC<{ standard: string; verified: boolean }> = ({ standard, verified }) => (
+  <Badge color={verified ? 'green' : 'gray'} className="flex items-center gap-1">
+    {verified ? <CheckCircle className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+    {standard}
+  </Badge>
 );
 
-const WatermarkRepeater: React.FC = () => {
+const ProgressBar: React.FC<{ current: number; target: number; label: string; unit?: string; color?: 'green' | 'blue' | 'amber' | 'purple'; }> = ({ current, target, label, unit = '', color = 'green' }) => {
+  const percentage = Math.min(100, Math.max(0, (current / target) * 100));
+  const colorClasses = { green: 'bg-emerald-500', blue: 'bg-blue-500', amber: 'bg-amber-500', purple: 'bg-purple-500' };
   return (
-    <div className="absolute inset-0 pointer-events-none opacity-[0.04] z-0 overflow-hidden flex flex-wrap content-center justify-center gap-12 rotate-[-15deg]">
-        {Array.from({ length: 40 }).map((_, i) => (
-           <span key={i} className="text-xl font-black tracking-widest text-emerald-900 uppercase whitespace-nowrap">
-              EviroSafe Certified
-           </span>
-        ))}
+    <div className="w-full">
+      <div className="flex justify-between text-sm mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-gray-300">{label}</span>
+          {percentage >= 100 && <CheckCircle className="w-4 h-4 text-emerald-400" />}
+        </div>
+        <span className="text-gray-400">{current.toLocaleString()} / {target.toLocaleString()} {unit}</span>
+      </div>
+      <div className="w-full bg-gray-800 rounded-full h-2.5">
+        <div className={`${colorClasses[color]} h-2.5 rounded-full transition-all duration-500`} style={{ width: `${percentage}%` }} />
+      </div>
     </div>
   );
 };
+
+const VerificationStatus: React.FC<{ status: string }> = ({ status }) => {
+  const config = {
+    verified: { color: 'green', icon: ShieldCheck, text: 'Verified' },
+    pending: { color: 'yellow', icon: Clock, text: 'Pending Review' },
+    rejected: { color: 'red', icon: XCircle, text: 'Rejected' },
+    expired: { color: 'gray', icon: AlertTriangle, text: 'Expired' }
+  }[status] || { color: 'gray', icon: AlertTriangle, text: 'Unknown' };
+  const Icon = config.icon;
+  return (
+    <Badge color={config.color as any} className="flex items-center gap-1">
+      <Icon className="w-3 h-3" />
+      {config.text}
+    </Badge>
+  );
+};
+
+const InternationalCertificateCard: React.FC<{ cert: InternationalCert }> = ({ cert }) => {
+  const verification = verifyInternationalCert(cert);
+  return (
+    <div className="p-4 border border-gray-700 rounded-lg bg-gray-900/50">
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <h4 className="font-bold text-white">{cert.type}</h4>
+          <p className="text-sm text-gray-400">{cert.issuingBody}</p>
+        </div>
+        <VerificationStatus status={cert.verificationStatus} />
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div><span className="text-gray-500">Cert #:</span><span className="ml-2 font-mono text-gray-300">{cert.certificateNumber}</span></div>
+        <div><span className="text-gray-500">Level:</span><span className="ml-2 text-white">{cert.level}</span></div>
+        <div><span className="text-gray-500">Issued:</span><span className="ml-2 text-gray-300">{new Date(cert.issueDate).toLocaleDateString()}</span></div>
+        <div><span className="text-gray-500">Expires:</span><span className="ml-2 text-gray-300">{new Date(cert.expiryDate).toLocaleDateString()}</span></div>
+      </div>
+      {verification.creditPoints > 0 && (
+        <div className="mt-3 p-2 bg-gray-800/50 rounded"><span className="text-sm text-gray-400">Credit Points: </span><span className="text-emerald-400 font-bold">{verification.creditPoints}</span></div>
+      )}
+    </div>
+  );
+};
+
+const SecurityPattern = () => (
+  <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: `repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)`, backgroundSize: '12px 12px' }} />
+);
+
+const WatermarkRepeater: React.FC = () => (
+  <div className="absolute inset-0 pointer-events-none opacity-[0.04] z-0 overflow-hidden flex flex-wrap content-center justify-center gap-12 rotate-[-15deg]">
+      {Array.from({ length: 40 }).map((_, i) => (
+         <span key={i} className="text-xl font-black tracking-widest text-emerald-900 uppercase whitespace-nowrap">EviroSafe Certified</span>
+      ))}
+  </div>
+);
 
 const Barcode: React.FC<{ value: string }> = ({ value }) => (
     <div className="flex flex-col items-center">
@@ -225,8 +383,7 @@ const Barcode: React.FC<{ value: string }> = ({ value }) => (
     </div>
 );
 
-const GoldenSeal: React.FC = () => {
-  return (
+const GoldenSeal: React.FC = () => (
     <div className="relative w-32 h-32 flex items-center justify-center drop-shadow-lg">
       <svg viewBox="0 0 200 200" className="w-full h-full">
         <defs>
@@ -238,85 +395,45 @@ const GoldenSeal: React.FC = () => {
             <stop offset="100%" stopColor="#F1D87E" />
           </linearGradient>
         </defs>
-        <polygon 
-          points="100,10 115,35 140,30 145,55 170,60 160,85 185,100 160,115 170,140 145,145 140,170 115,165 100,190 85,165 60,170 55,145 30,140 40,115 15,100 40,85 30,60 55,55 60,30 85,35"
-          fill="url(#goldGradient)"
-          stroke="#AA6C39"
-          strokeWidth="2"
-        />
+        <polygon points="100,10 115,35 140,30 145,55 170,60 160,85 185,100 160,115 170,140 145,145 140,170 115,165 100,190 85,165 60,170 55,145 30,140 40,115 15,100 40,85 30,60 55,55 60,30 85,35" fill="url(#goldGradient)" stroke="#AA6C39" strokeWidth="2" />
         <circle cx="100" cy="100" r="70" fill="none" stroke="#AA6C39" strokeWidth="2" />
         <circle cx="100" cy="100" r="65" fill="none" stroke="#F1D87E" strokeWidth="1" />
         <path id="textCurveTop" d="M 50,100 A 50,50 0 1,1 150,100" fill="none" />
-        <text fontSize="13" fontWeight="bold" fill="#5C3A1E" letterSpacing="1">
-            <textPath xlinkHref="#textCurveTop" startOffset="50%" textAnchor="middle">
-                 EVIROSAFE CERTIFIED
-            </textPath>
-        </text>
+        <text fontSize="13" fontWeight="bold" fill="#5C3A1E" letterSpacing="1"><textPath xlinkHref="#textCurveTop" startOffset="50%" textAnchor="middle">EVIROSAFE CERTIFIED</textPath></text>
         <path id="textCurveBottom" d="M 45,100 A 55,55 0 0,0 155,100" fill="none" />
-        <text fontSize="10" fontWeight="bold" fill="#5C3A1E" letterSpacing="1">
-            <textPath xlinkHref="#textCurveBottom" startOffset="50%" textAnchor="middle">
-                 OFFICIAL STANDARD
-            </textPath>
-        </text>
-        <path 
-            transform="translate(85, 80) scale(1.2)"
-            d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" 
-            fill="none" 
-            stroke="#5C3A1E" 
-            strokeWidth="2"
-        />
+        <text fontSize="10" fontWeight="bold" fill="#5C3A1E" letterSpacing="1"><textPath xlinkHref="#textCurveBottom" startOffset="50%" textAnchor="middle">OFFICIAL STANDARD</textPath></text>
+        <path transform="translate(85, 80) scale(1.2)" d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" fill="none" stroke="#5C3A1E" strokeWidth="2" />
         <text x="100" y="108" textAnchor="middle" fontSize="16" fontWeight="900" fill="#5C3A1E">ES</text>
       </svg>
     </div>
-  );
-};
+);
 
-const InternationalCertificate: React.FC<{
-  profile: CertificationProfile;
-  user: any;
-  app: CertificateApplication;
-}> = ({ profile, user, app }) => {
-  const level = app.certificateLevel || calcCertificateLevel(profile, app);
+// Simple QR Code Placeholder to avoid external dependency issues
+const SimpleQRCode: React.FC<{ value: string }> = ({ value }) => (
+  <div className="bg-white p-1">
+    <svg viewBox="0 0 100 100" width="80" height="80">
+      <rect width="100" height="100" fill="white" />
+      <path d="M10 10h20v20h-20zM70 10h20v20h-20zM10 70h20v20h-20zM40 10h20v20h-20zM40 40h20v20h-20zM70 40h20v20h-20zM40 70h20v20h-20zM70 70h20v20h-20z" fill="black" />
+      <rect x="15" y="15" width="10" height="10" fill="black" />
+      <rect x="75" y="15" width="10" height="10" fill="black" />
+      <rect x="15" y="75" width="10" height="10" fill="black" />
+    </svg>
+  </div>
+);
+
+const InternationalCertificateDocument: React.FC<{ profile: CertificationProfile; user: any; app: CertificateApplication; }> = ({ profile, user, app }) => {
+  const level = app.certificateLevel || determineCertificateLevel(profile, app);
   const issueDate = app.certificateIssuedAt || new Date().toISOString().slice(0, 10);
-  const validUntil = app.certificateValidUntil || new Date(new Date().setFullYear(new Date().getFullYear() + GLOBAL_STANDARDS.VALIDITY_YEARS[level])).toISOString().slice(0, 10);
-  const certId = app.certificateId || 'EVS-XXXX-XX-0000-XXXXXX';
+  const validUntil = app.certificateValidUntil || new Date().toISOString().slice(0, 10);
+  const certId = app.certificateId || generateCertificateId(level, app.idIssuingCountry);
+  const qrData = generateQRCodeData(certId, user?.name, level, issueDate, validUntil);
 
   return (
-    <div
-      id="printable-certificate"
-      className="relative mx-auto overflow-hidden shadow-2xl print:shadow-none"
-      style={{
-        width: '297mm', // A4 Landscape
-        height: '210mm',
-        backgroundColor: '#fdfbf7', // Rich Cream Paper
-        color: '#1a202c',
-        printColorAdjust: 'exact',
-        WebkitPrintColorAdjust: 'exact'
-      }}
-    >
-      {/* --- FRAME & BORDERS --- */}
-      <div className="absolute inset-0 border-[12px] border-emerald-900" />
-      <div className="absolute inset-3 border-[2px] border-[#c5a059]" />
-      <div className="absolute inset-5 border-[1px] border-emerald-900/30" />
-      
-      {/* Corner Ornaments */}
-      <div className="absolute top-5 left-5 w-16 h-16 border-t-[4px] border-l-[4px] border-[#c5a059] rounded-tl-xl" />
-      <div className="absolute top-5 right-5 w-16 h-16 border-t-[4px] border-r-[4px] border-[#c5a059] rounded-tr-xl" />
-      <div className="absolute bottom-5 left-5 w-16 h-16 border-b-[4px] border-l-[4px] border-[#c5a059] rounded-bl-xl" />
-      <div className="absolute bottom-5 right-5 w-16 h-16 border-b-[4px] border-r-[4px] border-[#c5a059] rounded-br-xl" />
-
-      {/* --- BACKGROUND SECURITY LAYERS --- */}
-      <WatermarkRepeater />
-      <SecurityPattern />
-
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.08]">
-        <img src="/icons/evirosafe-512.png" alt="Crest" className="w-[500px] grayscale brightness-50" />
-      </div>
-
-      {/* --- CONTENT LAYER --- */}
+    <div id="printable-certificate" className="relative mx-auto overflow-hidden shadow-2xl print:shadow-none bg-white" style={{ width: '297mm', height: '210mm', printColorAdjust: 'exact' }}>
+      <div className="absolute inset-0 border-[15mm] border-emerald-900" />
+      <div className="absolute inset-[5mm] border-[2mm] border-amber-600/30" />
+      <div className="absolute inset-0 opacity-5" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%2300597c' fill-opacity='0.4'/%3E%3C/svg%3E")` }}></div>
       <div className="relative z-10 h-full px-20 py-16 flex flex-col justify-between font-serif">
-        
-        {/* HEADER */}
         <div className="text-center space-y-4">
             <div className="flex justify-center items-center gap-3 mb-2">
                  <img src="/icons/evirosafe-512.png" alt="Logo" className="h-16 w-16 drop-shadow-md" />
@@ -325,35 +442,21 @@ const InternationalCertificate: React.FC<{
                      <p className="text-[10px] text-[#c5a059] font-bold uppercase tracking-[0.3em]">International Safety Standards</p>
                  </div>
             </div>
-            
             <div className="border-b-2 border-[#c5a059] w-24 mx-auto mb-6"></div>
-            
-            <h1 className="text-5xl font-black text-emerald-950 uppercase tracking-wider font-serif" style={{ textShadow: '1px 1px 0px rgba(197, 160, 89, 0.5)' }}>
-                Certificate of Competence
-            </h1>
-            <p className="text-lg text-emerald-800 italic font-medium">
-                Health, Safety & Environment Proficiency
-            </p>
+            <h1 className="text-5xl font-black text-emerald-950 uppercase tracking-wider font-serif" style={{ textShadow: '1px 1px 0px rgba(197, 160, 89, 0.5)' }}>Certificate of Competence</h1>
+            <p className="text-lg text-emerald-800 italic font-medium">Health, Safety & Environment Proficiency</p>
         </div>
-
-        {/* BODY */}
         <div className="text-center mt-4">
             <p className="text-sm text-slate-500 uppercase tracking-widest mb-4">This certifies that</p>
-            
             <div className="relative inline-block px-12 py-2">
-                <h2 className="text-4xl font-bold text-slate-900 font-serif border-b-2 border-slate-900/10 pb-2 mb-2">
-                    {(user?.name || 'Recipient Name').toUpperCase()}
-                </h2>
+                <h2 className="text-4xl font-bold text-slate-900 font-serif border-b-2 border-slate-900/10 pb-2 mb-2">{(user?.name || 'Recipient Name').toUpperCase()}</h2>
                 <div className="w-full h-1 bg-gradient-to-r from-transparent via-[#c5a059] to-transparent opacity-50"></div>
             </div>
-
             <p className="mt-6 text-sm text-slate-700 max-w-3xl mx-auto leading-loose">
                 Has successfully fulfilled the rigorous requirements set forth by the <strong>EviroSafe Global Certification Board</strong>. 
                 The holder has demonstrated exceptional knowledge, practical experience, and commitment to maintaining the highest 
-                standards of operational safety and risk management in accordance with 
-                <strong> ISO 45001:2018</strong> frameworks.
+                standards of operational safety and risk management in accordance with <strong> ISO 45001:2018</strong> frameworks.
             </p>
-
             <div className="mt-8 flex justify-center gap-8">
                 <div className="px-6 py-2 border border-[#c5a059] rounded bg-[#fffdf5] shadow-sm">
                     <span className="block text-[10px] uppercase text-[#c5a059] font-bold tracking-wider">Certification Level</span>
@@ -365,24 +468,17 @@ const InternationalCertificate: React.FC<{
                 </div>
             </div>
         </div>
-
-        {/* FOOTER AREA */}
         <div className="mt-auto pt-8 flex items-end justify-between border-t border-emerald-900/10">
-            
             <div className="text-center">
                  <div className="w-48 border-b border-slate-400 mb-2">
                      <img src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Signature_sample.svg" alt="Sig" className="h-10 mx-auto opacity-70" />
                  </div>
                  <p className="text-xs font-bold text-emerald-900 uppercase">Director of Certification</p>
-                 <p className="text-xs text-slate-500">EviroSafe Global HQ</p>
+                 <p className="text-[10px] text-slate-500">EviroSafe Global HQ</p>
             </div>
-
-            <div className="flex flex-col items-center mb-1">
-                 <GoldenSeal />
-            </div>
-
+            <div className="flex flex-col items-center mb-1"><GoldenSeal /></div>
             <div className="text-right flex flex-col items-end">
-                <Barcode value={certId} />
+                <SimpleQRCode value={qrData} />
                 <div className="mt-2 text-[10px] text-slate-600 font-mono">
                     <p>Issue Date: <span className="font-bold">{formatDateLong(issueDate)}</span></p>
                     <p>Expiry Date: <span className="font-bold">{formatDateLong(validUntil)}</span></p>
@@ -390,7 +486,6 @@ const InternationalCertificate: React.FC<{
                 </div>
             </div>
         </div>
-
         <div className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-r from-emerald-900 via-[#c5a059] to-emerald-900"></div>
       </div>
     </div>
@@ -398,19 +493,22 @@ const InternationalCertificate: React.FC<{
 };
 
 // ================================
-// MAIN COMPONENT
+// 4. MAIN COMPONENT
 // ================================
 export const CertifiedProfile: React.FC = () => {
   const { activeUser } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'overview' | 'requirements' | 'evidence' | 'certificate'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'requirements' | 'evidence' | 'certificate' | 'verification' | 'cpd'>('overview');
   const [profile] = useState<CertificationProfile>(mockProfile);
-  const [aiInsight, setAiInsight] = useState<{ nextLevelRecommendation: string; missingItems: string[] } | null>(null);
+  const [aiInsight, setAiInsight] = useState<{ nextLevelRecommendation: string; missingItems: string[]; globalStandardsMet: string[]; improvementAreas: string[]; } | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
+  const [verificationFile, setVerificationFile] = useState<File | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const storageKey = useMemo(() => `evirosafe_cert_app_${activeUser?.id || 'anonymous'}`, [activeUser?.id]);
   const [app, setApp] = useState<CertificateApplication>(DEFAULT_APP);
   const [reviewNote, setReviewNote] = useState('');
+  const [verificationStep, setVerificationStep] = useState(1);
+  const [selectedCertType, setSelectedCertType] = useState<InternationalCertType>('OSHA');
 
   useEffect(() => {
     try {
@@ -428,8 +526,10 @@ export const CertifiedProfile: React.FC = () => {
   useEffect(() => {
     const run = async () => {
       setLoadingInsight(true);
-      const insight = await generateCertificationInsight(profile);
-      setAiInsight(insight);
+      try {
+        const insight = await generateCertificationInsight(profile);
+        setAiInsight(insight);
+      } catch (e) { console.error("AI Insight failed", e); }
       setLoadingInsight(false);
     };
     run();
@@ -437,37 +537,43 @@ export const CertifiedProfile: React.FC = () => {
 
   const eligibility = useMemo(() => {
     const issues: string[] = [];
-    const serviceMonths = app.joinedEviroSafeDate ? monthsBetween(app.joinedEviroSafeDate, new Date().toISOString()) : 0;
+    const warnings: string[] = [];
+    const level = determineCertificateLevel(profile, app);
+    const targetLevel = app.certificateLevel || level;
+    
+    const serviceMonths = app.joinedEviroSafeDate ? Math.floor((new Date().getTime() - new Date(app.joinedEviroSafeDate).getTime()) / (1000 * 60 * 60 * 24 * 30)) : 0;
+    if (serviceMonths < GLOBAL_STANDARDS.MIN_SERVICE_MONTHS[targetLevel]) issues.push(`Minimum service required for ${targetLevel}: ${GLOBAL_STANDARDS.MIN_SERVICE_MONTHS[targetLevel]} months`);
+    if (app.hseExperienceMonths < GLOBAL_STANDARDS.MIN_HSE_EXPERIENCE[targetLevel]) issues.push(`Minimum HSE experience for ${targetLevel}: ${GLOBAL_STANDARDS.MIN_HSE_EXPERIENCE[targetLevel]} months`);
+    
+    const educationRank: Record<EducationLevel, number> = { 'Below Secondary': 0, 'Secondary': 1, 'Diploma': 2, 'Bachelor': 3, 'Master': 4, 'Doctorate': 5 };
+    if (educationRank[app.educationLevel] < educationRank[GLOBAL_STANDARDS.MIN_EDUCATION[targetLevel]]) issues.push(`Minimum education for ${targetLevel}: ${GLOBAL_STANDARDS.MIN_EDUCATION[targetLevel]}`);
+    
+    if (profile.safe_working_hours < GLOBAL_STANDARDS.SAFE_HOURS_REQUIREMENTS[targetLevel]) issues.push(`Minimum safe working hours for ${targetLevel}: ${GLOBAL_STANDARDS.SAFE_HOURS_REQUIREMENTS[targetLevel]} hours`);
+    
+    const requiredCpd = GLOBAL_STANDARDS.CPD_REQUIREMENTS[targetLevel];
+    if (app.cpdHoursCurrentYear < requiredCpd) warnings.push(`CPD hours for ${targetLevel}: ${app.cpdHoursCurrentYear}/${requiredCpd} hours`);
+    
+    const requiredDocs = ['idProof', 'educationProof', 'professionalPhoto', 'employerLetter'];
+    const missingDocs = requiredDocs.filter(doc => !app.docs[doc as keyof typeof app.docs]);
+    if (missingDocs.length > 0) issues.push(`Missing required documents: ${missingDocs.join(', ')}`);
+    
+    const declarations = ['acceptedTerms', 'acceptedPrivacy', 'acceptedCodeOfConduct', 'acceptedContinuousEducation', 'confirmedTrueInfo', 'consentForVerification'];
+    const missingDeclarations = declarations.filter(d => !app[d as keyof CertificateApplication]);
+    if (missingDeclarations.length > 0) issues.push(`Missing declarations`);
 
-    const educationOk = ['Secondary', 'Diploma', 'Bachelor', 'Master', 'Doctorate'].includes(app.educationLevel);
-    if (!educationOk) issues.push('Minimum education: Secondary (Intermediate) or higher.');
-
-    const serviceOk = serviceMonths >= GLOBAL_STANDARDS.MIN_SERVICE_MONTHS;
-    if (!serviceOk) issues.push(`Minimum EviroSafe engagement: ${GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} months.`);
-
-    const hseOk = app.hseExperienceMonths >= GLOBAL_STANDARDS.MIN_HSE_EXPERIENCE_MONTHS;
-    if (!hseOk) issues.push(`Minimum HSE experience: ${GLOBAL_STANDARDS.MIN_HSE_EXPERIENCE_MONTHS} months.`);
-
-    const docsOk = Boolean(app.docs.idProof && app.docs.educationProof && app.docs.professionalPhoto && app.docs.employerLetter);
-    if (!docsOk) issues.push('Upload all required documents.');
-
-    const competenciesOk = app.competencies.riskAssessment && app.competencies.incidentInvestigation;
-    if (!competenciesOk) issues.push('Required competencies: Risk Assessment & Incident Investigation.');
-
-    const termsOk = app.acceptedTerms && app.acceptedPrivacy && app.acceptedCodeOfConduct && app.acceptedContinuousEducation && app.confirmedTrueInfo;
-    if (!termsOk) issues.push('Accept all declarations and terms.');
-
-    const idOk = Boolean(app.idType === 'National ID' && app.idNumber && app.idIssuingCountry);
-    if (!idOk) issues.push('Valid National ID details required.');
-
-    return { serviceMonths, educationOk, serviceOk, hseOk, docsOk, competenciesOk, termsOk, idOk, issues, isEligible: educationOk && serviceOk && hseOk && docsOk && competenciesOk && termsOk && idOk };
-  }, [app]);
+    return { serviceMonths, issues, warnings, isEligible: issues.length === 0, currentLevel: level, targetLevel };
+  }, [app, profile, verificationFile]);
 
   const canSubmit = app.status === 'draft' && eligibility.isEligible;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    setApp(prev => ({ ...prev, status: 'submitted', submittedAt: new Date().toISOString() }));
+    const level = determineCertificateLevel(profile, app);
+    const accreditationBody = getAccreditationBody(level);
+    const certificateId = generateCertificateId(level, app.idIssuingCountry, accreditationBody);
+    const issueDate = new Date().toISOString().split('T')[0];
+    const validity = calculateCertificateValidity(level, issueDate);
+    setApp(prev => ({ ...prev, status: 'submitted', submittedAt: new Date().toISOString(), certificateLevel: level, certificateId, certificateIssuedAt: issueDate, certificateValidUntil: validity.validUntil, accreditationBody }));
     setActiveTab('overview');
   };
 
@@ -475,13 +581,13 @@ export const CertifiedProfile: React.FC = () => {
 
   const handleApprove = () => {
     if (!isAdmin) return;
-    const level = calcCertificateLevel(profile, app);
-    const certId = generateCertificateId(level, app.idIssuingCountry || 'XX');
-    const issuedAt = new Date().toISOString().slice(0, 10);
-    const validYears = GLOBAL_STANDARDS.VALIDITY_YEARS[level];
-    const validUntil = new Date(new Date().setFullYear(new Date().getFullYear() + validYears)).toISOString().slice(0, 10);
-
-    setApp(prev => ({ ...prev, status: 'approved', approvedAt: new Date().toISOString(), approvalNotes: reviewNote, certificateLevel: level, certificateId: certId, certificateIssuedAt: issuedAt, certificateValidUntil: validUntil }));
+    const level = determineCertificateLevel(profile, app);
+    const accreditationBody = getAccreditationBody(level);
+    const certificateId = generateCertificateId(level, app.idIssuingCountry, accreditationBody);
+    const issueDate = new Date().toISOString().split('T')[0];
+    const validity = calculateCertificateValidity(level, issueDate);
+    const qrData = generateQRCodeData(certificateId, activeUser?.name, level, issueDate, validity.validUntil);
+    setApp(prev => ({ ...prev, status: 'approved', approvedAt: new Date().toISOString(), approvalNotes: reviewNote, certificateLevel: level, certificateId, certificateIssuedAt: issueDate, certificateValidUntil: validity.validUntil, accreditationBody, certificateQRCode: qrData }));
     setActiveTab('certificate');
   };
 
@@ -500,237 +606,254 @@ export const CertifiedProfile: React.FC = () => {
   const handlePrint = () => {
     const content = document.getElementById('printable-certificate');
     if (!content) return;
-    const printWindow = window.open('', '', 'height=900,width=1200');
+    const printWindow = window.open('', '_blank', 'height=900,width=1200');
     if (!printWindow) return;
-
-    printWindow.document.write('<html><head><title>EviroSafe Certificate</title>');
-    printWindow.document.write('<script src="https://cdn.tailwindcss.com"></script>');
-    printWindow.document.write('<style>@page{size:A4 landscape; margin:0;} body{margin:0; -webkit-print-color-adjust: exact; print-color-adjust: exact;} </style>');
-    printWindow.document.write('</head><body>');
-    printWindow.document.write(content.outerHTML);
-    printWindow.document.write('</body></html>');
+    printWindow.document.write(`<html><head><title>EviroSafe Certificate</title><link href="https://cdn.tailwindcss.com" rel="stylesheet"><style>@media print {@page { size: landscape; margin: 0; } body { margin: 0; padding: 0; } #printable-certificate { width: 100%; height: 100%; }}</style></head><body class="bg-white">${content.outerHTML}</body></html>`);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => printWindow.print(), 500);
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
   };
 
-  if (!activeUser) return <div className="p-8 text-center"><p className="text-gray-400">Please sign in.</p></div>;
+  const addInternationalCert = () => {
+    const newCert: InternationalCert = { type: selectedCertType, certificateNumber: '', issuingBody: '', issueDate: new Date().toISOString().split('T')[0], expiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0], level: 'Professional', verificationStatus: 'pending' };
+    setApp(prev => ({ ...prev, internationalCerts: [...prev.internationalCerts, newCert] }));
+  };
 
-  const termsList = [
-    { key: 'acceptedTerms', label: 'I accept the EviroSafe Certification Terms & Conditions' },
-    { key: 'acceptedPrivacy', label: 'I accept the Privacy Policy and consent to verification' },
-    { key: 'acceptedCodeOfConduct', label: 'I agree to comply with the professional Code of Conduct' },
-    { key: 'acceptedContinuousEducation', label: 'I agree to continuous education / renewal requirements' },
-    { key: 'confirmedTrueInfo', label: 'I confirm all information provided is true and accurate' },
-  ];
+  const updateCert = (index: number, updates: Partial<InternationalCert>) => {
+    setApp(prev => ({ ...prev, internationalCerts: prev.internationalCerts.map((cert, i) => i === index ? { ...cert, ...updates } : cert) }));
+  };
+
+  const addCPDActivity = () => {
+    const newActivity: CPDActivity = { id: `cpd_${Date.now()}`, title: '', provider: '', date: new Date().toISOString().split('T')[0], hours: 0, category: 'training', verificationStatus: 'pending' };
+    setApp(prev => ({ ...prev, cpdActivities: [...prev.cpdActivities, newActivity] }));
+  };
+
+  const calculateCPDHours = () => {
+    const currentYear = new Date().getFullYear();
+    const currentYearHours = app.cpdActivities.filter(a => new Date(a.date).getFullYear() === currentYear && a.verificationStatus === 'verified').reduce((sum, a) => sum + a.hours, 0);
+    const previousYearHours = app.cpdActivities.filter(a => new Date(a.date).getFullYear() === currentYear - 1 && a.verificationStatus === 'verified').reduce((sum, a) => sum + a.hours, 0);
+    setApp(prev => ({ ...prev, cpdHoursCurrentYear: currentYearHours, cpdHoursPreviousYear: previousYearHours }));
+  };
+
+  if (!activeUser) return <div className="p-8 text-center text-gray-400">Please sign in.</div>;
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-100">My Certification Profile</h1>
-          <p className="text-gray-400 mt-1">International-level rules • evidence • approval • controlled certificate</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setActiveTab('requirements')}>View Requirements</Button>
-          <Button onClick={() => setActiveTab('certificate')} disabled={app.status !== 'approved'} title={app.status !== 'approved' ? 'Pending Approval' : ''}>View Certificate</Button>
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <div className="bg-gradient-to-r from-gray-900 to-emerald-900/50 rounded-2xl p-6 border border-gray-800">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex items-start gap-4">
+            <div className="p-3 rounded-xl bg-emerald-900/30 border border-emerald-700/50"><Award className="w-8 h-8 text-emerald-400" /></div>
+            <div>
+              <h1 className="text-3xl font-bold text-white">Global Certification System</h1>
+              <p className="text-gray-300 mt-1 flex items-center gap-2"><Globe className="w-4 h-4" /> Internationally recognized certifications • ISO 17024 compliant • Global verification</p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Badge color="blue">ISO 17024</Badge><Badge color="green">Global Recognition</Badge><Badge color="purple">Blockchain Verified</Badge><Badge color="amber">Digital Credentials</Badge>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <div className="text-right"><div className="text-sm text-gray-400">Current Status</div><Badge color={statusColor(app.status)} className="text-lg px-4 py-1.5">{app.status.toUpperCase().replace(/_/g, ' ')}</Badge></div>
+            {app.certificateLevel && <div className="text-right"><div className="text-sm text-gray-400">Certification Level</div><div className="text-xl font-bold text-white">{app.certificateLevel}</div></div>}
+          </div>
         </div>
       </div>
 
-      <div className="flex border-b border-gray-700 mb-6">
-        {[{ key: 'overview', label: 'Overview' }, { key: 'requirements', label: 'Requirements' }, { key: 'evidence', label: 'Apply & Evidence' }, { key: 'certificate', label: 'Certificate' }].map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key as any)} className={`px-4 py-3 font-semibold -mb-px border-b-2 ${activeTab === t.key ? 'border-neon-green text-neon-green' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>{t.label}</button>
-        ))}
+      <div className="bg-gray-900/50 rounded-xl p-2 border border-gray-800">
+        <div className="flex overflow-x-auto gap-1 pb-2">
+          {[{ key: 'overview', label: 'Dashboard', icon: BarChart }, { key: 'requirements', label: 'Global Standards', icon: Target }, { key: 'evidence', label: 'Application', icon: FileText }, { key: 'verification', label: 'Verification', icon: ShieldCheck }, { key: 'cpd', label: 'CPD Tracker', icon: BookOpen }, { key: 'certificate', label: 'Certificate', icon: Award }].map(tab => {
+            const Icon = tab.icon;
+            return <button key={tab.key} onClick={() => setActiveTab(tab.key as any)} className={`flex items-center gap-2 px-4 py-3 rounded-lg font-medium transition-all whitespace-nowrap ${activeTab === tab.key ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-700/50' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}><Icon className="w-4 h-4" />{tab.label}</button>;
+          })}
+        </div>
       </div>
 
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card title="Certification Status" className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-4">
-                <img src={activeUser.avatar_url || 'https://i.pravatar.cc/150'} className="w-14 h-14 rounded-full border border-gray-700" alt="avatar" />
-                <div>
-                  <div className="text-2xl font-bold text-gray-100">{activeUser.name}</div>
-                  <div className="text-gray-400">{profile.role_title}</div>
-                </div>
-              </div>
-              <div className="text-right">
-                <Badge color={statusColor(app.status)}>{app.status.toUpperCase().replace('_', ' ')}</Badge>
-                <div className="text-xs text-gray-400 mt-2">Engagement: <span className="font-bold text-gray-200">{eligibility.serviceMonths}</span> months</div>
-              </div>
-            </div>
-            {!eligibility.serviceOk && (
-              <div className="p-4 rounded-xl border border-red-400/40 bg-red-500/10 text-red-200 mb-4">
-                <div className="font-bold mb-1">Not Eligible</div>
-                <div className="text-sm">Minimum engagement required: {GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} months.</div>
-              </div>
-            )}
-            <div className="space-y-5">
-              <ProgressBar current={profile.safe_working_hours} target={5000} label="Safe Working Hours" />
-              <ProgressBar current={profile.qualifications?.length || 0} target={5} label="Qualifications" />
-              <ProgressBar current={eligibility.serviceMonths} target={GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} label="Engagement Months" />
-            </div>
-            {eligibility.issues.length > 0 && (
-              <div className="mt-6 p-4 rounded-xl border border-amber-400/30 bg-amber-500/10">
-                <div className="font-bold text-amber-200 mb-2">Pending Items</div>
-                <ul className="text-sm text-amber-100 space-y-1">
-                  {eligibility.issues.map((x, i) => <li key={i}>• {x}</li>)}
-                </ul>
-                <div className="mt-3"><Button variant="outline" onClick={() => setActiveTab('evidence')}>Go to Application</Button></div>
-              </div>
-            )}
-          </Card>
-
-          <div className="space-y-6">
-            <Card title="AI Recommendation" edgeColor="purple" variant="glass">
-              {loadingInsight ? <p className="text-gray-400">Analyzing...</p> : aiInsight ? (
-                <div className="space-y-3">
-                  <p className="text-gray-200 italic">"{aiInsight.nextLevelRecommendation}"</p>
-                  <div className="text-sm text-gray-300">
-                    <div className="font-bold mb-1">Suggested Actions</div>
-                    <ul className="space-y-1">{aiInsight.missingItems.map((m, i) => <li key={i}>• {m}</li>)}</ul>
+          <div className="lg:col-span-2 space-y-6">
+            <Card title="Certification Progress">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-900 to-cyan-900 flex items-center justify-center text-2xl font-bold text-white">{activeUser.name.charAt(0)}</div>
+                    <div><div className="text-2xl font-bold text-white">{activeUser.name}</div><div className="text-gray-400">{profile.role_title}</div><div className="text-sm text-gray-500 mt-1">Member since: {app.joinedEviroSafeDate || 'Not specified'}</div></div>
                   </div>
+                  <div className="text-right"><div className="text-sm text-gray-400">Target Level</div><div className="text-2xl font-bold text-emerald-400">{eligibility.targetLevel}</div><div className="text-xs text-gray-500 mt-1">Current: {eligibility.currentLevel}</div></div>
                 </div>
-              ) : <p className="text-gray-400">No insight available.</p>}
+                <div className="space-y-4">
+                  <ProgressBar current={profile.safe_working_hours} target={GLOBAL_STANDARDS.SAFE_HOURS_REQUIREMENTS[eligibility.targetLevel]} label="Safe Working Hours" unit="hours" color="green" />
+                  <ProgressBar current={eligibility.serviceMonths} target={GLOBAL_STANDARDS.MIN_SERVICE_MONTHS[eligibility.targetLevel]} label="Service Months" unit="months" color="blue" />
+                  <ProgressBar current={app.cpdHoursCurrentYear} target={GLOBAL_STANDARDS.CPD_REQUIREMENTS[eligibility.targetLevel]} label="CPD Hours (Current Year)" unit="hours" color="purple" />
+                  <ProgressBar current={app.hseExperienceMonths} target={GLOBAL_STANDARDS.MIN_HSE_EXPERIENCE[eligibility.targetLevel]} label="HSE Experience" unit="months" color="amber" />
+                </div>
+                {eligibility.issues.length > 0 && <div className="mt-6 p-4 rounded-xl border border-red-400/40 bg-red-500/10"><div className="flex items-center gap-2 mb-2"><AlertTriangle className="w-5 h-5 text-red-400" /><div className="font-bold text-red-200">Eligibility Requirements Missing</div></div><ul className="text-sm text-red-100 space-y-1">{eligibility.issues.map((x, i) => <li key={i} className="flex items-start gap-2"><XCircle className="w-3 h-3 mt-1 flex-shrink-0" />{x}</li>)}</ul><div className="mt-4"><Button variant="outline" onClick={() => setActiveTab('evidence')}>Complete Application</Button></div></div>}
+              </div>
             </Card>
-
-            {isAdmin && (
-              <Card title="Reviewer Panel" edgeColor="red" variant="glass">
-                <div className="space-y-3">
-                  <textarea value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} className="w-full rounded-xl bg-black/30 border border-gray-700 p-3 text-gray-100 text-sm" placeholder="Reviewer notes" rows={3} />
-                  <div className="flex gap-2">
-                    <Button onClick={handleApprove} disabled={app.status === 'approved'}>Approve</Button>
-                    <Button variant="danger" onClick={handleReject} disabled={app.status === 'draft'}>Reject</Button>
-                  </div>
-                </div>
-              </Card>
-            )}
+          </div>
+          <div className="space-y-6">
+            <Card title="Quick Actions">
+              <div className="space-y-3">
+                <Button variant="outline" onClick={() => setActiveTab('evidence')} className="w-full justify-start" leftIcon={<FileText className="w-4 h-4" />}>Continue Application</Button>
+                <Button variant="outline" onClick={() => setActiveTab('verification')} className="w-full justify-start" leftIcon={<ShieldCheck className="w-4 h-4" />}>Upload Verification</Button>
+                <Button variant="outline" onClick={() => setActiveTab('cpd')} className="w-full justify-start" leftIcon={<BookOpen className="w-4 h-4" />}>Log CPD Hours</Button>
+                <Button variant="outline" onClick={handleSubmit} disabled={!canSubmit} className="w-full justify-start" leftIcon={<CheckCircle className="w-4 h-4" />}>Submit Application</Button>
+              </div>
+            </Card>
+            <Card title="Global Standards Met">
+              <div className="space-y-2">
+                <GlobalStandardsBadge standard="ISO 17024" verified={true} />
+                <GlobalStandardsBadge standard="Continuous CPD" verified={app.cpdHoursCurrentYear >= 20} />
+                <GlobalStandardsBadge standard="Experience Portfolio" verified={app.hseExperienceMonths >= 24} />
+                <GlobalStandardsBadge standard="International Recognition" verified={app.internationalCerts.length > 0} />
+                <GlobalStandardsBadge standard="Digital Verification" verified={app.certificateQRCode !== undefined} />
+              </div>
+            </Card>
           </div>
         </div>
       )}
 
       {activeTab === 'requirements' && (
-        <Card title="Global Certification Rules">
-          <div className="space-y-6 text-gray-200">
-            <p>1. Minimum {GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} months engagement on EviroSafe platform.</p>
-            <p>2. Valid National ID and Secondary Education (or higher) required.</p>
-            <p>3. Proven competence in Risk Assessment and Incident Investigation.</p>
+        <Card title="Global Certification Standards & Requirements">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {Object.entries(ACCREDITATION_REQUIREMENTS).map(([key, body]) => (
+                <div key={key} className="p-4 border border-gray-700 rounded-xl bg-gray-900/50">
+                  <div className="flex items-center gap-3 mb-3"><Shield className="w-8 h-8 text-emerald-400" /><div><h3 className="font-bold text-white">{body.name}</h3><p className="text-sm text-gray-400">{key}</p></div></div>
+                  <div className="space-y-2 mb-4"><h4 className="text-sm font-bold text-gray-300">Requirements:</h4><ul className="text-sm text-gray-400 space-y-1">{body.requirements.map((req, i) => <li key={i} className="flex items-center gap-2"><CheckCircle className="w-3 h-3 text-emerald-400" />{req}</li>)}</ul></div>
+                  <div className="text-sm text-gray-400"><span className="font-bold">Validity:</span> {body.validity}</div>
+                  <a href={body.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-emerald-400 hover:text-emerald-300 mt-2">Visit website <ExternalLink className="w-3 h-3" /></a>
+                </div>
+              ))}
+            </div>
           </div>
         </Card>
       )}
 
       {activeTab === 'evidence' && (
-        <Card title="Application Form" actions={<Badge color={statusColor(app.status)}>{app.status}</Badge>}>
-            <div className="space-y-8">
-                <div className="space-y-4">
-                    <h3 className="font-bold text-gray-100 border-b border-gray-700 pb-2">A) Eligibility & Education</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm text-gray-400 mb-1">Joined Date</label>
-                            <input type="date" value={app.joinedEviroSafeDate} onChange={e => setApp(p => ({...p, joinedEviroSafeDate: e.target.value, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-gray-400 mb-1">Education Level</label>
-                            <select value={app.educationLevel} onChange={e => setApp(p => ({...p, educationLevel: e.target.value as any, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white">
-                                <option value="Secondary">Secondary</option>
-                                <option value="Diploma">Diploma</option>
-                                <option value="Bachelor">Bachelor</option>
-                                <option value="Master">Master</option>
-                            </select>
-                        </div>
-                    </div>
+        <Card title="Global Certification Application">
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              {['Personal', 'Experience', 'Certifications', 'Documents', 'Review'].map((step, index) => (
+                <div key={step} className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${verificationStep > index + 1 ? 'bg-emerald-900 text-emerald-300' : verificationStep === index + 1 ? 'bg-emerald-700 text-white' : 'bg-gray-800 text-gray-400'}`}>{verificationStep > index + 1 ? '✓' : index + 1}</div>
+                  <div className="text-xs mt-1 text-gray-400">{step}</div>
                 </div>
-
-                <div className="space-y-4">
-                    <h3 className="font-bold text-gray-100 border-b border-gray-700 pb-2">B) Identity (National ID Only)</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm text-gray-400 mb-1">ID Type</label>
-                            <input type="text" value="National ID" disabled className="w-full bg-black/40 border border-gray-700 rounded-lg p-2 text-gray-500 cursor-not-allowed" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-gray-400 mb-1">ID Number</label>
-                            <input type="text" value={app.idNumber} onChange={e => setApp(p => ({...p, idNumber: e.target.value, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white" placeholder="ID Number" />
-                        </div>
-                        <div>
-                            <label className="block text-sm text-gray-400 mb-1">Issuing Country</label>
-                            <input type="text" value={app.idIssuingCountry} onChange={e => setApp(p => ({...p, idIssuingCountry: e.target.value, status: 'draft'}))} className="w-full bg-black/20 border border-gray-700 rounded-lg p-2 text-white" placeholder="Country Code" />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <h3 className="font-bold text-gray-100 border-b border-gray-700 pb-2">F) Terms & Conditions</h3>
-                    <div className="space-y-3 bg-black/20 p-4 rounded-lg">
-                        {termsList.map((t) => (
-                            <label key={t.key} className="flex items-start gap-3 text-sm text-gray-300 cursor-pointer">
-                                <input 
-                                    type="checkbox" 
-                                    checked={!!(app as any)[t.key]} 
-                                    onChange={(e) => setApp(p => ({ ...p, status: 'draft', [t.key]: e.target.checked }))}
-                                    className="mt-1 w-4 h-4 rounded bg-gray-800 border-gray-600 text-neon-green focus:ring-offset-gray-900"
-                                />
-                                <span>{t.label}</span>
-                            </label>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="pt-4 flex gap-4">
-                    <Button onClick={handleSubmit} disabled={!canSubmit}>Submit Application</Button>
-                    <Button variant="outline" onClick={() => setApp(DEFAULT_APP)} disabled={app.status !== 'draft'}>Reset</Button>
-                </div>
+              ))}
             </div>
+            {verificationStep === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-white">Personal Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><label className="block text-sm text-gray-400 mb-1">Full Name</label><input type="text" value={activeUser?.name || ''} disabled className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-gray-300" /></div>
+                  <div><label className="block text-sm text-gray-400 mb-1">Email</label><input type="email" value={activeUser?.email || ''} disabled className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-gray-300" /></div>
+                  <div><label className="block text-sm text-gray-400 mb-1">Education Level</label><select value={app.educationLevel} onChange={e => setApp(p => ({...p, educationLevel: e.target.value as EducationLevel}))} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white"><option value="Secondary">Secondary</option><option value="Diploma">Diploma</option><option value="Bachelor">Bachelor's Degree</option><option value="Master">Master's Degree</option><option value="Doctorate">Doctorate</option></select></div>
+                  <div><label className="block text-sm text-gray-400 mb-1">Institution</label><input type="text" value={app.educationInstitute} onChange={e => setApp(p => ({...p, educationInstitute: e.target.value}))} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white" placeholder="University/College name" /></div>
+                </div>
+                <div className="flex justify-between"><Button variant="outline" onClick={() => setVerificationStep(5)}>Skip to Review</Button><Button onClick={() => setVerificationStep(2)}>Next: Experience</Button></div>
+              </div>
+            )}
+            {verificationStep === 2 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-white">Professional Experience</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div><label className="block text-sm text-gray-400 mb-1">HSE Experience (Months)</label><input type="number" value={app.hseExperienceMonths} onChange={e => setApp(p => ({...p, hseExperienceMonths: parseInt(e.target.value) || 0}))} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white" /></div>
+                  <div><label className="block text-sm text-gray-400 mb-1">Current Position</label><input type="text" value={app.currentPosition} onChange={e => setApp(p => ({...p, currentPosition: e.target.value}))} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white" /></div>
+                </div>
+                <div className="flex justify-between"><Button variant="outline" onClick={() => setVerificationStep(1)}>Back</Button><Button onClick={() => setVerificationStep(3)}>Next: Certifications</Button></div>
+              </div>
+            )}
+            {verificationStep === 3 && (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-white">International Certifications</h3><Button variant="outline" onClick={addInternationalCert} leftIcon={<Plus className="w-4 h-4" />}>Add Certification</Button></div>
+                <div className="space-y-4">
+                  {app.internationalCerts.map((cert, index) => (
+                    <div key={index} className="p-4 border border-gray-700 rounded-lg bg-gray-900/30">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label className="block text-sm text-gray-400 mb-1">Certification Type</label><select value={cert.type} onChange={e => updateCert(index, { type: e.target.value as InternationalCertType })} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white"><option value="NEBOSH">NEBOSH</option><option value="IOSH">IOSH</option><option value="OSHA">OSHA</option><option value="Other">Other</option></select></div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Certificate Number</label><input type="text" value={cert.certificateNumber} onChange={e => updateCert(index, { certificateNumber: e.target.value })} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white" /></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between"><Button variant="outline" onClick={() => setVerificationStep(2)}>Back</Button><Button onClick={() => setVerificationStep(4)}>Next: Documents</Button></div>
+              </div>
+            )}
+            {verificationStep === 4 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-white">Required Documents</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[{ key: 'idProof', label: 'Government ID Proof', required: true }, { key: 'educationProof', label: 'Education Certificate', required: true }].map((doc) => (
+                    <div key={doc.key} className="p-4 border border-gray-700 rounded-lg"><div className="flex items-center justify-between mb-2"><span className="text-white">{doc.label}</span>{doc.required && <Badge color="red" size="sm">Required</Badge>}</div><input type="file" className="w-full text-gray-400 text-sm" onChange={(e) => { const file = e.target.files?.[0]; if (file) setApp(p => ({ ...p, docs: { ...p.docs, [doc.key]: URL.createObjectURL(file) } })); }} /></div>
+                  ))}
+                </div>
+                <div className="flex justify-between"><Button variant="outline" onClick={() => setVerificationStep(3)}>Back</Button><Button onClick={() => setVerificationStep(5)}>Next: Review</Button></div>
+              </div>
+            )}
+            {verificationStep === 5 && (
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold text-white">Review & Submit</h3>
+                <div className="p-4 border border-gray-700 rounded-lg"><h4 className="font-bold text-white mb-3">Declarations</h4><div className="space-y-3"><label className="flex items-center gap-3 text-gray-300 hover:text-white cursor-pointer"><input type="checkbox" checked={app.acceptedTerms} onChange={(e) => setApp(p => ({ ...p, acceptedTerms: e.target.checked }))} className="w-4 h-4 text-emerald-500 bg-gray-800 border-gray-700 rounded focus:ring-emerald-500" />I accept the Terms and Conditions</label></div></div>
+                <div className="flex justify-between"><Button variant="outline" onClick={() => setVerificationStep(4)}>Back</Button><Button onClick={handleSubmit} disabled={!canSubmit} className={!canSubmit ? 'opacity-50 cursor-not-allowed' : ''} leftIcon={<CheckCircle className="w-4 h-4" />}>Submit Application</Button></div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {activeTab === 'verification' && (
+        <Card title="Verification Portal">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <h3 className="text-lg font-bold text-white">International Certification Verification</h3>
+              <div className="p-6 border-2 border-dashed border-emerald-700/30 rounded-xl bg-emerald-900/10">
+                <div className="text-center mb-4"><ShieldCheck className="w-12 h-12 text-emerald-400 mx-auto mb-3" /><h4 className="font-bold text-white">Upload Certification for Verification</h4></div>
+                <div className="space-y-4">
+                  <div><label className="block text-sm text-gray-400 mb-2">Select Certification Type</label><select value={selectedCertType} onChange={e => setSelectedCertType(e.target.value as InternationalCertType)} className="w-full bg-gray-900/50 border border-gray-700 rounded p-2 text-white"><option value="NEBOSH">NEBOSH</option><option value="IOSH">IOSH</option><option value="OSHA">OSHA</option></select></div>
+                  <div><label className="block text-sm text-gray-400 mb-2">Upload Certificate</label><div className="border border-gray-700 rounded-lg p-4 bg-gray-900/30"><input type="file" accept=".pdf,.jpg,.png,.jpeg" onChange={e => setVerificationFile(e.target.files?.[0] || null)} className="w-full text-gray-400" /></div></div>
+                </div>
+              </div>
+              <div className="space-y-4"><h4 className="font-bold text-white">Verification Status</h4><div className="space-y-3">{app.internationalCerts.map((cert, index) => <InternationalCertificateCard key={index} cert={cert} />)}</div></div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {activeTab === 'cpd' && (
+        <Card title="Continuous Professional Development (CPD) Tracker">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="flex justify-between items-center"><h3 className="text-lg font-bold text-white">CPD Activities</h3><Button variant="outline" onClick={addCPDActivity} leftIcon={<Plus className="w-4 h-4" />}>Add Activity</Button></div>
+              <div className="space-y-4">{app.cpdActivities.map((activity, index) => <div key={activity.id} className="p-4 border border-gray-700 rounded-lg bg-gray-900/30"><h4 className="font-bold text-white">{activity.title || 'Untitled Activity'}</h4></div>)}</div>
+            </div>
+            <div className="space-y-6"><Card title="CPD Summary"><div className="space-y-4"><div className="p-4 bg-gray-900/50 rounded-lg"><div className="text-center mb-3"><div className="text-3xl font-bold text-emerald-400">{app.cpdHoursCurrentYear}</div><div className="text-sm text-gray-400">Hours This Year</div></div><ProgressBar current={app.cpdHoursCurrentYear} target={GLOBAL_STANDARDS.CPD_REQUIREMENTS[eligibility.targetLevel]} label="Annual Target" unit="hours" /></div><Button onClick={calculateCPDHours} className="w-full" leftIcon={<RefreshCw className="w-4 h-4" />}>Recalculate CPD Hours</Button></div></Card></div>
+          </div>
         </Card>
       )}
 
       {activeTab === 'certificate' && (
         <div className="space-y-6">
-          {app.status !== 'approved' ? (
-            <Card title="Certificate Not Available Yet">
-              <div className="text-center py-10">
-                <div className="text-6xl mb-4">🏆</div>
-                <h3 className="text-xl font-bold text-gray-100 mb-2">Pending Approval</h3>
-                <p className="text-gray-400 max-w-xl mx-auto">
-                  Your certificate will be generated only after your application is verified and approved.
-                  Minimum engagement is {GLOBAL_STANDARDS.MIN_SERVICE_MONTHS} months.
-                </p>
-                <div className="mt-6 flex gap-3 justify-center">
-                  <Button onClick={() => setActiveTab('evidence')}>Complete Application</Button>
-                  <Button variant="outline" onClick={() => setActiveTab('requirements')}>
-                    View Requirements
-                  </Button>
-                </div>
-                {app.approvalNotes && (
-                  <div className="mt-6 text-sm text-amber-200">
-                    Reviewer notes: <span className="text-amber-100">{app.approvalNotes}</span>
-                  </div>
-                )}
+          {app.status === 'approved' ? (
+            <div className="bg-white rounded-xl overflow-hidden shadow-2xl">
+              <InternationalCertificateDocument profile={profile} user={activeUser} app={app} />
+            </div>
+          ) : (
+            <Card>
+              <div className="text-center py-12">
+                <Clock className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">Application Under Review</h3>
+                <p className="text-gray-400">Your certification application is currently being reviewed.</p>
               </div>
             </Card>
-          ) : (
-            <>
-              <div className="flex items-center justify-between p-5 rounded-2xl border border-gray-700 bg-black/20">
-                <div>
-                  <div className="text-xl font-bold text-gray-100">Certificate Ready</div>
-                  <div className="text-sm text-gray-400">
-                    ID: <b className="text-gray-200">{app.certificateId}</b> • Valid until:{' '}
-                    <b className="text-gray-200">{app.certificateValidUntil}</b>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={handlePrint}>Print</Button>
-                  <Button variant="outline" onClick={handleDownloadPDF} disabled={isGeneratingPdf}>
-                    {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
-                  </Button>
-                </div>
-              </div>
-              <div className="overflow-auto py-8">
-                <InternationalCertificate profile={profile} user={activeUser} app={app} />
-              </div>
-            </>
           )}
         </div>
+      )}
+
+      {isAdmin && app.status === 'submitted' && (
+        <Card title="Admin Review Panel" className="mt-6 border border-emerald-800/50">
+          <div className="space-y-4">
+            <div><label className="block text-sm text-gray-400 mb-2">Review Notes</label><textarea value={reviewNote} onChange={e => setReviewNote(e.target.value)} className="w-full h-32 bg-gray-900/50 border border-gray-700 rounded p-3 text-white" placeholder="Enter review notes..." /></div>
+            <div className="grid grid-cols-2 gap-4"><Button onClick={handleApprove} className="bg-emerald-900 hover:bg-emerald-800 border-emerald-700" leftIcon={<CheckCircle className="w-4 h-4" />}>Approve & Issue Certificate</Button><Button variant="danger" onClick={handleReject} leftIcon={<XCircle className="w-4 h-4" />}>Reject Application</Button></div>
+          </div>
+        </Card>
       )}
     </div>
   );
