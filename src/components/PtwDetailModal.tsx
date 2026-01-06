@@ -93,7 +93,7 @@ const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => v
             onChange={e => onChange(e.target.value)}
             className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm read-only:bg-gray-100 dark:read-only:bg-white/5"
             required={required}
-            read-only={disabled}
+            readOnly={disabled}
         />
     </div>
 );
@@ -107,7 +107,7 @@ const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any)
             onChange={e => onChange(e.target.value)}
             className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-200 read-only:bg-gray-100 dark:read-only:bg-white/5"
             placeholder={disabled ? "Signed" : "Type name to sign"}
-            read-only={disabled}
+            readOnly={disabled}
         />
     </div>
 );
