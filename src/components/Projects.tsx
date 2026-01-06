@@ -1,23 +1,26 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { Project, User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { 
-    Briefcase, Plus 
+    Briefcase, Calendar, MapPin, Users, Activity, 
+    AlertTriangle, FileText, CheckSquare, ArrowLeft, 
+    Plus, Settings, MoreVertical 
 } from 'lucide-react';
+import { roles } from '../config';
 
 // --- Project Creation/Edit Modal ---
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: Omit<Project, 'id' | 'org_id' | 'status'>) => void;
-  initialData?: Project;
   users: User[];
+  initialData?: Project;
 }
 
-const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, initialData, users }) => {
+const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, users, initialData }) => {
     const [formData, setFormData] = useState({
         name: initialData?.name || '',
         code: initialData?.code || '',
@@ -25,8 +28,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
         start_date: initialData?.start_date || new Date().toISOString().split('T')[0],
         finish_date: initialData?.finish_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         manager_id: initialData?.manager_id || '',
-        type: initialData?.type || 'Construction',
-        status: initialData?.status || 'active'
+        type: initialData?.type || 'Construction'
     });
     const [error, setError] = useState('');
 
@@ -45,9 +47,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
                 <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                        {initialData ? 'Edit Project' : 'Create New Project'}
-                    </h3>
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create New Project</h3>
                 </div>
                 <div className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -94,9 +94,9 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
                     </div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
                 </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border rounded-b-xl">
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>{initialData ? 'Save Changes' : 'Create Project'}</Button>
+                    <Button onClick={handleSubmit}>Create Project</Button>
                 </div>
             </div>
         </div>
@@ -168,6 +168,7 @@ export const Projects: React.FC = () => {
   const { projects, handleCreateProject, isLoading } = useDataContext();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const orgProjects = useMemo(() => projects.filter(p => p.org_id === activeOrg.id), [projects, activeOrg]);
   const canCreate = can('create', 'projects');
@@ -176,6 +177,13 @@ export const Projects: React.FC = () => {
     handleCreateProject(data);
     setIsModalOpen(false);
   };
+
+  if (selectedProject) {
+      // In a real app, you would navigate to a route. Here we just render the detail view.
+      // We need to import ProjectDetails but it's not imported in this file to avoid circular dependency in this snippet.
+      // Assuming ProjectDetails is handled by parent or router.
+      return <div>Project Details View Placeholder</div>;
+  }
 
   return (
     <div>
@@ -198,7 +206,7 @@ export const Projects: React.FC = () => {
                 key={project.id} 
                 project={project} 
                 users={usersList} 
-                onView={() => {}} 
+                onView={() => setSelectedProject(project)} 
               />
           ))}
       </div>

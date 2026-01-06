@@ -51,9 +51,8 @@ const StatBox: React.FC<{ label: string; value: string | number; icon: React.Rea
 );
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
-  const { reportList, ptwList, inspectionList, ramsList } = useDataContext();
+  const { reportList, ptwList, inspectionList } = useDataContext(); // Removed unused lists
   const { usersList } = useAppContext();
-  const [activeTab, setActiveTab] = useState('Overview');
   const [isSafetyPulseModalOpen, setIsSafetyPulseModalOpen] = useState(false);
 
   // Filter Data for this Project
@@ -102,21 +101,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-slate-900/50 border border-white/10 rounded-xl overflow-hidden px-6 py-3">
-        <nav className="flex space-x-8">
-          {['Overview', 'Safety', 'Team', 'Documents'].map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`relative py-3 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === tab ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-200'}`}>
-              {tab}
-              {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-green-500"></span>}
-            </button>
-          ))}
-        </nav>
-      </div>
-
       {/* Content */}
-      {activeTab === 'Overview' && (
-        <div className="space-y-6">
+      <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatBox label="Safe Man Hours" value="125,000" icon={<Shield className="w-6 h-6" />} color="text-emerald-500" change={12} trend="up" />
                 <StatBox label="Active Permits" value={stats.activePtws} icon={<FileText className="w-6 h-6" />} color="text-blue-500" change={-5} trend="down" />
@@ -149,7 +135,6 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
                 </DashboardWidget>
             </div>
         </div>
-      )}
     </div>
   );
 };
