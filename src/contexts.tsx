@@ -159,8 +159,8 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
-  equipmentList: any[]; // Added
-  subcontractors: any[]; // Added
+  equipmentList: any[];
+  subcontractors: any[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -214,8 +214,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
-    const [equipmentList, setEquipmentList] = useState<any[]>([]); // Added
-    const [subcontractors, setSubcontractors] = useState<any[]>([]); // Added
+    const [equipmentList] = useState<any[]>([]); // Removed setter
+    const [subcontractors] = useState<any[]>([]); // Removed setter
 
     useEffect(() => {
       if (!currentUser) {

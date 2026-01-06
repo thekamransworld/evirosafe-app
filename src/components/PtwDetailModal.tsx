@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
-  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage 
+  Ptw, PtwSafetyRequirement, PtwLiftingPayload, PtwWorkAtHeightPayload, PtwStoppage 
 } from '../types';
 import { Button } from './ui/Button';
-import { ptwTypeDetails } from '../config';
 import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
-import { useToast } from './ui/Toast';
 import { ActionsBar } from './ui/ActionsBar';
 import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
@@ -45,9 +42,8 @@ const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChan
 );
 
 const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
-    const { activeUser, can } = useAppContext();
+    const { can } = useAppContext();
     const canApprove = can('approve', 'ptw');
-    const isCreator = ptw.payload.creator_id === activeUser?.id;
     const selfApprovalBlocked = false; 
 
     return (
@@ -117,7 +113,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const toast = useToast();
   
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
