@@ -11,8 +11,9 @@ import {
   Globe, ShieldCheck, FileText, Clock, Award, 
   CheckCircle, XCircle, AlertTriangle, Download, 
   BookOpen, Target, BarChart, ExternalLink, Copy, 
-  Shield, Database, Plus, FileSearch
+  Shield, Database, Plus, FileSearch, RefreshCw // <--- Added RefreshCw here
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 // ================================
 // 1. TYPES & STANDARDS
@@ -408,19 +409,6 @@ const GoldenSeal: React.FC = () => (
     </div>
 );
 
-// Simple QR Code Placeholder to avoid external dependency issues
-const SimpleQRCode: React.FC<{ value: string }> = ({ value }) => (
-  <div className="bg-white p-1">
-    <svg viewBox="0 0 100 100" width="80" height="80">
-      <rect width="100" height="100" fill="white" />
-      <path d="M10 10h20v20h-20zM70 10h20v20h-20zM10 70h20v20h-20zM40 10h20v20h-20zM40 40h20v20h-20zM70 40h20v20h-20zM40 70h20v20h-20zM70 70h20v20h-20z" fill="black" />
-      <rect x="15" y="15" width="10" height="10" fill="black" />
-      <rect x="75" y="15" width="10" height="10" fill="black" />
-      <rect x="15" y="75" width="10" height="10" fill="black" />
-    </svg>
-  </div>
-);
-
 const InternationalCertificateDocument: React.FC<{ profile: CertificationProfile; user: any; app: CertificateApplication; }> = ({ profile, user, app }) => {
   const level = app.certificateLevel || determineCertificateLevel(profile, app);
   const issueDate = app.certificateIssuedAt || new Date().toISOString().slice(0, 10);
@@ -478,7 +466,14 @@ const InternationalCertificateDocument: React.FC<{ profile: CertificationProfile
             </div>
             <div className="flex flex-col items-center mb-1"><GoldenSeal /></div>
             <div className="text-right flex flex-col items-end">
-                <SimpleQRCode value={qrData} />
+                <QRCodeSVG 
+                    value={qrData} 
+                    size={80}
+                    level="H"
+                    includeMargin={false}
+                    bgColor="#ffffff"
+                    fgColor="#064e3b"
+                />
                 <div className="mt-2 text-[10px] text-slate-600 font-mono">
                     <p>Issue Date: <span className="font-bold">{formatDateLong(issueDate)}</span></p>
                     <p>Expiry Date: <span className="font-bold">{formatDateLong(validUntil)}</span></p>
