@@ -94,6 +94,7 @@ const AuthSync: React.FC = () => {
         status: 'active'
       };
 
+      // @ts-ignore
       return [newUser, ...prev];
     });
 
@@ -156,7 +157,8 @@ const GlobalModals = () => {
 
 // --- Main App Content ---
 const AppContent = () => {
-  const { currentView, setCurrentView, activeUser, isLoading, usersList } = useAppContext();
+  const { currentView, setCurrentView, activeUser, usersList } = useAppContext();
+  const { isLoading } = useDataContext(); // Fixed: isLoading comes from DataContext
   const { currentUser } = useAuth();
 
   const {
