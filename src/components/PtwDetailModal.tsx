@@ -86,7 +86,7 @@ const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => v
             onChange={e => onChange(e.target.value)}
             className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm read-only:bg-gray-100 dark:read-only:bg-white/5"
             required={required}
-            readOnly={disabled}
+            read-only={disabled}
         />
     </div>
 );
@@ -274,7 +274,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                     {/* Type-specific sections */}
                     {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
-                            // FIX: Ensure all required fields are present to satisfy type definition
                             loadCalc={{
                                 ...formData.payload.load_calculation,
                                 lift_plan_ref: formData.payload.load_calculation.lift_plan_ref || '',

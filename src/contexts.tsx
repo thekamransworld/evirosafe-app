@@ -15,13 +15,10 @@ import type {
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
 import { useToast } from './components/ui/Toast';
-
-// --- FIREBASE IMPORTS ---
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
-// --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
@@ -141,7 +138,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 export const useAppContext = () => useContext(AppContext);
 
-// --- DATA CONTEXT ---
 interface DataContextType {
   isLoading: boolean;
   projects: Project[];
@@ -186,6 +182,7 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
+  handleCreateChecklistTemplate: (data: any) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -319,6 +316,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
 
+    const handleCreateChecklistTemplate = async (data: any) => {
+        const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
+        setChecklistTemplates(prev => [newTemplate, ...prev]);
+        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
+    };
+
     const handleStatusChange = (id: string, status: any) => {
         setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
         updateDB('reports', id, { status });
@@ -448,7 +451,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction 
+        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction, handleCreateChecklistTemplate
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

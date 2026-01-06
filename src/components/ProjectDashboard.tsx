@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Project } from '../types';
+import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { 
@@ -7,13 +8,13 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { 
-  AlertTriangle, FileText, ClipboardCheck, 
+  ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
   Users, Shield, MapPin, TrendingUp, TrendingDown, 
-  Activity as ActivityIcon, ShieldAlert, 
+  BarChart3, Activity as ActivityIcon, ShieldAlert, 
   Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
-  Clock, ArrowLeft
+  Clock, MessageSquare, Eye, Plus, MoreVertical, 
+  List, Search
 } from 'lucide-react';
-import { Button } from './ui/Button';
 
 interface ProjectDetailsProps {
   project: Project;
@@ -49,7 +50,7 @@ const StatBox: React.FC<{ label: string; value: string | number; icon: React.Rea
 );
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
-  const { reportList, ptwList, inspectionList, ramsList } = useDataContext();
+  const { reportList, ptwList, inspectionList, ramsList, equipmentList = [] } = useDataContext();
   const { usersList } = useAppContext();
   const [activeTab, setActiveTab] = useState('Overview');
 

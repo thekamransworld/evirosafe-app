@@ -5,13 +5,14 @@ import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { useToast } from './ui/Toast';
 import { 
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
   Users, Shield, MapPin, TrendingUp, TrendingDown, 
-  BarChart3, Activity as ActivityIcon, ShieldAlert, 
-  Download, Share2, Printer,
+  BarChart3, Activity as ActivityIcon, ShieldAlert, Wrench, 
+  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
   Clock, MessageSquare, Eye, Plus, MoreVertical, 
   List, Search, Mail, Phone, Briefcase, X, FileCheck
 } from 'lucide-react';
