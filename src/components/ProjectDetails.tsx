@@ -1,14 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import type { Project, User, ActivityItem } from '../types';
+import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { useToast } from './ui/Toast';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  BarChart, Activity as ActivityIcon,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid
+} from 'recharts';
+import { 
+  ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
+  Users, Shield, MapPin, TrendingUp, TrendingDown, 
+  BarChart3, Activity as ActivityIcon, ShieldAlert, 
+  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
   Clock, MessageSquare, Eye, Plus, MoreVertical, 
-  List, Search, Mail, Phone, Briefcase, X, FileText, ClipboardCheck, FileCheck, ShieldAlert
+  List, Search, Mail, Phone, Briefcase, X, FileCheck
 } from 'lucide-react';
 import { roles } from '../config';
 
@@ -19,8 +25,186 @@ interface ProjectDetailsProps {
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
 
-// ... (Keep AddMemberModal and MemberProfileModal exactly as they were)
-// ... (Keep DashboardWidget and StatBox exactly as they were)
+// --- Dashboard Widget ---
+const DashboardWidget: React.FC<{ title: string; children: React.ReactNode; className?: string; actions?: React.ReactNode }> = ({ title, children, className, actions }) => (
+    <div className={`bg-gradient-to-br from-slate-900/60 to-slate-800/40 border border-white/10 backdrop-blur-lg rounded-2xl p-6 flex flex-col shadow-2xl ${className}`}>
+        <div className="flex justify-between items-center mb-6">
+            <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">{title}</h3>
+            {actions && <div className="flex gap-2">{actions}</div>}
+        </div>
+        <div className="flex-1 min-h-0">{children}</div>
+    </div>
+);
+
+// --- Stat Box ---
+const StatBox: React.FC<{ label: string; value: string | number; icon: React.ReactNode; color: string; change?: number; trend?: 'up' | 'down' }> = ({ label, value, icon, color, change, trend }) => (
+    <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/5 p-6 rounded-2xl flex items-center justify-between hover:border-white/10 transition-all duration-300 group hover:scale-[1.02] hover:shadow-xl">
+        <div>
+            <p className="text-slate-400 text-xs uppercase font-semibold tracking-wide mb-2">{label}</p>
+            <p className="text-3xl font-black text-white mb-1">{value}</p>
+            {change !== undefined && (
+                <div className="flex items-center gap-1 mt-2">
+                    {trend === 'up' ? <TrendingUp className="w-4 h-4 text-green-500" /> : <TrendingDown className="w-4 h-4 text-red-500" />}
+                    <span className={`text-xs font-medium ${trend === 'up' ? 'text-green-400' : 'text-red-400'}`}>{change}% from last month</span>
+                </div>
+            )}
+        </div>
+        <div className={`p-4 rounded-xl bg-white/5 ${color} group-hover:scale-110 transition-transform duration-300 shadow-lg`}>{icon}</div>
+    </div>
+);
+
+// --- Add Member Modal ---
+const AddMemberModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    project: Project;
+    existingTeamIds: string[];
+}> = ({ isOpen, onClose, project, existingTeamIds }) => {
+    const { usersList, handleInviteUser, activeOrg } = useAppContext();
+    const toast = useToast();
+    const [activeTab, setActiveTab] = useState<'existing' | 'invite'>('existing');
+    
+    // Invite Form State
+    const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
+    const [role, setRole] = useState('WORKER');
+
+    // Existing User Selection
+    const [selectedUserId, setSelectedUserId] = useState('');
+
+    // Filter users in the org who are NOT in the project yet
+    const availableUsers = usersList.filter(u => 
+        u.org_id === activeOrg.id && !existingTeamIds.includes(u.id)
+    );
+
+    const handleAddExisting = () => {
+        if (!selectedUserId) return;
+        const user = usersList.find(u => u.id === selectedUserId);
+        if (user) {
+            toast.success(`${user.name} added to ${project.name}`);
+            onClose();
+        }
+    };
+
+    const handleInviteNew = () => {
+        if (!email || !name) return;
+        // @ts-ignore
+        handleInviteUser({
+            email,
+            name,
+            role,
+            org_id: activeOrg.id,
+            project_id: project.id
+        });
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b dark:border-slate-800">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Add Team Member</h3>
+                    <p className="text-sm text-gray-500">Add to {project.name}</p>
+                </div>
+                
+                <div className="p-4">
+                    <div className="flex space-x-2 mb-6 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                        <button 
+                            onClick={() => setActiveTab('existing')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'existing' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            Select Existing
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('invite')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${activeTab === 'invite' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
+                        >
+                            Invite New
+                        </button>
+                    </div>
+
+                    {activeTab === 'existing' ? (
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Select User</label>
+                                <select 
+                                    className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                    value={selectedUserId}
+                                    onChange={(e) => setSelectedUserId(e.target.value)}
+                                >
+                                    <option value="">-- Choose a member --</option>
+                                    {availableUsers.map(u => (
+                                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {availableUsers.length === 0 && (
+                                <p className="text-sm text-amber-500">No available users found in organization.</p>
+                            )}
+                            <Button className="w-full" onClick={handleAddExisting} disabled={!selectedUserId}>Add Selected Member</Button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <input className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Full Name" value={name} onChange={e => setName(e.target.value)} />
+                            <input className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Email Address" type="email" value={email} onChange={e => setEmail(e.target.value)} />
+                            <select className="w-full p-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={role} onChange={e => setRole(e.target.value as any)}>
+                                {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                            </select>
+                            <Button className="w-full" onClick={handleInviteNew}>Send Invitation</Button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Member Profile Modal ---
+const MemberProfileModal: React.FC<{ user: User | null; onClose: () => void }> = ({ user, onClose }) => {
+    if (!user) return null;
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="h-24 bg-gradient-to-r from-blue-600 to-indigo-600 relative">
+                    <button onClick={onClose} className="absolute top-2 right-2 p-1 bg-black/20 hover:bg-black/40 rounded-full text-white transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="px-6 pb-6">
+                    <div className="relative -mt-12 mb-4">
+                        <div className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-900 bg-slate-200 flex items-center justify-center text-3xl font-bold text-slate-500 overflow-hidden">
+                            {user.avatar_url ? <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" /> : user.name.charAt(0)}
+                        </div>
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{user.name}</h2>
+                    <p className="text-blue-600 dark:text-blue-400 font-medium mb-4">{user.role.replace('_', ' ')}</p>
+                    
+                    <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
+                        <div className="flex items-center gap-3">
+                            <Mail className="w-4 h-4 text-gray-400" />
+                            <span>{user.email}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Phone className="w-4 h-4 text-gray-400" />
+                            <span>{user.mobile || 'No mobile number'}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Briefcase className="w-4 h-4 text-gray-400" />
+                            <span>{user.designation || 'No designation'}</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t dark:border-slate-800 flex gap-3">
+                        <Button className="flex-1">Message</Button>
+                        <Button variant="secondary" className="flex-1">View Activity</Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- Team Member Card ---
 const TeamMemberCard: React.FC<{ 
