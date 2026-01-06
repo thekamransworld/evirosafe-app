@@ -24,7 +24,7 @@ const FindingForm: React.FC<{
     onSave: (finding: InspectionFinding) => void;
     onCancel: () => void;
     users: User[];
-}> = ({ finding, onSave, onCancel, users }) => {
+}> = ({ finding, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
         description: finding.description || '',
         risk_level: finding.risk_level || 'Low',
@@ -179,7 +179,7 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = (pr
     };
 
     const template = useMemo(() => checklistTemplates.find(t => t.id === inspection.checklist_template_id), [checklistTemplates, inspection]);
-    const isReviewer = useMemo(() => ['HSE_MANAGER', 'SUPERVISOR', 'ADMIN'].includes(activeUser.role), [activeUser.role]);
+    const isReviewer = useMemo(() => ['HSE_MANAGER', 'SUPERVISOR', 'ADMIN'].includes(activeUser?.role || ''), [activeUser?.role]);
     const isSubmitted = useMemo(() => ['Submitted', 'Under Review', 'Approved', 'Closed'].includes(currentInspection.status), [currentInspection.status]);
     
     const itemFindings = useMemo(() => (currentInspection.findings || []).filter(f => f.checklist_item_id), [currentInspection.findings]);

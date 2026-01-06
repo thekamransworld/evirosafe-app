@@ -59,8 +59,7 @@ const AppContext = createContext<AppContextType>(null!);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
-  // FIX: Ensure activeOrg is initialized with a valid Organization object or the first one from the list
-  const [activeOrg, setActiveOrg] = useState<Organization>(initialOrganizations[0]); 
+  const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || {});
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
@@ -189,6 +188,7 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
+  handleCreateChecklistTemplate: (data: any) => void; // FIX: Added this
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -215,8 +215,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
-    const [equipmentList] = useState<any[]>([]);
-    const [subcontractors] = useState<any[]>([]);
+    const [equipmentList, setEquipmentList] = useState<any[]>([]);
+    const [subcontractors, setSubcontractors] = useState<any[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -322,6 +322,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newPtw = { ...data, id: `ptw_${Date.now()}`, status: 'DRAFT' };
         setPtwList(prev => [newPtw, ...prev]);
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
+    };
+
+    const handleCreateChecklistTemplate = async (data: any) => {
+        const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
+        setChecklistTemplates(prev => [newTemplate, ...prev]);
+        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
     };
 
     const handleStatusChange = (id: string, status: any) => {
@@ -453,7 +459,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction 
+        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction, handleCreateChecklistTemplate
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

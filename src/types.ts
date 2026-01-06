@@ -25,7 +25,8 @@ export interface User {
   name: string;
   avatar_url: string;
   role: 'ADMIN' | 'ORG_ADMIN' | 'HSE_MANAGER' | 'HSE_OFFICER' | 'SUPERVISOR' | 'INSPECTOR' | 'WORKER' | 'CLIENT_VIEWER' | 'CUSTOM_SITE_LEAD';
-  status: 'active' | 'inactive' | 'invited' | 'pending_approval';
+  // FIX: Added 'string' to allow flexible status from AuthSync
+  status: 'active' | 'inactive' | 'invited' | 'pending_approval' | string; 
   mobile?: string;
   designation?: string;
   company?: string;
@@ -211,7 +212,9 @@ export interface Report {
     created_at?: string;
 }
 
-export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived';
+// FIX: Updated InspectionStatus to include all possible statuses
+export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue';
+
 export interface InspectionFinding {
     id: string;
     checklist_item_id?: string;
@@ -243,7 +246,6 @@ export interface Inspection {
     inspection_id?: string;
 }
 
-// FIX: Added riskLevel optional property
 export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
 export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
@@ -355,6 +357,7 @@ export interface PtwLiftingPayload extends CanonicalPtwPayload {
         crane_capacity_at_radius?: number; 
         crane_capacity: number; 
         utilization_percent: number; 
+        // FIX: Made these optional to match usage
         lift_plan_ref?: string; 
         crane_certification_no?: string; 
         operator_certification_no?: string; 
