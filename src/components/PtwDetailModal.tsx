@@ -274,6 +274,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                     {/* Type-specific sections */}
                     {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
+                            // FIX: Ensure all required fields are present to satisfy type definition
                             loadCalc={{
                                 ...formData.payload.load_calculation,
                                 lift_plan_ref: formData.payload.load_calculation.lift_plan_ref || '',

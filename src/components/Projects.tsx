@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { 
-    Briefcase, MapPin, Plus 
+    Briefcase, Plus 
 } from 'lucide-react';
 
 // --- Project Creation/Edit Modal ---
@@ -198,7 +198,7 @@ export const Projects: React.FC = () => {
                 key={project.id} 
                 project={project} 
                 users={usersList} 
-                onView={() => {}} // No-op for list view, drill-down is in OrganizationDetails
+                onView={() => {}} 
               />
           ))}
       </div>

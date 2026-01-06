@@ -5,14 +5,13 @@ import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { useToast } from './ui/Toast';
 import { 
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
   Users, Shield, MapPin, TrendingUp, TrendingDown, 
-  BarChart3, Activity as ActivityIcon, ShieldAlert, Wrench, 
-  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
+  BarChart3, Activity as ActivityIcon, ShieldAlert, 
+  Download, Share2, Printer,
   Clock, MessageSquare, Eye, Plus, MoreVertical, 
   List, Search, Mail, Phone, Briefcase, X, FileCheck
 } from 'lucide-react';
@@ -24,9 +23,6 @@ interface ProjectDetailsProps {
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
-
-// ... (Rest of the file remains the same as the previous correct version I sent, just ensuring ActivityItem is removed from imports)
-// I will paste the full file content again to be safe.
 
 // --- Add Member Modal ---
 const AddMemberModal: React.FC<{ 
