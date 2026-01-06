@@ -6,7 +6,6 @@ import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
 import { roles as rolesConfig } from './config';
-import type { View, User } from './types'; // Import types
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -48,12 +47,11 @@ import { TrainingSessionModal } from './components/TrainingSessionModal';
 import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
-// Removed unused InspectionConductModal import
 
 // --- Auth Sync ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
-  const { setUsersList, login, logout, activeOrg } = useAppContext();
+  const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
 
   useEffect(() => {
     if (!currentUser) {
@@ -87,13 +85,13 @@ const AuthSync: React.FC = () => {
         }
       };
 
-      const newUser: User = {
+      const newUser = {
         ...template,
         id: uid,
         org_id: activeOrg?.id || template.org_id,
         email,
         name: displayName,
-        status: 'active' as const // FIX: Explicit type assertion
+        status: 'active'
       };
 
       return [newUser, ...prev];
@@ -107,7 +105,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser, usersList } = useAppContext(); // FIX: usersList moved here
+  const { activeUser } = useAppContext();
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
@@ -128,7 +126,7 @@ const GlobalModals = () => {
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
     handleCreateStandaloneAction, handleCreateInspection,
-    projects, trainingCourseList, checklistTemplates
+    projects, usersList, trainingCourseList, checklistTemplates
   } = useDataContext();
 
   if (!activeUser) return null;
@@ -158,9 +156,12 @@ const GlobalModals = () => {
 
 // --- Main App Content ---
 const AppContent = () => {
-  const { currentView, setCurrentView } = useAppContext();
-  const { isLoading, projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList } = useDataContext(); // FIX: isLoading moved here
+  const { currentView, setCurrentView, activeUser, isLoading, usersList } = useAppContext();
   const { currentUser } = useAuth();
+
+  const {
+    projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
+  } = useDataContext();
 
   const {
     setSelectedPlan, setSelectedPlanForEdit, setIsPlanCreationModalOpen,
@@ -186,7 +187,7 @@ const AppContent = () => {
     <div className="flex min-h-screen bg-slate-950 text-slate-100 transition-all duration-300">
       <Sidebar
         currentView={currentView}
-        setCurrentView={(view: string) => setCurrentView(view as View)} // FIX: Type casting
+        setCurrentView={setCurrentView}
         isOpen={sidebarOpen}
         setOpen={setSidebarOpen}
       />
@@ -200,7 +201,7 @@ const AppContent = () => {
           {currentView === 'ptw' && (
             <Ptw
               ptws={ptwList}
-              users={[]}
+              users={usersList}
               projects={projects}
               onCreatePtw={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }}
               onAddExistingPtw={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}

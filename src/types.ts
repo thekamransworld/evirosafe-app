@@ -60,28 +60,7 @@ export interface Project {
 }
 
 export type Resource = 
-  | 'dashboard' 
-  | 'reports' 
-  | 'inspections' 
-  | 'plans' 
-  | 'rams' 
-  | 'training' 
-  | 'people' 
-  | 'settings' 
-  | 'files' 
-  | 'analytics' 
-  | 'checklists' 
-  | 'signage' 
-  | 'tbt' 
-  | 'organizations' 
-  | 'projects' 
-  | 'roles' 
-  | 'ptw' 
-  | 'housekeeping' 
-  | 'actions' 
-  | 'site-map' 
-  | 'certification'
-  | 'hse-statistics';
+  | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics';
 
 export type View = Resource | 'ai-insights';
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
@@ -264,8 +243,9 @@ export interface Inspection {
     inspection_id?: string;
 }
 
-export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; }
-export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; }
+// FIX: Added riskLevel optional property
+export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
+export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
 export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
 
@@ -338,7 +318,7 @@ export interface PtwWorkflowLog {
   user_id: string;
   timestamp: string;
   comments?: string;
-  signoff_type?: string; // Made optional to fix error
+  signoff_type?: string;
 }
 
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
@@ -392,7 +372,6 @@ export type CertificationLevel = 'Beginner' | 'Competent' | 'Advanced' | 'Expert
 export interface Qualification { id: string; title: string; issuer: string; date_obtained: string; expiry_date?: string; verification_status: 'Pending' | 'Verified' | 'Rejected'; attachment_url?: string; }
 export interface CertificationProfile { user_id: string; org_id: string; level: CertificationLevel; role_title: string; safe_working_hours: number; total_years_experience: number; last_incident_date?: string; qualifications: Qualification[]; requirements_met: { training: boolean; experience: boolean; safe_hours: boolean; behavior: boolean; }; certificate_id?: string; certificate_issued_at?: string; supervisor_approval?: { name: string; approved_at: string; comments: string; }; }
 
-// --- NEW TYPES FOR RISK & SIMOPS ---
 export interface PtwRiskAnalysis {
     base_score: number;
     complexity_factor: number;

@@ -17,7 +17,7 @@ const StatCard: React.FC<{ title: string; value: string | number; change?: strin
 );
 
 export const Housekeeping: React.FC = () => {
-    const { activeOrg, activeUser, language } = useAppContext();
+    const { activeOrg, activeUser, language, usersList } = useAppContext();
     const { checklistRunList, setChecklistRunList, projects, checklistTemplates, handleCreateChecklistTemplate } = useDataContext();
 
     const [isRunModalOpen, setRunModalOpen] = useState(false);
@@ -59,6 +59,8 @@ export const Housekeeping: React.FC = () => {
         setRunModalOpen(false);
         setSelectedTemplate(null);
     };
+
+    if (!activeUser) return null;
 
     return (
         <div className="space-y-6">
@@ -123,7 +125,6 @@ export const Housekeeping: React.FC = () => {
                         <tbody className="bg-white dark:bg-slate-900 divide-y divide-gray-200 dark:divide-slate-700">
                             {housekeepingRuns.slice(0, 5).map(run => {
                                 const template = housekeepingTemplates.find(t => t.id === run.template_id);
-                                // @ts-ignore
                                 const user = usersList.find(u => u.id === run.executed_by_id);
                                 return (
                                 <tr key={run.id}>
@@ -145,7 +146,7 @@ export const Housekeeping: React.FC = () => {
                 </div>
             </Card>
 
-            {isRunModalOpen && selectedTemplate && projects.length > 0 && activeUser && (
+            {isRunModalOpen && selectedTemplate && projects[0] && (
                 <ChecklistRunModal
                     template={selectedTemplate}
                     project={projects.find(p => p.org_id === activeOrg.id) || projects[0]}
@@ -155,7 +156,7 @@ export const Housekeeping: React.FC = () => {
                 />
             )}
             
-            {isDetailModalOpen && selectedTemplate && projects.length > 0 && activeUser && (
+            {isDetailModalOpen && selectedTemplate && projects[0] && (
                  <ChecklistDetailModal
                     template={selectedTemplate}
                     organization={activeOrg}
