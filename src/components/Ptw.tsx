@@ -7,7 +7,8 @@ import { useAppContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
-  MapPin, User as UserIcon, CheckCircle
+  MapPin, User as UserIcon, CheckCircle,
+  Shield // <--- ADDED THIS IMPORT
 } from 'lucide-react';
 
 // === GEN 4 STYLES ===
@@ -34,7 +35,7 @@ const getStatusConfig = (status: PtwDoc['status']) => {
 
 interface PtwProps {
   ptws: PtwDoc[];
-  users: User[]; // Added this
+  users: User[];
   projects: Project[];
   onCreatePtw: () => void;
   onAddExistingPtw: () => void;

@@ -6,6 +6,7 @@ import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
 import { roles as rolesConfig } from './config';
+import type { User } from './types'; // Import User type
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -67,6 +68,19 @@ const AuthSync: React.FC = () => {
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
 
+      // Create a default template that matches the User type exactly
+      const defaultPreferences: User['preferences'] = {
+        language: 'en',
+        default_view: 'dashboard',
+        units: { 
+          temperature: 'C', 
+          wind_speed: 'km/h', 
+          height: 'm', 
+          weight: 'kg',
+          distance: 'km'
+        }
+      };
+
       const template = prev[0] || {
         id: uid,
         org_id: activeOrg?.id || 'org1',
@@ -75,35 +89,19 @@ const AuthSync: React.FC = () => {
         avatar_url: '',
         role: 'ADMIN',
         status: 'active',
-        preferences: {
-          language: 'en',
-          default_view: 'dashboard',
-          units: { temperature: 'C', distance: 'km', weight: 'kg' },
-          notifications: { email: true, push: true, sms: false },
-          date_format: 'DD/MM/YYYY',
-          time_format: '24h',
-          theme: 'system'
-        }
+        preferences: defaultPreferences
       };
 
-      const newUser = {
+      const newUser: User = {
         ...template,
         id: uid,
         org_id: activeOrg?.id || template.org_id,
         email,
         name: displayName,
         status: 'active',
-        preferences: {
-            ...template.preferences,
-            units: {
-                temperature: 'C',
-                weight: 'kg',
-                distance: 'km'
-            }
-        }
+        preferences: template.preferences // Use the strictly typed preferences
       };
 
-      // @ts-ignore
       return [newUser, ...prev];
     });
 
@@ -115,7 +113,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser, usersList } = useAppContext(); // Fixed: Get usersList from AppContext
+  const { activeUser, usersList } = useAppContext();
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
