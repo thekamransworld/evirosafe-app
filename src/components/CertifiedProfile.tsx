@@ -223,8 +223,7 @@ const Barcode: React.FC<{ value: string }> = ({ value }) => (
         </div>
         <div className="text-[8px] font-mono mt-1 tracking-widest">{value}</div>
     </div>
-  );
-};
+);
 
 const GoldenSeal: React.FC = () => {
   return (
