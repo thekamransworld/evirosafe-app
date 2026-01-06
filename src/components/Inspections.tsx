@@ -158,6 +158,7 @@ export const Inspections: React.FC = () => {
             inspection={selectedInspection}
             // @ts-ignore
             onUpdate={handleUpdateAndCloseConduct}
+            onConvertToReport={() => {}} // Added missing prop
             projects={projects}
             users={usersList}
             checklistTemplates={checklistTemplates}

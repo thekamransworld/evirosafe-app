@@ -47,6 +47,7 @@ import { TrainingSessionModal } from './components/TrainingSessionModal';
 import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
+import { InspectionConductModal } from './components/InspectionConductModal';
 
 // --- Auth Sync ---
 const AuthSync: React.FC = () => {
