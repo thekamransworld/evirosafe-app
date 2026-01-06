@@ -59,7 +59,8 @@ const AppContext = createContext<AppContextType>(null!);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
-  const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || {});
+  // FIX: Ensure activeOrg is initialized with a valid Organization object or the first one from the list
+  const [activeOrg, setActiveOrg] = useState<Organization>(initialOrganizations[0]); 
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
@@ -214,8 +215,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
-    const [equipmentList] = useState<any[]>([]); // Removed setter
-    const [subcontractors] = useState<any[]>([]); // Removed setter
+    const [equipmentList] = useState<any[]>([]);
+    const [subcontractors] = useState<any[]>([]);
 
     useEffect(() => {
       if (!currentUser) {

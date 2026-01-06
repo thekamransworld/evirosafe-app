@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
-  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage 
+  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, 
+  PtwWorkAtHeightPayload, PtwStoppage 
 } from '../types';
 import { Button } from './ui/Button';
-import { ptwTypeDetails } from '../config';
 import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
@@ -45,9 +44,9 @@ const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChan
 );
 
 const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
-    const { activeUser, can } = useAppContext();
+    const { can } = useAppContext();
     const canApprove = can('approve', 'ptw');
-    const isCreator = ptw.payload.creator_id === activeUser?.id;
+    // const isCreator = ptw.payload.creator_id === activeUser?.id; // Unused
     const selfApprovalBlocked = false; 
 
     return (
@@ -117,7 +116,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const toast = useToast();
+  // const toast = useToast(); // Unused
   
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
@@ -512,7 +511,16 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                                 <FormInput label="New To Date/Time" type="datetime-local" value={formData.payload.extension.hours.to} onChange={val => handlePayloadChange('extension.hours.to', val)} disabled={!isExtensionEditable} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-case 'IX':
+                                <SignatureInput label="Requester" value={formData.payload.extension.requester.signature} onChange={val => handlePayloadChange('extension.requester.signature', val)} disabled={!isExtensionEditable} />
+                                <SignatureInput label="Client Proponent" value={formData.payload.extension.client_proponent.signature} onChange={val => handlePayloadChange('extension.client_proponent.signature', val)} disabled={!isExtensionEditable} />
+                                <SignatureInput label="Client HSE" value={formData.payload.extension.client_hs.signature} onChange={val => handlePayloadChange('extension.client_hs.signature', val)} disabled={!isExtensionEditable} />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+
+        case 'IX':
             return (
                  <div>
                     <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section IX – Permit Closure</h3>
