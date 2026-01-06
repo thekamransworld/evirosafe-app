@@ -1,19 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Project, User } from '../types';
+import { Card } from './ui/Card';
 import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { 
-    Briefcase, Plus
+    Briefcase, Calendar, MapPin, Users, Activity, 
+    AlertTriangle, FileText, CheckSquare, ArrowLeft, 
+    Plus, Settings, MoreVertical 
 } from 'lucide-react';
-import { ProjectDetails } from './ProjectDetails';
-import { Card } from './ui/Card';
-import { Badge } from './ui/Badge';
+import { roles } from '../config';
 
 // --- Project Creation/Edit Modal ---
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Omit<Project, 'id' | 'org_id' | 'status'>) => void;
   initialData?: Project;
   users: User[];
 }
@@ -29,7 +31,6 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
         type: initialData?.type || 'Construction',
         status: initialData?.status || 'active'
     });
-
     const [error, setError] = useState('');
 
     const handleSubmit = () => {
@@ -55,7 +56,7 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Name</label>
-                            <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. Tower A" />
+                            <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" placeholder="e.g. Tower A" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Code</label>
@@ -96,9 +97,53 @@ const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, 
                     </div>
                     {error && <p className="text-sm text-red-500">{error}</p>}
                 </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end space-x-3 border-t dark:border-dark-border rounded-b-xl">
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border rounded-b-xl">
                     <Button variant="secondary" onClick={onClose}>Cancel</Button>
                     <Button onClick={handleSubmit}>{initialData ? 'Save Changes' : 'Create Project'}</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Invite Member Modal ---
+const InviteMemberModal: React.FC<{ isOpen: boolean; onClose: () => void; onInvite: (data: any) => void }> = ({ isOpen, onClose, onInvite }) => {
+    const [formData, setFormData] = useState({ name: '', email: '', role: 'WORKER' });
+
+    const handleSubmit = () => {
+        if (!formData.name || !formData.email) return;
+        onInvite(formData);
+        setFormData({ name: '', email: '', role: 'WORKER' });
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-dark-border" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b dark:border-dark-border">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite Team Member</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="John Doe" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
+                        <input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="john@company.com" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                        <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
+                            {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end space-x-3 border-t dark:border-dark-border rounded-b-xl">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Send Invite</Button>
                 </div>
             </div>
         </div>
@@ -115,6 +160,15 @@ const ProjectCard: React.FC<{
         switch (status) { case 'active': return 'green'; case 'pending': return 'yellow'; case 'archived': return 'gray'; }
     };
 
+    const crew = useMemo(() => users.filter(u => u.org_id === project.org_id), [users, project.org_id]);
+    const crewCounts = useMemo(() => ({
+        managers: crew.filter(c => c.role === 'HSE_MANAGER').length,
+        supervisors: crew.filter(c => c.role === 'SUPERVISOR').length,
+        officers: crew.filter(c => c.role === 'HSE_OFFICER').length,
+        inspectors: crew.filter(c => c.role === 'INSPECTOR').length,
+        workers: crew.filter(c => c.role === 'WORKER').length,
+    }), [crew]);
+
     return (
         <Card className="hover:shadow-lg transition-all cursor-pointer flex flex-col" onClick={onView}>
             <div className="flex justify-between items-start">
@@ -123,6 +177,21 @@ const ProjectCard: React.FC<{
                     <p className="text-sm text-gray-500">{project.location}</p>
                 </div>
                 <Badge color={getStatusColor(project.status)}>{project.status}</Badge>
+            </div>
+            <div className="mt-4 border-t border-gray-100 dark:border-dark-border pt-4">
+                <h4 className="text-sm font-bold mb-2 text-gray-700 dark:text-gray-300">Crew Overview</h4>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.managers}</strong> Managers</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.officers}</strong> HSE Officers</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.supervisors}</strong> Supervisors</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded text-gray-700 dark:text-gray-300"><strong>{crewCounts.inspectors}</strong> Inspectors</div>
+                    <div className="bg-gray-100 dark:bg-white/5 p-1 rounded col-span-2 text-gray-700 dark:text-gray-300"><strong>{crewCounts.workers}</strong> Workers</div>
+                </div>
+            </div>
+             <div className="mt-4 border-t border-gray-100 dark:border-dark-border pt-4 grid grid-cols-3 gap-2 text-center">
+                 <div><p className="text-2xl font-bold text-gray-900 dark:text-white">82%</p><p className="text-xs text-gray-500">Training</p></div>
+                 <div><p className="text-2xl font-bold text-gray-900 dark:text-white">17</p><p className="text-xs text-gray-500">PTW Today</p></div>
+                 <div><p className="text-2xl font-bold text-green-600">0</p><p className="text-xs text-gray-500">Incidents</p></div>
             </div>
             <div className="mt-auto pt-4 flex justify-end">
                 <Button 
@@ -147,8 +216,9 @@ export const Projects: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
-  const orgProjects = React.useMemo(() => projects.filter(p => p.org_id === activeOrg.id), [projects, activeOrg]);
+  const orgProjects = useMemo(() => projects.filter(p => p.org_id === activeOrg.id), [projects, activeOrg]);
   const canCreate = can('create', 'projects');
 
   const handleCreateSubmit = (data: any) => {
@@ -157,27 +227,14 @@ export const Projects: React.FC = () => {
   };
 
   const handleEditSubmit = (data: any) => {
+      // In a real app, call updateProject here
       console.log("Update project", data);
       setIsModalOpen(false);
+      setIsEditMode(false);
   };
 
-  if (selectedProject) {
-      return (
-          <>
-            <ProjectDetails 
-                project={selectedProject} 
-                onBack={() => setSelectedProject(null)} 
-            />
-            <ProjectModal
-                isOpen={isModalOpen}
-                onClose={() => { setIsModalOpen(false); }}
-                onSubmit={handleEditSubmit}
-                users={usersList}
-                initialData={selectedProject}
-            />
-          </>
-      );
-  }
+  // Removed ProjectDetail rendering here as it's handled in OrganizationDetails.tsx now
+  // This component is mainly for the list view if used standalone
 
   return (
     <div>
@@ -187,7 +244,7 @@ export const Projects: React.FC = () => {
             <p className="text-text-secondary dark:text-gray-400">{activeOrg.name}</p>
         </div>
         {canCreate && (
-            <Button onClick={() => { setIsModalOpen(true); }}>
+            <Button onClick={() => { setIsEditMode(false); setIsModalOpen(true); }}>
                 <Plus className="w-5 h-5 mr-2" />
                 New Project
             </Button>

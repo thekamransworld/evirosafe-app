@@ -12,8 +12,7 @@ import { translations, supportedLanguages, roles } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction,
-  Equipment, Subcontractor
+  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
 import { useToast } from './components/ui/Toast';
 
@@ -160,9 +159,6 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
-  equipmentList: Equipment[];
-  trainingList: any[]; // Placeholder
-  subcontractors: Subcontractor[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -190,7 +186,6 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
-  handleCreateChecklistTemplate: (data: any) => void; // Added
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -217,8 +212,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
-    const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
-    const [subcontractors, setSubcontractors] = useState<Subcontractor[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -326,12 +319,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
 
-    const handleCreateChecklistTemplate = async (data: any) => {
-        const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
-        setChecklistTemplates(prev => [newTemplate, ...prev]);
-        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
-    };
-
     const handleStatusChange = (id: string, status: any) => {
         setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
         updateDB('reports', id, { status });
@@ -426,12 +413,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
 
-    // --- CREATE HANDLERS (Local for now, can be upgraded) ---
     const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
     const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
     const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
 
-    // --- DERIVED STATE ---
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
         (reportList || []).forEach(report => {
@@ -457,13 +442,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems, equipmentList, trainingList: [], subcontractors,
+        actionItems,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction, handleCreateChecklistTemplate
+        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction 
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -5,14 +5,15 @@ import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
-  Users, Shield, MapPin, Calendar, DollarSign, TrendingUp, TrendingDown, 
-  BarChart3, PieChart as PieChartIcon, Activity, ShieldAlert, Wrench, 
-  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning
+  Users, Shield, MapPin, TrendingUp, TrendingDown, 
+  BarChart3, Activity as ActivityIcon, ShieldAlert, Wrench, 
+  Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
+  Clock, MessageSquare, Eye, Plus, MoreVertical, 
+  List, Search
 } from 'lucide-react';
 
 interface ProjectDetailsProps {
@@ -20,7 +21,7 @@ interface ProjectDetailsProps {
   onBack: () => void;
 }
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
 
 const DashboardWidget: React.FC<{ title: string; children: React.ReactNode; className?: string; actions?: React.ReactNode }> = ({ title, children, className, actions }) => (
     <div className={`bg-gradient-to-br from-slate-900/60 to-slate-800/40 border border-white/10 backdrop-blur-lg rounded-2xl p-6 flex flex-col shadow-2xl ${className}`}>
@@ -49,7 +50,7 @@ const StatBox: React.FC<{ label: string; value: string | number; icon: React.Rea
 );
 
 export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
-  const { reportList, ptwList, inspectionList, ramsList, equipmentList = [], trainingList = [] } = useDataContext();
+  const { reportList, ptwList, inspectionList, ramsList, equipmentList = [] } = useDataContext();
   const { usersList } = useAppContext();
   const [activeTab, setActiveTab] = useState('Overview');
 
@@ -57,14 +58,14 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
   const projectReports = useMemo(() => reportList.filter(r => r.project_id === project.id), [reportList, project.id]);
   const projectPtws = useMemo(() => ptwList.filter(p => p.project_id === project.id), [ptwList, project.id]);
   const projectInspections = useMemo(() => inspectionList.filter(i => i.project_id === project.id), [inspectionList, project.id]);
-  const projectTeam = useMemo(() => usersList.filter(u => u.org_id === project.org_id), [usersList, project.org_id]); // Simplified team logic
+  const projectTeam = useMemo(() => usersList.filter(u => u.org_id === project.org_id), [usersList, project.org_id]);
 
   const stats = {
       openReports: projectReports.filter(r => r.status !== 'closed').length,
       activePtws: projectPtws.filter(p => p.status === 'ACTIVE').length,
       pendingInspections: projectInspections.filter(i => i.status !== 'Closed').length,
-      safetyScore: 92, // Mock
-      progress: 65, // Mock
+      safetyScore: 92,
+      progress: 65,
   };
 
   return (

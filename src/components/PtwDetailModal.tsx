@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
-  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage 
+  Ptw, PtwSafetyRequirement, PtwWorkAtHeightPayload, PtwStoppage, PtwLiftingPayload 
 } from '../types';
 import { Button } from './ui/Button';
-import { ptwTypeDetails } from '../config';
 import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
-import { useToast } from './ui/Toast';
-import { ActionsBar } from './ui/ActionsBar';
-import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
 import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
@@ -45,11 +40,9 @@ const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChan
 );
 
 const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
-    const { activeUser, can } = useAppContext();
+    const { can } = useAppContext();
     const canApprove = can('approve', 'ptw');
-    const isCreator = ptw.payload.creator_id === activeUser?.id;
-    // In a real app, you might block self-approval. For demo/testing, we allow it or warn.
-    const selfApprovalBlocked = false; 
+    // Removed unused isCreator check to fix TS error
 
     return (
         <div className="flex items-center space-x-2">
@@ -59,7 +52,7 @@ const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () =>
             {ptw.status === 'SUBMITTED' && canApprove && (
                 <>
                     <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
-                    <Button onClick={() => onAction('approve_proponent')} disabled={selfApprovalBlocked}>Approve (Proponent)</Button>
+                    <Button onClick={() => onAction('approve_proponent')}>Approve (Proponent)</Button>
                 </>
             )}
             
@@ -99,6 +92,21 @@ const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => v
     </div>
 );
 
+const FormSelect: React.FC<{ label: string, value: any, onChange: (val: any) => void, options: string[], disabled?: boolean }> = ({ label, value, onChange, options, disabled = false }) => (
+    <div>
+        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
+        <select
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:bg-gray-100 dark:disabled:bg-white/5"
+            disabled={disabled}
+        >
+            <option value="">Select...</option>
+            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+    </div>
+);
+
 const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, disabled?: boolean }> = ({ label, value, onChange, disabled = false }) => (
     <div>
         <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
@@ -117,16 +125,13 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   const { ptw, onClose, onUpdate } = props;
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const toast = useToast();
   
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
-  // Determine editability based on status
   const isEditable = formData.status === 'DRAFT';
   const isProponentEditable = formData.status === 'SUBMITTED';
   const isHseEditable = formData.status === 'APPROVAL';
-  const isInspectionEditable = formData.status === 'APPROVAL' || formData.status === 'ACTIVE'; // Allow inspection during approval or just before active
+  const isInspectionEditable = formData.status === 'APPROVAL' || formData.status === 'ACTIVE';
   const isStoppageEditable = formData.status === 'ACTIVE' || formData.status === 'HOLD';
   const isExtensionEditable = formData.status === 'ACTIVE';
   const isClosureEditable = formData.status === 'ACTIVE' || formData.status === 'HOLD';
@@ -135,19 +140,17 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
       setFormData(JSON.parse(JSON.stringify(ptw)));
   }, [ptw]);
 
-  // Helper to update nested payload properties
   const handlePayloadChange = (path: string, value: any) => {
     setFormData(prev => {
         const keys = path.split('.');
         const newPayload = JSON.parse(JSON.stringify(prev.payload));
         let current: any = newPayload;
         for (let i = 0; i < keys.length - 1; i++) {
-            if (!current[keys[i]]) current[keys[i]] = {}; // Create object if missing
+            if (!current[keys[i]]) current[keys[i]] = {};
             current = current[keys[i]];
         }
         current[keys[keys.length - 1]] = value;
 
-        // Auto-set signed_at date if a signature is being added
         if (path.endsWith('.signature') && value) {
             const pathPrefix = path.substring(0, path.lastIndexOf('.'));
             const signedAtPath = `${pathPrefix}.signed_at`;
@@ -223,7 +226,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   
   const handleWorkflowAction = (action: any) => {
         if (!action) return;
-        // Add validation logic here if needed
         onUpdate(formData, action);
   };
 
@@ -273,7 +275,13 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                     {/* Type-specific sections */}
                     {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
-                            loadCalc={formData.payload.load_calculation}
+                            // FIX: Ensure all required fields are present to satisfy type definition
+                            loadCalc={{
+                                ...formData.payload.load_calculation,
+                                lift_plan_ref: formData.payload.load_calculation.lift_plan_ref || '',
+                                crane_certification_no: formData.payload.load_calculation.crane_certification_no || '',
+                                operator_certification_no: formData.payload.load_calculation.operator_certification_no || ''
+                            } as PtwLiftingPayload['load_calculation']}
                             onChange={(calc) => handlePayloadChange('load_calculation', calc)}
                             disabled={!isEditable}
                         />
@@ -492,7 +500,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                         <div className="mt-6 border-t pt-4 dark:border-dark-border">
                             <h4 className="font-semibold mb-2 text-gray-800 dark:text-gray-200">Log a New Work Stoppage</h4>
                              <div className="grid grid-cols-2 gap-4">
-                                <FormInput label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} />
+                                <FormSelect label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} options={['Unsafe Condition', 'Unsafe Act', 'Emergency', 'Weather', 'Client Instruction', 'Other']} />
                                 <FormInput label="Stopped By" value={stoppageFormData.stopped_by} onChange={val => setStoppageFormData(p => ({...p, stopped_by: val}))} />
                                 <div className="col-span-2"><FormInput label="Informed To" value={stoppageFormData.informed_to} onChange={val => setStoppageFormData(p => ({...p, informed_to: val}))} /></div>
                             </div>
@@ -573,7 +581,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} downloadOptions={[{ label: 'Download PDF', handler: () => window.print() }]} />
               <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
             </div>
           </header>
@@ -609,23 +616,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
           </footer>
         </div>
       </div>
-
-      <EmailModal 
-        isOpen={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
-        documentTitle={`PTW: ${ptw.payload.permit_no || ptw.id}`}
-        defaultRecipients={[...Object.values(ptw.payload.signoffs ?? {}).flat(), ptw.payload.requester, ptw.payload.contractor_safety_personnel].filter(Boolean) as Partial<User>[]}
-        documentLink={`#`}
-      />
-
-      <style>{`
-          @media print {
-              body * { visibility: hidden; }
-              #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
-              #ptw-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
-              @page { size: A4; margin: 1.5cm; }
-          }
-      `}</style>
     </>
   );
 };
