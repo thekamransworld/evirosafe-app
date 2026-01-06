@@ -166,6 +166,7 @@ export const Housekeeping: React.FC = () => {
                 />
             )}
 
+            {/* Library Modal */}
             <ChecklistLibraryModal 
                 isOpen={isLibraryOpen} 
                 onClose={() => setIsLibraryOpen(false)} 

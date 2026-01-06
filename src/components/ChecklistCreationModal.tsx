@@ -29,15 +29,13 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
     setItems(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index: number, field: keyof ChecklistItem, value: string) => {
+  const handleItemChange = (index: number, field: 'text' | 'description' | 'riskLevel', value: string) => {
     setItems(prev => {
       const newItems = [...prev];
       if (field === 'text' || field === 'description') {
-          // @ts-ignore
-          newItems[index][field] = { en: value };
+          newItems[index] = { ...newItems[index], [field]: { en: value } };
       } else {
-          // @ts-ignore
-          newItems[index][field] = value;
+          newItems[index] = { ...newItems[index], [field]: value };
       }
       return newItems;
     });

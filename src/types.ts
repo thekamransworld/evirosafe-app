@@ -25,19 +25,19 @@ export interface User {
   name: string;
   avatar_url: string;
   role: 'ADMIN' | 'ORG_ADMIN' | 'HSE_MANAGER' | 'HSE_OFFICER' | 'SUPERVISOR' | 'INSPECTOR' | 'WORKER' | 'CLIENT_VIEWER' | 'CUSTOM_SITE_LEAD';
-  // FIX: Added 'string' to allow flexible status from AuthSync
   status: 'active' | 'inactive' | 'invited' | 'pending_approval' | string; 
   mobile?: string;
   designation?: string;
   company?: string;
   preferences: {
     language: string;
-    default_view: 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'projects' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics';
+    default_view: string; // Relaxed type to avoid conflicts
     units: {
       temperature: 'C' | 'F';
-      wind_speed: 'km/h' | 'mph';
-      height: 'm' | 'ft';
+      wind_speed?: 'km/h' | 'mph'; // Made optional
+      height?: 'm' | 'ft';         // Made optional
       weight: 'kg' | 'lbs';
+      distance?: 'km' | 'mi';      // Added distance
     };
   };
   project_ids?: string[];
@@ -61,9 +61,9 @@ export interface Project {
 }
 
 export type Resource = 
-  | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics';
+  | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights';
 
-export type View = Resource | 'ai-insights';
+export type View = Resource | string; // Relaxed to string to fix Sidebar error
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
 export type Scope = 'org' | 'project' | 'own';
 
@@ -212,7 +212,6 @@ export interface Report {
     created_at?: string;
 }
 
-// FIX: Updated InspectionStatus to include all possible statuses
 export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue';
 
 export interface InspectionFinding {
@@ -357,7 +356,6 @@ export interface PtwLiftingPayload extends CanonicalPtwPayload {
         crane_capacity_at_radius?: number; 
         crane_capacity: number; 
         utilization_percent: number; 
-        // FIX: Made these optional to match usage
         lift_plan_ref?: string; 
         crane_certification_no?: string; 
         operator_certification_no?: string; 

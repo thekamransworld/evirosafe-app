@@ -80,7 +80,6 @@ const RiskLevelCard: React.FC<{
     const baseClass = "rounded-3xl p-6 text-slate-100 transition-all duration-300 shadow-[0_18px_45px_rgba(0,0,0,0.55)]";
     const themeClass = isHighRisk ? "hero-card-high" : "hero-card-normal";
     
-    // CRITICAL FIX: Ensure recommendations is an array
     const safeRecs = Array.isArray(recommendations) ? recommendations : [];
 
     return (
@@ -171,15 +170,14 @@ const WidgetCard: React.FC<{ title: string; children: React.ReactNode; className
 );
 
 export const Dashboard: React.FC = () => {
-    const { reportList, ptwList, usersList } = useDataContext();
+    const { reportList, ptwList } = useDataContext();
+    const { usersList } = useAppContext(); // Fixed: Get usersList from AppContext
     const { setIsReportCreationModalOpen, setIsTbtCreationModalOpen, setSelectedReport, setIsInspectionCreationModalOpen } = useModalContext();
     const { setCurrentView } = useAppContext();
     
     const [isSafetyPulseModalOpen, setIsSafetyPulseModalOpen] = useState(false);
     const [simulatedTemp, setSimulatedTemp] = useState(38);
 
-    // --- REAL DATA CALCULATIONS ---
-    // CRITICAL FIX: Ensure lists are arrays
     const safePtwList = Array.isArray(ptwList) ? ptwList : [];
     const safeReportList = Array.isArray(reportList) ? reportList : [];
     const safeUsersList = Array.isArray(usersList) ? usersList : [];
@@ -187,7 +185,6 @@ export const Dashboard: React.FC = () => {
     const activePermits = useMemo(() => safePtwList.filter(p => p.status === 'ACTIVE').length, [safePtwList]);
     const pendingReports = useMemo(() => safeReportList.filter(r => r.status === 'under_review' || r.status === 'submitted'), [safeReportList]);
     
-    // Calculate Risk Level based on Open Incidents
     const riskAnalysis = useMemo(() => {
         const openIncidents = safeReportList.filter(r => r.status !== 'closed');
         const criticalCount = openIncidents.filter(r => (r.risk_pre_control.severity * r.risk_pre_control.likelihood) >= 15).length;
@@ -199,7 +196,6 @@ export const Dashboard: React.FC = () => {
         return { level: 'Low', summary: 'Site operations are stable. No major incidents.' };
     }, [safeReportList]);
 
-    // Calculate Stats for Pulse Widget
     const pulseStats = useMemo(() => ({
         incidents: safeReportList.filter(r => ['Incident', 'Accident', 'Fire Event'].includes(r.type)).length,
         unsafeActs: safeReportList.filter(r => r.type === 'Unsafe Act').length,
@@ -207,17 +203,14 @@ export const Dashboard: React.FC = () => {
         positiveObs: safeReportList.filter(r => r.type === 'Positive Observation').length,
     }), [safeReportList]);
 
-    // Estimate Workforce (Users + 4 workers per active permit)
     const workforceCount = safeUsersList.length + (activePermits * 4);
 
-    // Recommendations based on Risk
     const recommendations = useMemo(() => {
         if (riskAnalysis.level === 'Critical') return ['Stop work in affected areas', 'Conduct emergency meeting', 'Review all active permits'];
         if (riskAnalysis.level === 'High') return ['Increase inspection frequency', 'Verify all PTW controls', 'Conduct TBT on recent incidents'];
         return ['Maintain housekeeping standards', 'Ensure hydration breaks', 'Routine equipment checks'];
     }, [riskAnalysis.level]);
 
-    // Simulate temp fluctuation
     useEffect(() => {
         const interval = setInterval(() => {
             setSimulatedTemp(prev => parseFloat((prev + (Math.random() > 0.5 ? 0.1 : -0.1)).toFixed(1)));
@@ -266,13 +259,12 @@ export const Dashboard: React.FC = () => {
                             <span className="text-sky-400">{pendingReports.length}</span>
                         </h2>
                         <div className="space-y-2 flex-1 overflow-y-auto pr-1 custom-scrollbar">
-                            {pendingReports.length > 0 ? pendingReports.slice(0, 3).map((r, idx) => (
-                                <button key={r.id || idx} onClick={() => setSelectedReport(r)} className="w-full text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group">
+                            {pendingReports.length > 0 ? pendingReports.slice(0, 3).map(r => (
+                                <button key={r.id} onClick={() => setSelectedReport(r)} className="w-full text-left p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all group">
                                     <div className="flex justify-between items-start">
                                         <span className="text-xs font-bold text-slate-200 group-hover:text-white">{r.type}</span>
                                         <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">Pending</span>
                                     </div>
-                                    {/* CRITICAL FIX: Safe ID slicing */}
                                     <p className="text-[10px] text-slate-500 mt-1 truncate">#{r.id ? r.id.slice(-6) : '???'} • {new Date(r.reported_at).toLocaleDateString()}</p>
                                 </button>
                             )) : (

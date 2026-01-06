@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { Ptw, PtwWorkflowStage, PtwWorkflowLog } from '../types';
+import type { Ptw, PtwWorkflowStage } from '../types';
 import { PtwWorkflowEngine } from '../utils/workflowEngine';
 
 interface PtwWorkflowContextType {
@@ -39,7 +39,7 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
           user_id: userId,
           timestamp: new Date().toISOString(),
           comments,
-          signoff_type: 'digital' // Added this required field
+          signoff_type: 'digital' // FIX: Added this property
         }
       ],
       updated_at: new Date().toISOString()

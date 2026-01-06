@@ -174,7 +174,7 @@ const ProgressBar: React.FC<{ current: number; target: number; label: string }> 
       </div>
       <div className="w-full bg-gray-700 rounded-full h-2.5">
         <div
-          className="bg-emerald-500 h-2.5 rounded-full transition-all duration-500"
+          className="bg-neon-green h-2.5 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
         />
       </div>
@@ -223,7 +223,8 @@ const Barcode: React.FC<{ value: string }> = ({ value }) => (
         </div>
         <div className="text-[8px] font-mono mt-1 tracking-widest">{value}</div>
     </div>
-);
+  );
+};
 
 const GoldenSeal: React.FC = () => {
   return (
@@ -539,7 +540,7 @@ export const CertifiedProfile: React.FC = () => {
 
       <div className="flex border-b border-gray-700 mb-6">
         {[{ key: 'overview', label: 'Overview' }, { key: 'requirements', label: 'Requirements' }, { key: 'evidence', label: 'Apply & Evidence' }, { key: 'certificate', label: 'Certificate' }].map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key as any)} className={`px-4 py-3 font-semibold -mb-px border-b-2 ${activeTab === t.key ? 'border-emerald-500 text-emerald-500' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>{t.label}</button>
+          <button key={t.key} onClick={() => setActiveTab(t.key as any)} className={`px-4 py-3 font-semibold -mb-px border-b-2 ${activeTab === t.key ? 'border-neon-green text-neon-green' : 'border-transparent text-gray-400 hover:text-gray-200'}`}>{t.label}</button>
         ))}
       </div>
 
@@ -668,7 +669,7 @@ export const CertifiedProfile: React.FC = () => {
                                     type="checkbox" 
                                     checked={!!(app as any)[t.key]} 
                                     onChange={(e) => setApp(p => ({ ...p, status: 'draft', [t.key]: e.target.checked }))}
-                                    className="mt-1 w-4 h-4 rounded bg-gray-800 border-gray-600 text-emerald-500 focus:ring-offset-gray-900"
+                                    className="mt-1 w-4 h-4 rounded bg-gray-800 border-gray-600 text-neon-green focus:ring-offset-gray-900"
                                 />
                                 <span>{t.label}</span>
                             </label>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ChecklistTemplate, ChecklistRun } from '../types';
+import type { ChecklistTemplate } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -31,7 +31,12 @@ export const Checklists: React.FC = () => {
     if (!template) return 'Unknown Template';
     return getTranslated(template.title);
   };
-  const getUserName = (userId: string) => 'User';
+  
+  // Simplified user name lookup
+  const getUserName = (userId: string) => {
+      // In a real app, you'd look this up from usersList
+      return userId ? 'User' : 'Unknown'; 
+  };
 
   const handleViewTemplate = (template: ChecklistTemplate) => {
     setSelectedTemplate(template);

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Project } from '../types';
+import type { Project, User } from '../types';
 import type { Ptw as PtwDoc } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
@@ -7,8 +7,7 @@ import { useAppContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
-  MapPin, User as UserIcon, CheckCircle,
-  Shield
+  MapPin, User as UserIcon, CheckCircle
 } from 'lucide-react';
 
 // === GEN 4 STYLES ===
@@ -35,6 +34,7 @@ const getStatusConfig = (status: PtwDoc['status']) => {
 
 interface PtwProps {
   ptws: PtwDoc[];
+  users: User[]; // Added this
   projects: Project[];
   onCreatePtw: () => void;
   onAddExistingPtw: () => void;
@@ -53,7 +53,7 @@ const StatCard: React.FC<{ label: string, value: number, color: string, icon: Re
     </div>
 );
 
-export const Ptw: React.FC<PtwProps> = ({ ptws, projects, onCreatePtw, onAddExistingPtw, onSelectPtw }) => {
+export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, onAddExistingPtw, onSelectPtw }) => {
   const { can } = useAppContext();
   const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Closed'>('All');
   const [search, setSearch] = useState('');

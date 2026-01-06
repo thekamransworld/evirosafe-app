@@ -92,7 +92,15 @@ const AuthSync: React.FC = () => {
         org_id: activeOrg?.id || template.org_id,
         email,
         name: displayName,
-        status: 'active'
+        status: 'active',
+        preferences: {
+            ...template.preferences,
+            units: {
+                temperature: 'C',
+                weight: 'kg',
+                distance: 'km'
+            }
+        }
       };
 
       // @ts-ignore
@@ -107,7 +115,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser } = useAppContext();
+  const { activeUser, usersList } = useAppContext(); // Fixed: Get usersList from AppContext
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
@@ -128,7 +136,7 @@ const GlobalModals = () => {
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
     handleCreateStandaloneAction, handleCreateInspection,
-    projects, usersList, trainingCourseList, checklistTemplates
+    projects, trainingCourseList, checklistTemplates
   } = useDataContext();
 
   if (!activeUser) return null;
@@ -159,7 +167,7 @@ const GlobalModals = () => {
 // --- Main App Content ---
 const AppContent = () => {
   const { currentView, setCurrentView, activeUser, usersList } = useAppContext();
-  const { isLoading } = useDataContext(); // Fixed: isLoading comes from DataContext
+  const { isLoading } = useDataContext();
   const { currentUser } = useAuth();
 
   const {

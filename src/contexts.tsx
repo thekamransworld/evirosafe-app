@@ -59,7 +59,8 @@ const AppContext = createContext<AppContextType>(null!);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
-  const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || {});
+  // FIX: Ensure activeOrg is never null by providing a default empty object if organizations is empty
+  const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || { id: 'default', name: 'Default Org', slug: 'default', domain: '', status: 'active', timezone: 'UTC', primaryLanguage: 'en', secondaryLanguages: [], branding: { logoUrl: '' }, industry: '', country: '' });
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
@@ -188,7 +189,7 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
-  handleCreateChecklistTemplate: (data: any) => void; // FIX: Added this
+  handleCreateChecklistTemplate: (data: any) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
