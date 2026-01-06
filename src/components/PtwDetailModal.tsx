@@ -512,16 +512,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                                 <FormInput label="New To Date/Time" type="datetime-local" value={formData.payload.extension.hours.to} onChange={val => handlePayloadChange('extension.hours.to', val)} disabled={!isExtensionEditable} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                                <SignatureInput label="Requester" value={formData.payload.extension.requester.signature} onChange={val => handlePayloadChange('extension.requester.signature', val)} disabled={!isExtensionEditable} />
-                                <SignatureInput label="Client Proponent" value={formData.payload.extension.client_proponent.signature} onChange={val => handlePayloadChange('extension.client_proponent.signature', val)} disabled={!isExtensionEditable} />
-                                <SignatureInput label="Client HSE" value={formData.payload.extension.client_hs.signature} onChange={val => handlePayloadChange('extension.client_hs.signature', val)} disabled={!isExtensionEditable} />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-
-        case 'IX':
+case 'IX':
             return (
                  <div>
                     <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section IX – Permit Closure</h3>
