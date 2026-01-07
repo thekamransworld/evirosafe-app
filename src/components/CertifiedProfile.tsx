@@ -11,9 +11,8 @@ import {
   Globe, ShieldCheck, FileText, Clock, Award, 
   CheckCircle, XCircle, AlertTriangle, Download, 
   BookOpen, Target, BarChart, ExternalLink, Copy, 
-  Shield, Database, Plus, FileSearch, RefreshCw // <--- Added RefreshCw here
+  Shield, Database, Plus, FileSearch, RefreshCw
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 
 // ================================
 // 1. TYPES & STANDARDS
@@ -466,13 +465,10 @@ const InternationalCertificateDocument: React.FC<{ profile: CertificationProfile
             </div>
             <div className="flex flex-col items-center mb-1"><GoldenSeal /></div>
             <div className="text-right flex flex-col items-end">
-                <QRCodeSVG 
-                    value={qrData} 
-                    size={80}
-                    level="H"
-                    includeMargin={false}
-                    bgColor="#ffffff"
-                    fgColor="#064e3b"
+                <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}&color=064e3b`}
+                    alt="Verification QR"
+                    className="w-20 h-20"
                 />
                 <div className="mt-2 text-[10px] text-slate-600 font-mono">
                     <p>Issue Date: <span className="font-bold">{formatDateLong(issueDate)}</span></p>
