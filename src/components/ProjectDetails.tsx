@@ -3,6 +3,7 @@ import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
+import { roles } from '../config';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
   AreaChart, Area, XAxis, YAxis, CartesianGrid
@@ -28,6 +29,50 @@ interface ProjectDetailsProps {
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+
+// --- Invite Member Modal ---
+const InviteMemberModal: React.FC<{ isOpen: boolean; onClose: () => void; onInvite: (data: any) => void }> = ({ isOpen, onClose, onInvite }) => {
+    const [formData, setFormData] = useState({ name: '', email: '', role: 'WORKER' });
+
+    const handleSubmit = () => {
+        if (!formData.name || !formData.email) return;
+        onInvite(formData);
+        setFormData({ name: '', email: '', role: 'WORKER' });
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-dark-border" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b dark:border-dark-border">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite Team Member</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="John Doe" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
+                        <input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="john@company.com" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Role</label>
+                        <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
+                            {roles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                        </select>
+                    </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-4 flex justify-end space-x-3 border-t dark:border-dark-border rounded-b-xl">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Send Invite</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- Reusable Dashboard Widget Component ---
 const DashboardWidget: React.FC<{ 
@@ -122,8 +167,8 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
             case 'inspection': return 'green';
             case 'ptw': return 'purple';
             case 'rams': return 'amber';
-            case 'equipment': return 'blue'; // Changed from cyan
-            case 'training': return 'purple'; // Changed from pink
+            case 'equipment': return 'blue';
+            case 'training': return 'purple';
             case 'message': return 'gray';
             case 'incident': return 'red';
             case 'milestone': return 'yellow';
@@ -258,15 +303,16 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
     ptwList, 
     inspectionList, 
     ramsList, 
-    trainingSessionList, // Corrected from trainingList
+    trainingSessionList, 
     tbtList
   } = useDataContext();
   
-  const { usersList } = useAppContext();
+  const { usersList, handleInviteUser, activeOrg } = useAppContext();
   
   const [activeTab, setActiveTab] = useState('Overview');
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [teamView, setTeamView] = useState<'grid' | 'list'>('grid');
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false); // <--- Added State
 
   // Filter Data for this Project
   const projectReports = useMemo(() => reportList.filter(r => r.project_id === project.id), [reportList, project.id]);
@@ -396,6 +442,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
     };
   }, [projectReports, projectPtws, projectInspections, projectRams, projectTraining, projectTbt, activityFeed, projectTeam]);
 
+  const handleInvite = (data: any) => {
+    handleInviteUser({
+        ...data,
+        org_id: activeOrg.id,
+        project_id: project.id // <--- Link invite to this project
+    });
+    setIsInviteModalOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-10 bg-gradient-to-b from-slate-950 to-slate-900 min-h-screen">
       {/* Header */}
@@ -415,8 +470,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                 <div className="flex flex-wrap items-center gap-4 text-slate-300 text-sm">
                   <span className="font-mono bg-white/10 px-3 py-1 rounded-lg text-xs">{project.code || 'PRJ-001'}</span>
                   <span className="flex items-center gap-2"><MapPin className="w-4 h-4"/> {project.location}</span>
+                  {/* ADDED DATES HERE */}
+                  <span className="flex items-center gap-2"><Calendar className="w-4 h-4"/> {new Date(project.start_date).toLocaleDateString()} - {new Date(project.finish_date).toLocaleDateString()}</span>
                   <span className="flex items-center gap-2"><Users className="w-4 h-4"/> {stats.teamSize} members</span>
-                  <span className="flex items-center gap-2"><ActivityIcon className="w-4 h-4"/> {stats.totalActivities} activities</span>
                 </div>
               </div>
             </div>
@@ -523,7 +579,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600" onClick={() => setIsInviteModalOpen(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Member
                     </Button>
@@ -796,6 +852,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
             </div>
         </div>
       )}
+
+      <InviteMemberModal 
+        isOpen={isInviteModalOpen} 
+        onClose={() => setIsInviteModalOpen(false)} 
+        onInvite={handleInvite} 
+      />
     </div>
   );
 };
