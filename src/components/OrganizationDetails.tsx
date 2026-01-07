@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { ProjectCreationModal } from './ProjectCreationModal';
-import { ProjectDetails } from './ProjectDetails'; // <--- Import ProjectDetails
+import { ProjectDetails } from './ProjectDetails';
 
 interface OrganizationDetailsProps {
   org: Organization;
@@ -19,7 +19,7 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
   const { projects, handleCreateProject } = useDataContext();
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<any>(null); // State for selected project
+  const [selectedProject, setSelectedProject] = useState<any>(null);
 
   // Filter data for this specific organization
   const orgProjects = useMemo(() => projects.filter(p => p.org_id === org.id), [projects, org.id]);
@@ -41,7 +41,8 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
       return (
           <ProjectDetails 
               project={selectedProject} 
-              onBack={() => setSelectedProject(null)} 
+              onBack={() => setSelectedProject(null)}
+              onEdit={() => console.log("Edit project clicked")} // <--- FIXED: Added missing prop
           />
       );
   }
@@ -147,7 +148,7 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
                         <Card 
                             key={p.id} 
                             className="hover:border-primary-500 transition-colors cursor-pointer"
-                            onClick={() => setSelectedProject(p)} // <--- Click to view details
+                            onClick={() => setSelectedProject(p)}
                         >
                             <div className="flex justify-between items-start">
                                 <div>
