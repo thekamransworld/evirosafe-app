@@ -1,22 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import type { Project, User, Report, Ptw, Inspection, Rams, Equipment, Training, Subcontractor } from '../types';
+import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
-  Users, Shield, MapPin, Calendar, DollarSign, TrendingUp, TrendingDown, 
-  BarChart3, PieChart as PieChartIcon, Activity, ShieldAlert, Wrench, 
+  Users, Shield, MapPin, Calendar, TrendingUp, TrendingDown, 
+  BarChart3, Activity, ShieldAlert, Wrench, 
   Download, Share2, Printer, Thermometer, Droplets, Wind, CloudLightning,
-  Clock, MessageSquare, CheckCircle, Eye,
-  Truck, Plus, MoreVertical, 
+  Clock, MessageSquare, Eye,
+  Plus, MoreVertical, 
   Award, Trophy,
-  FileCheck, // <--- FIXED: Added this missing import
+  FileCheck,
   Activity as ActivityIcon,
   List,
   Search
@@ -25,6 +24,7 @@ import {
 interface ProjectDetailsProps {
   project: Project;
   onBack: () => void;
+  onEdit: () => void;
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
@@ -107,8 +107,8 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
             case 'inspection': return <ClipboardCheck className="w-5 h-5 text-emerald-500" />;
             case 'ptw': return <FileCheck className="w-5 h-5 text-purple-500" />;
             case 'rams': return <ShieldAlert className="w-5 h-5 text-amber-500" />;
-            case 'equipment': return <Wrench className="w-5 h-5 text-cyan-500" />;
-            case 'training': return <Award className="w-5 h-5 text-pink-500" />;
+            case 'equipment': return <Wrench className="w-5 h-5 text-blue-500" />;
+            case 'training': return <Award className="w-5 h-5 text-purple-500" />;
             case 'message': return <MessageSquare className="w-5 h-5 text-slate-400" />;
             case 'incident': return <AlertTriangle className="w-5 h-5 text-red-500" />;
             case 'milestone': return <Trophy className="w-5 h-5 text-yellow-500" />;
@@ -122,8 +122,8 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
             case 'inspection': return 'green';
             case 'ptw': return 'purple';
             case 'rams': return 'amber';
-            case 'equipment': return 'cyan';
-            case 'training': return 'pink';
+            case 'equipment': return 'blue'; // Changed from cyan
+            case 'training': return 'purple'; // Changed from pink
             case 'message': return 'gray';
             case 'incident': return 'red';
             case 'milestone': return 'yellow';
@@ -252,16 +252,14 @@ const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[] }> = ({ 
     );
 };
 
-export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack }) => {
+export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack, onEdit }) => {
   const { 
     reportList, 
     ptwList, 
     inspectionList, 
     ramsList, 
-    equipmentList = [], 
-    trainingList = [],
-    tbtList = [],
-    subcontractors = []
+    trainingSessionList, // Corrected from trainingList
+    tbtList
   } = useDataContext();
   
   const { usersList } = useAppContext();
@@ -269,29 +267,26 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
   const [activeTab, setActiveTab] = useState('Overview');
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [teamView, setTeamView] = useState<'grid' | 'list'>('grid');
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
 
   // Filter Data for this Project
   const projectReports = useMemo(() => reportList.filter(r => r.project_id === project.id), [reportList, project.id]);
   const projectPtws = useMemo(() => ptwList.filter(p => p.project_id === project.id), [ptwList, project.id]);
   const projectInspections = useMemo(() => inspectionList.filter(i => i.project_id === project.id), [inspectionList, project.id]);
   const projectRams = useMemo(() => ramsList.filter(r => r.project_id === project.id), [ramsList, project.id]);
-  const projectEquipment = useMemo(() => equipmentList.filter(e => e.project_id === project.id), [equipmentList, project.id]);
-  const projectTraining = useMemo(() => trainingList.filter(t => t.project_id === project.id), [trainingList, project.id]);
+  const projectTraining = useMemo(() => trainingSessionList.filter(t => t.project_id === project.id), [trainingSessionList, project.id]);
   const projectTbt = useMemo(() => tbtList.filter(t => t.project_id === project.id), [tbtList, project.id]);
 
   // Get project team members
   const projectTeam = useMemo(() => {
     return usersList.filter(u => 
       u.org_id === project.org_id && 
-      (u.project_ids?.includes(project.id) || 
-       u.role === 'ADMIN' || 
+      (u.role === 'ADMIN' || 
        u.role === 'ORG_ADMIN' ||
        u.role === 'HSE_MANAGER' ||
        u.role === 'SUPERVISOR' ||
        u.role === 'INSPECTOR')
     );
-  }, [usersList, project.org_id, project.id]);
+  }, [usersList, project.org_id]);
 
   // Create comprehensive activity feed
   const activityFeed = useMemo(() => {
@@ -307,7 +302,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
           title: `${report.type} Report`,
           description: report.description || 'No description provided',
           user,
-          timestamp: report.created_at || new Date().toISOString(),
+          timestamp: report.reported_at || new Date().toISOString(),
           data: report,
           status: report.status,
           priority: report.risk_pre_control.severity > 3 ? 'high' : 'medium'
@@ -335,7 +330,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
 
     // Add PTW
     projectPtws.forEach(ptw => {
-      const user = usersList.find(u => u.id === ptw.payload.requester.name); // Assuming name maps to ID for mock
+      const user = usersList.find(u => u.id === ptw.payload.creator_id);
       if (user) {
         activities.push({
           id: ptw.id,
@@ -383,8 +378,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
       openReports: projectReports.filter(r => r.status !== 'closed').length,
       activePtws: projectPtws.filter(p => p.status === 'ACTIVE').length,
       pendingInspections: projectInspections.filter(i => i.status !== 'Closed').length,
-      safetyScore: project.safety_score || 92,
-      progress: project.progress || 0,
+      safetyScore: 92, // Mock
+      progress: 0, // Mock
       totalActivities: activityFeed.length,
       todayActivities: todayActivities.length,
       teamSize: projectTeam.length,
@@ -395,16 +390,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
         inspections: projectInspections.length,
         ptws: projectPtws.length,
         rams: projectRams.length,
-        equipment: projectEquipment.length,
         training: projectTraining.length,
         tbt: projectTbt.length
-      },
-      budgetSpent: project.budget_spent || 0,
-      budgetRemaining: (project.budget || 0) - (project.budget_spent || 0),
-      daysElapsed: Math.round((new Date().getTime() - new Date(project.start_date).getTime()) / (1000 * 60 * 60 * 24)),
-      totalDays: Math.round((new Date(project.finish_date).getTime() - new Date(project.start_date).getTime()) / (1000 * 60 * 60 * 24)),
+      }
     };
-  }, [projectReports, projectPtws, projectInspections, projectRams, projectEquipment, projectTraining, projectTbt, activityFeed, projectTeam, project]);
+  }, [projectReports, projectPtws, projectInspections, projectRams, projectTraining, projectTbt, activityFeed, projectTeam]);
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 bg-gradient-to-b from-slate-950 to-slate-900 min-h-screen">
@@ -634,6 +624,176 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
                     </div>
                 </DashboardWidget>
             )}
+        </div>
+      )}
+
+      {activeTab === 'Activities' && (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-xl font-bold text-white mb-1">Project Activity Feed</h2>
+                    <p className="text-slate-400 text-sm">Real-time updates from all team members</p>
+                </div>
+                <div className="flex gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                            type="text" 
+                            placeholder="Search activities..." 
+                            className="pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm w-64"
+                        />
+                    </div>
+                    <select 
+                        value={activityFilter}
+                        onChange={(e) => setActivityFilter(e.target.value)}
+                        className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                    >
+                        <option value="all">All Activities</option>
+                        <option value="report">Reports</option>
+                        <option value="inspection">Inspections</option>
+                        <option value="ptw">PTW</option>
+                        <option value="rams">RAMS</option>
+                        <option value="training">Training</option>
+                        <option value="message">Messages</option>
+                    </select>
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                        <Plus className="w-4 h-4 mr-2" />
+                        New Activity
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <DashboardWidget title="Activity Feed" className="lg:col-span-2">
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                        {filteredActivities.length > 0 ? (
+                            filteredActivities.map(activity => (
+                                <ActivityFeedItem key={activity.id} activity={activity} />
+                            ))
+                        ) : (
+                            <div className="text-center py-12">
+                                <ActivityIcon className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+                                <p className="text-slate-500">No activities found</p>
+                                <p className="text-slate-600 text-sm mt-1">Try changing your filters</p>
+                            </div>
+                        )}
+                    </div>
+                </DashboardWidget>
+
+                <div className="space-y-6">
+                    <DashboardWidget title="Activity Stats">
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-300">Total Activities</span>
+                                <span className="text-white font-bold">{stats.totalActivities}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-300">Today</span>
+                                <span className="text-emerald-400 font-bold">{stats.todayActivities}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-300">This Week</span>
+                                <span className="text-white font-bold">
+                                    {activityFeed.filter(a => 
+                                        new Date(a.timestamp) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                                    ).length}
+                                </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-slate-300">Active Users</span>
+                                <span className="text-white font-bold">{stats.teamSize}</span>
+                            </div>
+                        </div>
+                    </DashboardWidget>
+
+                    <DashboardWidget title="Top Contributors">
+                        <div className="space-y-4">
+                            {projectTeam
+                                .map(user => ({
+                                    user,
+                                    count: activityFeed.filter(a => a.user.id === user.id).length
+                                }))
+                                .sort((a, b) => b.count - a.count)
+                                .slice(0, 3)
+                                .map(({ user, count }, index) => (
+                                    <div key={user.id} className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
+                                            {user.name.charAt(0)}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-medium text-white">{user.name}</p>
+                                            <p className="text-xs text-slate-400">{count} activities</p>
+                                        </div>
+                                        <div className={`text-lg font-bold ${index === 0 ? 'text-yellow-400' : index === 1 ? 'text-slate-300' : 'text-amber-600'}`}>
+                                            #{index + 1}
+                                        </div>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    </DashboardWidget>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {activeTab === 'Safety' && (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatBox label="Safe Man Hours" value="125,000" icon={<Shield className="w-6 h-6" />} color="text-emerald-500" change={12} trend="up" />
+                <StatBox label="Active Permits" value={stats.activePtws} icon={<FileText className="w-6 h-6" />} color="text-blue-500" change={-5} trend="down" />
+                <StatBox label="Open Incidents" value={stats.openReports} icon={<AlertTriangle className="w-6 h-6" />} color="text-red-500" change={2} trend="up" />
+                <StatBox label="Safety Score" value={`${stats.safetyScore}%`} icon={<ShieldAlert className="w-6 h-6" />} color="text-amber-500" change={3} trend="up" />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DashboardWidget title="Incident Trend">
+                    <div className="h-72">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={[{name: 'Mon', val: 2}, {name: 'Tue', val: 1}, {name: 'Wed', val: 3}, {name: 'Thu', val: 0}, {name: 'Fri', val: 1}]}>
+                                <defs><linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/><stop offset="95%" stopColor="#EF4444" stopOpacity={0}/></linearGradient></defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
+                                <Area type="monotone" dataKey="val" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorVal)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </DashboardWidget>
+                <DashboardWidget title="Environmental Monitoring">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                            <div className="flex justify-between mb-2">
+                                <span className="text-sm text-slate-300">Temp</span>
+                                <Thermometer className="w-5 h-5 text-blue-400"/>
+                            </div>
+                            <p className="text-2xl font-bold text-white">32°C</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                            <div className="flex justify-between mb-2">
+                                <span className="text-sm text-slate-300">Humidity</span>
+                                <Droplets className="w-5 h-5 text-cyan-400"/>
+                            </div>
+                            <p className="text-2xl font-bold text-white">65%</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                            <div className="flex justify-between mb-2">
+                                <span className="text-sm text-slate-300">Air Quality</span>
+                                <Wind className="w-5 h-5 text-emerald-400"/>
+                            </div>
+                            <p className="text-2xl font-bold text-white">Good</p>
+                        </div>
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                            <div className="flex justify-between mb-2">
+                                <span className="text-sm text-slate-300">Noise</span>
+                                <CloudLightning className="w-5 h-5 text-amber-400"/>
+                            </div>
+                            <p className="text-2xl font-bold text-white">85 dB</p>
+                        </div>
+                    </div>
+                </DashboardWidget>
+            </div>
         </div>
       )}
     </div>
