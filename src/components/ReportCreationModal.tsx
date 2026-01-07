@@ -79,7 +79,8 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     return defaultState;
   };
 
-  const [formData, setFormData] = useState(getInitialState);
+  // Use 'any' to prevent strict type checking issues during form state updates
+  const [formData, setFormData] = useState<any>(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   
@@ -90,12 +91,12 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
   useEffect(() => {
     if (!formData.project_id && projects.length > 0) {
-        setFormData(prev => ({ ...prev, project_id: projects[0].id }));
+        setFormData((prev: any) => ({ ...prev, project_id: projects[0].id }));
     }
   }, [projects, formData.project_id]);
 
   const handleTypeSelect = (newType: ReportType) => {
-      let newDetails = defaultDetails.unsafeCondition;
+      let newDetails: any = defaultDetails.unsafeCondition;
       if (['First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)', 'Restricted Work Case (RWC)', 'Accident', 'Incident'].includes(newType)) {
           newDetails = defaultDetails.injury;
       } else if (['Property / Asset Damage', 'Fire Event', 'Environmental Incident'].includes(newType)) {
@@ -107,19 +108,19 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
       } else if (['Leadership Event', 'Positive Observation'].includes(newType)) {
           newDetails = defaultDetails.leadership;
       }
-      setFormData(prev => ({ ...prev, type: newType, details: newDetails }));
+      setFormData((prev: any) => ({ ...prev, type: newType, details: newDetails }));
   };
 
-  const handleChange = (field: keyof Omit<typeof formData, 'details' | 'risk_pre_control' | 'location' | 'distribution' | 'identification' | 'classification_codes' | 'ai_suggested_evidence'>, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleChange = (field: string, value: any) => {
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
   
   const handleDetailsChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, details: { ...(prev.details as any), [field]: value } }));
+    setFormData((prev: any) => ({ ...prev, details: { ...prev.details, [field]: value } }));
   };
 
   const handleLocationChange = (field: 'text' | 'specific_area', value: string) => {
-     setFormData(prev => ({ ...prev, location: { ...prev.location, [field]: value }}));
+     setFormData((prev: any) => ({ ...prev, location: { ...prev.location, [field]: value }}));
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +137,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const { latitude, longitude } = position.coords;
-            setFormData(prev => ({
+            setFormData((prev: any) => ({
                 ...prev,
                 location: {
                     ...prev.location,
@@ -235,7 +236,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
             {/* Report Type Selection - FIXED GRID */}
             <section>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">What do you want to report?</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-3">
                     {REPORT_TYPES.map((rt) => (
                         <button
                             key={rt.type}
@@ -326,7 +327,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
                     <section className="border-t dark:border-dark-border pt-4">
                         <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Risk Assessment</h3>
-                        <RiskMatrixInput value={formData.risk_pre_control} onChange={(val) => setFormData(p => ({...p, risk_pre_control: val}))} />
+                        <RiskMatrixInput value={formData.risk_pre_control} onChange={(val) => setFormData((p: any) => ({...p, risk_pre_control: val}))} />
                     </section>
                 </>
             )}
