@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Report, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, ImpactedParty, ReportDistribution, ReportType, ReportDetails } from '../types';
+import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
@@ -11,28 +11,6 @@ interface ReportCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialData?: Partial<Omit<Report, 'id' | 'org_id' | 'reporter_id'>> | null;
-}
-
-// Explicit interface to handle the Union Type for 'details'
-interface ReportFormData {
-    project_id: string;
-    type: ReportType;
-    occurred_at: string;
-    location: { text: string; specific_area: string; geo?: { lat: number; lng: number } };
-    description: string;
-    evidence_urls: string[];
-    risk_pre_control: { severity: Severity; likelihood: Likelihood };
-    work_related: boolean;
-    impacted_party: ImpactedParty[];
-    conditions: string;
-    immediate_actions: string;
-    further_corrective_action_required: boolean;
-    details: ReportDetails; // <--- This allows any of the detail types
-    distribution: ReportDistribution;
-    identification: { was_fire: boolean; was_injury: boolean; was_environment: boolean };
-    classification_codes: string[];
-    ai_evidence_summary: string;
-    ai_suggested_evidence: string[];
 }
 
 const REPORT_TYPES: { type: ReportType; icon: string; description: string; color: string }[] = [
@@ -58,10 +36,10 @@ const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} x
 
 export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen, onClose, initialData }) => {
   const { projects, handleCreateReport } = useDataContext();
-  const { activeUser } = useAppContext();
+  const { activeUser, usersList, activeOrg } = useAppContext();
   
   const defaultDetails = useMemo(() => ({
-    injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '', days_lost: 0, medical_report_urls: [] } as AccidentDetails,
+    injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '' } as AccidentDetails,
     incident: { property_damage_details: '', environmental_impact: null } as IncidentDetails,
     nearMiss: { potential_consequence: '' } as NearMissDetails,
     unsafeAct: { act_category: 'PPE Non-Compliance', coaching_given: false, coaching_notes: '' } as UnsafeActDetails,
@@ -69,17 +47,17 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     leadership: { event_type_code: 'TBD', leader_name: activeUser?.name || '', attendees_count: 0, key_observations: '' } as LeadershipEventDetails,
   }), [activeUser?.name]);
 
-  const getInitialState = (): ReportFormData => {
-    const defaultState: ReportFormData = {
+  const getInitialState = () => {
+    const defaultState = {
         project_id: projects[0]?.id || '',
-        type: 'Unsafe Condition',
+        type: 'Unsafe Condition' as ReportType,
         occurred_at: new Date().toISOString().slice(0, 16),
         location: { text: '', specific_area: '', geo: undefined },
         description: '',
-        evidence_urls: [],
-        risk_pre_control: { severity: 1, likelihood: 1 },
+        evidence_urls: [] as string[],
+        risk_pre_control: { severity: 1 as Severity, likelihood: 1 as Likelihood },
         work_related: true,
-        impacted_party: [],
+        impacted_party: [] as ImpactedParty[],
         conditions: '',
         immediate_actions: '',
         further_corrective_action_required: false,
@@ -89,19 +67,19 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
             additional_recipients: [],
             send_alert_on_submit: true,
             notify_on_update: true,
-        },
+        } as ReportDistribution,
         identification: { was_fire: false, was_injury: false, was_environment: false },
-        classification_codes: [],
+        classification_codes: [] as string[],
         ai_evidence_summary: '',
-        ai_suggested_evidence: [],
+        ai_suggested_evidence: [] as string[],
     };
     if (initialData) {
-      return { ...defaultState, ...initialData } as ReportFormData;
+      return { ...defaultState, ...initialData };
     }
     return defaultState;
   };
 
-  const [formData, setFormData] = useState<ReportFormData>(getInitialState);
+  const [formData, setFormData] = useState(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
   
@@ -117,7 +95,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   }, [projects, formData.project_id]);
 
   const handleTypeSelect = (newType: ReportType) => {
-      let newDetails: ReportDetails = defaultDetails.unsafeCondition;
+      let newDetails = defaultDetails.unsafeCondition;
       if (['First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)', 'Restricted Work Case (RWC)', 'Accident', 'Incident'].includes(newType)) {
           newDetails = defaultDetails.injury;
       } else if (['Property / Asset Damage', 'Fire Event', 'Environmental Incident'].includes(newType)) {
@@ -219,14 +197,12 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     setUploadProgress('Uploading evidence...');
 
     try {
-      // 1. Upload files to Firebase Storage
       let realUrls: string[] = [];
       if (evidenceFiles.length > 0) {
           const uploadPromises = evidenceFiles.map(file => uploadFileToCloud(file, 'reports'));
           realUrls = await Promise.all(uploadPromises);
       }
 
-      // 2. Save Report to Firestore
       setUploadProgress('Saving report...');
       await handleCreateReport({ ...formData, evidence_urls: realUrls });
       
@@ -246,41 +222,43 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex justify-center items-center p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="p-6 border-b dark:border-dark-border flex justify-between items-center">
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-dark-card rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="p-6 border-b dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-card sticky top-0 z-10 rounded-t-xl">
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">New HSE Report</h2>
-            <button onClick={onClose}><CloseIcon className="w-6 h-6 text-gray-500" /></button>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full"><CloseIcon className="w-6 h-6 text-gray-500" /></button>
         </div>
         
         <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
-            {/* Report Type Selection */}
+            {/* Report Type Selection - FIXED GRID */}
             <section>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">What do you want to report?</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                     {REPORT_TYPES.map((rt) => (
                         <button
                             key={rt.type}
                             onClick={() => handleTypeSelect(rt.type)}
-                            className={`p-2 rounded-lg border-2 text-left transition-all flex flex-col h-full ${
+                            className={`p-3 rounded-xl border-2 text-center transition-all flex flex-col items-center justify-center gap-2 min-h-[100px] ${
                                 formData.type === rt.type 
-                                ? `${rt.color} border-transparent shadow-md ring-2 ring-offset-1 ring-blue-400` 
+                                ? `${rt.color} border-transparent shadow-lg ring-2 ring-offset-2 ring-blue-400 dark:ring-offset-slate-900` 
                                 : 'bg-gray-50 dark:bg-white/5 border-transparent hover:bg-gray-100 dark:hover:bg-white/10 text-gray-600 dark:text-gray-400'
                             }`}
                         >
-                            <span className="text-xl mb-1 block text-center">{rt.icon}</span>
-                            <span className="font-bold text-[10px] leading-tight block text-center">{rt.type}</span>
+                            <span className="text-2xl">{rt.icon}</span>
+                            <span className="font-bold text-xs leading-tight">{rt.type}</span>
                         </button>
                     ))}
                 </div>
             </section>
 
             {/* AI Helper */}
-            <section className="bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-900/20 dark:to-blue-900/20 p-4 rounded-xl border border-primary-200 dark:border-primary-800">
+            <section className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
                 <div className="flex items-start gap-4">
-                    <div className="bg-white dark:bg-black p-2 rounded-full shadow-sm text-primary-600"><SparklesIcon className="w-6 h-6" /></div>
+                    <div className="bg-white dark:bg-black p-2 rounded-full shadow-sm text-blue-600"><SparklesIcon className="w-6 h-6" /></div>
                     <div className="flex-1">
-                        <label className="block text-sm font-bold text-primary-900 dark:text-primary-100 mb-1">AI Form Assistant</label>
+                        <label className="block text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">AI Form Assistant</label>
                         <div className="flex gap-2">
                             <input 
                                 type="text" 
@@ -288,7 +266,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                                 onChange={(e) => setAiPrompt(e.target.value)} 
                                 onKeyDown={(e) => e.key === 'Enter' && handleQuickAiReport()}
                                 placeholder={`Describe the ${formData.type.toLowerCase()}...`} 
-                                className="flex-1 p-2 text-sm border border-primary-300 dark:border-primary-700 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-black/30"
+                                className="flex-1 p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-black/30 dark:text-white"
                             />
                             <Button onClick={handleQuickAiReport} disabled={isAiLoading || !aiPrompt.trim()}>
                                 {isAiLoading ? 'Analyzing...' : 'Auto-Fill'}
@@ -303,38 +281,42 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                 <>
                     <section>
                         <h3 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Event Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FormField label="Project">
-                                <select value={formData.project_id} onChange={e => handleChange('project_id', e.target.value)} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md">
+                                <select value={formData.project_id} onChange={e => handleChange('project_id', e.target.value)} className="w-full p-2.5 border dark:border-dark-border bg-white dark:bg-dark-background rounded-lg text-gray-900 dark:text-white">
                                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                 </select>
                             </FormField>
                             <FormField label="Event Date & Time">
-                                <input type="datetime-local" value={formData.occurred_at} onChange={e => handleChange('occurred_at', e.target.value)} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md" />
+                                <input type="datetime-local" value={formData.occurred_at} onChange={e => handleChange('occurred_at', e.target.value)} className="w-full p-2.5 border dark:border-dark-border bg-white dark:bg-dark-background rounded-lg text-gray-900 dark:text-white" />
                             </FormField>
-                            <FormField label="Location" fullWidth>
-                                <div className="flex items-center space-x-2">
-                                    <input type="text" value={formData.location.text} onChange={e => handleLocationChange('text', e.target.value)} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md" placeholder="e.g. Loading Dock" />
-                                    <Button variant="ghost" onClick={handleGetGps} leftIcon={<GpsIcon />}>GPS</Button>
-                                </div>
-                            </FormField>
+                            <div className="md:col-span-2">
+                                <FormField label="Location" fullWidth>
+                                    <div className="flex items-center space-x-2">
+                                        <input type="text" value={formData.location.text} onChange={e => handleLocationChange('text', e.target.value)} className="w-full p-2.5 border dark:border-dark-border bg-white dark:bg-dark-background rounded-lg text-gray-900 dark:text-white" placeholder="e.g. Loading Dock, Sector 4" />
+                                        <Button variant="secondary" onClick={handleGetGps} leftIcon={<GpsIcon />}>GPS</Button>
+                                    </div>
+                                </FormField>
+                            </div>
                         </div>
                         <div className="mt-4 space-y-4">
-                             <FormField label="Description" fullWidth><textarea value={formData.description} onChange={e => handleChange('description', e.target.value)} rows={3} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md" placeholder="Describe what happened..." /></FormField>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField label="Immediate Actions"><textarea value={formData.immediate_actions} onChange={e => handleChange('immediate_actions', e.target.value)} rows={2} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md" /></FormField>
-                                <FormField label="Conditions"><textarea value={formData.conditions} onChange={e => handleChange('conditions', e.target.value)} rows={2} className="w-full p-2 border dark:border-dark-border bg-transparent rounded-md" /></FormField>
+                             <FormField label="Description" fullWidth>
+                                <textarea value={formData.description} onChange={e => handleChange('description', e.target.value)} rows={3} className="w-full p-3 border dark:border-dark-border bg-white dark:bg-dark-background rounded-lg text-gray-900 dark:text-white" placeholder="Describe what happened in detail..." />
+                             </FormField>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField label="Immediate Actions"><textarea value={formData.immediate_actions} onChange={e => handleChange('immediate_actions', e.target.value)} rows={2} className="w-full p-3 border dark:border-dark-border bg-white dark:bg-dark-background rounded-lg text-gray-900 dark:text-white" /></FormField>
+                                <FormField label="Conditions"><textarea value={formData.conditions} onChange={e => handleChange('conditions', e.target.value)} rows={2} className="w-full p-3 border dark:border-dark-border bg-white dark:bg-dark-background rounded-lg text-gray-900 dark:text-white" /></FormField>
                              </div>
                         </div>
                     </section>
 
                     {isInjuryType && (
-                        <section className="bg-red-50 dark:bg-red-900/10 p-4 rounded-lg border border-red-200 dark:border-red-800">
+                        <section className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-200 dark:border-red-800">
                             <h3 className="text-md font-bold mb-3 text-red-800 dark:text-red-300">Injury Details</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField label="Injured Person Name"><input type="text" value={(formData.details as AccidentDetails).person_name} onChange={e => handleDetailsChange('person_name', e.target.value)} className="w-full p-2 border rounded-md" /></FormField>
+                                <FormField label="Injured Person Name"><input type="text" value={(formData.details as AccidentDetails).person_name} onChange={e => handleDetailsChange('person_name', e.target.value)} className="w-full p-2 border rounded-lg bg-white dark:bg-black/20" /></FormField>
                                 <FormField label="Nature of Injury">
-                                    <select value={(formData.details as AccidentDetails).nature_of_injury} onChange={e => handleDetailsChange('nature_of_injury', e.target.value)} className="w-full p-2 border rounded-md">
+                                    <select value={(formData.details as AccidentDetails).nature_of_injury} onChange={e => handleDetailsChange('nature_of_injury', e.target.value)} className="w-full p-2 border rounded-lg bg-white dark:bg-black/20">
                                         <option>Laceration</option><option>Burn</option><option>Fracture</option><option>Sprain</option><option>Other</option>
                                     </select>
                                 </FormField>
@@ -343,7 +325,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                     )}
 
                     <section className="border-t dark:border-dark-border pt-4">
-                        <h3 className="text-lg font-semibold mb-3">Risk Assessment</h3>
+                        <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Risk Assessment</h3>
                         <RiskMatrixInput value={formData.risk_pre_control} onChange={(val) => setFormData(p => ({...p, risk_pre_control: val}))} />
                     </section>
                 </>
@@ -351,17 +333,23 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
 
             {/* Evidence Upload */}
             <section className="border-t dark:border-dark-border pt-6">
-                 <h3 className="text-lg font-semibold mb-3">Evidence</h3>
+                 <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Evidence</h3>
                  <div className="grid grid-cols-1 gap-4">
                     <FormField label="Photo/Video Evidence">
-                        <div>
-                            <input type="file" multiple onChange={handleFileChange} className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"/>
+                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                            <input type="file" multiple onChange={handleFileChange} className="hidden" id="file-upload" />
+                            <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
+                                <span className="text-4xl mb-2">📷</span>
+                                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Click to upload photos or videos</span>
+                                <span className="text-xs text-gray-500">Supports JPG, PNG, MP4</span>
+                            </label>
                             {evidenceFiles.length > 0 && (
-                                <div className="mt-3 space-y-2">
+                                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {evidenceFiles.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between text-sm bg-gray-100 dark:bg-dark-background p-2 rounded-md border dark:border-dark-border">
-                                            <span className="truncate pr-4">{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                                            <button onClick={() => handleRemoveFile(index)} className="font-bold text-red-500 hover:text-red-700">&times;</button>
+                                        <div key={index} className="relative group bg-gray-100 dark:bg-white/10 p-2 rounded-lg flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-gray-300 rounded flex-shrink-0"></div>
+                                            <span className="text-xs truncate flex-1 dark:text-white">{file.name}</span>
+                                            <button onClick={() => handleRemoveFile(index)} className="text-red-500 hover:text-red-700 font-bold px-2">×</button>
                                         </div>
                                     ))}
                                 </div>
@@ -371,11 +359,12 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                  </div>
             </section>
             
-            {error && <p className="text-sm text-red-500 mt-4 text-center font-semibold">{error}</p>}
+            {error && <p className="text-sm text-red-500 mt-4 text-center font-semibold bg-red-50 p-2 rounded">{error}</p>}
         </div>
-        <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
+        
+        <div className="bg-gray-50 dark:bg-dark-card px-6 py-4 flex justify-end space-x-3 border-t dark:border-dark-border rounded-b-xl sticky bottom-0 z-10">
             <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={isSubmitting}>
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20">
                 {isSubmitting ? uploadProgress || 'Submitting...' : 'Submit Report'}
             </Button>
         </div>
