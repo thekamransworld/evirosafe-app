@@ -7,14 +7,12 @@ import { useAppContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
-  MapPin, User as UserIcon, CheckCircle,
-  Shield // <--- ADDED THIS IMPORT
+  MapPin, User as UserIcon, CheckCircle
 } from 'lucide-react';
 
 // === GEN 4 STYLES ===
 const glassStyles = {
   card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
-  header: "bg-gradient-to-br from-slate-900/80 to-slate-950/80 backdrop-blur-xl border-b border-white/10 p-6 sticky top-0 z-30",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
   filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
 };
@@ -147,7 +145,8 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPtws.map((ptw) => {
             const statusConfig = getStatusConfig(ptw.status);
-            const typeDetails = ptwTypeDetails[ptw.type];
+            // SAFE CHECK: Ensure type exists in config
+            const typeDetails = ptwTypeDetails[ptw.type] || { icon: '?', hex: '#64748b' };
             const StatusIcon = statusConfig.icon;
             
             return (

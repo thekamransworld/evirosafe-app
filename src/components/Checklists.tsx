@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ChecklistTemplate } from '../types';
+import type { ChecklistTemplate, ChecklistRun } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -31,12 +31,7 @@ export const Checklists: React.FC = () => {
     if (!template) return 'Unknown Template';
     return getTranslated(template.title);
   };
-  
-  // Simplified user name lookup
-  const getUserName = (userId: string) => {
-      // In a real app, you'd look this up from usersList
-      return userId ? 'User' : 'Unknown'; 
-  };
+  const getUserName = (userId: string) => 'User'; // Simplified
 
   const handleViewTemplate = (template: ChecklistTemplate) => {
     setSelectedTemplate(template);
@@ -59,7 +54,6 @@ export const Checklists: React.FC = () => {
   };
   
   const handleSubmitRun = (data: any) => {
-    if (!activeUser) return;
     const newRun = { 
         ...data, 
         id: `cr_${Date.now()}`, 
@@ -141,7 +135,8 @@ export const Checklists: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{getUserName(run.executed_by_id)}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">{run.status === 'completed' ? `${run.score}%` : 'N/A'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <Badge color={run.status === 'completed' ? 'green' : 'blue'}>{run.status.replace('_', ' ')}</Badge>
+                            {/* SAFE CHECK ADDED HERE */}
+                            <Badge color={run.status === 'completed' ? 'green' : 'blue'}>{(run.status || 'Unknown').replace('_', ' ')}</Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <a href="#" className="text-primary-600 hover:text-primary-900">View</a>
@@ -156,7 +151,7 @@ export const Checklists: React.FC = () => {
       </div>
       
       {/* Modals */}
-      {isDetailModalOpen && selectedTemplate && activeUser && (
+      {isDetailModalOpen && selectedTemplate && (
         <ChecklistDetailModal 
             template={selectedTemplate}
             onClose={() => setDetailModalOpen(false)}
@@ -193,7 +188,7 @@ export const Checklists: React.FC = () => {
          </div>
       )}
       
-      {isRunModalOpen && selectedTemplate && projectForRun && activeUser && (
+      {isRunModalOpen && selectedTemplate && projectForRun && (
         <ChecklistRunModal
             template={selectedTemplate}
             project={projectForRun}

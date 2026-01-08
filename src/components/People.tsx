@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import type { User, Project } from '../types';
+import type { User } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { roles as rolesData } from '../config';
 import { FormField } from './ui/FormField';
-import { Plus, UserPlus, RefreshCw } from 'lucide-react';
+import { UserPlus, RefreshCw, MoreVertical } from 'lucide-react';
 
-// --- Invite User Modal (Updated with Project Selection) ---
+// --- Invite User Modal ---
 const InviteUserModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, onClose }) => {
     const { activeOrg, handleInviteUser } = useAppContext();
     const { projects } = useDataContext();
@@ -18,7 +18,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ i
         name: '',
         email: '',
         role: 'WORKER' as User['role'],
-        project_id: '', // New field
+        project_id: '',
     });
     const [error, setError] = useState('');
 
@@ -33,7 +33,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ i
             name: formData.name,
             email: formData.email,
             role: formData.role,
-            project_id: formData.project_id // Pass project ID
+            project_id: formData.project_id
         });
         
         onClose();
@@ -85,8 +85,6 @@ const ReassignModal: React.FC<{ isOpen: boolean, onClose: () => void, user: User
 
     const handleReassign = () => {
         if (user) {
-            // In a real app, you might have a 'project_ids' array. Here we assume single project assignment for simplicity or update a custom field.
-            // For this demo, we'll assume we are updating a 'project_id' field on the user object (even if not strictly in type, we simulate it).
             const updatedUser = { ...user, project_id: selectedProject }; 
             handleUpdateUser(updatedUser);
         }
@@ -120,7 +118,7 @@ const ReassignModal: React.FC<{ isOpen: boolean, onClose: () => void, user: User
 };
 
 export const People: React.FC = () => {
-  const { usersList, activeOrg, can, activeUser, impersonateUser, handleApproveUser, invitedEmails } = useAppContext();
+  const { usersList, activeOrg, can, activeUser, impersonateUser, invitedEmails } = useAppContext();
   const { projects } = useDataContext();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [reassignUser, setReassignUser] = useState<User | null>(null);
@@ -130,7 +128,6 @@ export const People: React.FC = () => {
       return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
   };
 
-  // Combine active users and invited users for display
   const allPersonnel = [
     ...usersList.filter(u => u.org_id === activeOrg.id),
     ...invitedEmails.filter(i => i.org_id === activeOrg.id).map(i => ({
@@ -177,7 +174,8 @@ export const People: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                     <Badge color="blue">{user.role.replace(/_/g, ' ')}</Badge>
+                     {/* SAFE CHECK ADDED HERE */}
+                     <Badge color="blue">{(user.role || 'Unknown').replace(/_/g, ' ')}</Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {getProjectName(user.project_id)}
