@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { Inspection, InspectionStatus } from '../types';
+import type { Inspection, InspectionStatus, InspectionFinding } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -34,7 +34,6 @@ const InspectionCard: React.FC<{
     };
     
     const findingsCount = inspection.findings?.length || 0;
-    // SAFE CHECK: Ensure status exists before replacing
     const statusText = inspection.status ? inspection.status.replace(/_/g, ' ') : 'Unknown';
 
     return (
@@ -78,7 +77,14 @@ const InspectionCard: React.FC<{
 export const Inspections: React.FC = () => {
   const { activeOrg, usersList, can } = useAppContext();
   const { inspectionList, setInspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection } = useDataContext();
-  const { isInspectionCreationModalOpen, setIsInspectionCreationModalOpen } = useModalContext();
+  
+  // FIX: Destructure report modal controls
+  const { 
+    isInspectionCreationModalOpen, 
+    setIsInspectionCreationModalOpen,
+    setIsReportCreationModalOpen,
+    setReportInitialData
+  } = useModalContext();
 
   const [isConductModalOpen, setConductModalOpen] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
@@ -108,7 +114,23 @@ export const Inspections: React.FC = () => {
         setConductModalOpen(false);
         setSelectedInspection(null);
     }
-  }
+  };
+
+  // FIX: Added handler to convert finding to report
+  const handleConvertToReport = (finding: InspectionFinding) => {
+    setReportInitialData({
+        description: finding.description,
+        type: 'Unsafe Condition', // Default type
+        risk_pre_control: { 
+            severity: finding.risk_level === 'High' ? 3 : finding.risk_level === 'Medium' ? 2 : 1, 
+            likelihood: 2 
+        },
+        evidence_urls: finding.evidence_urls
+    });
+    // Close inspection modal and open report modal
+    // setConductModalOpen(false); // Optional: keep inspection open or close it
+    setIsReportCreationModalOpen(true);
+  };
 
   return (
     <div>
@@ -157,6 +179,7 @@ export const Inspections: React.FC = () => {
             onClose={() => setConductModalOpen(false)}
             inspection={selectedInspection}
             onUpdate={handleUpdateAndCloseConduct}
+            onConvertToReport={handleConvertToReport} // <--- Passed the handler here
             projects={projects}
             users={usersList}
             checklistTemplates={checklistTemplates}
