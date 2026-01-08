@@ -29,9 +29,6 @@ interface ProjectDetailsProps {
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
 
-// ... (DashboardWidget, StatBox, ActivityFeedItem components remain the same) ...
-// I will include the full file content below to ensure you have the complete fixed version.
-
 // --- Reusable Dashboard Widget Component ---
 const DashboardWidget: React.FC<{ 
   title: string; 
@@ -207,7 +204,7 @@ const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[] }> = ({ 
                     <div>
                         <h4 className="font-bold text-white">{user.name}</h4>
                         <p className="text-xs text-slate-400">{user.email}</p>
-                        {/* SAFE CHECK ADDED HERE */}
+                        {/* FIXED: Safe replace */}
                         <Badge color={
                             user.role === 'ADMIN' ? 'purple' :
                             user.role === 'HSE_MANAGER' ? 'blue' :
@@ -414,7 +411,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
               <div>
                 <div className="flex items-center gap-4 mb-2">
                   <h1 className="text-3xl font-bold text-white">{project.name}</h1>
-                  {/* SAFE CHECK ADDED HERE */}
+                  {/* FIXED: Safe replace */}
                   <Badge color={project.status === 'active' ? 'green' : 'yellow'}>{(project.status || 'Unknown').toUpperCase()}</Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-slate-300 text-sm">
@@ -528,7 +525,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600" onClick={onEdit}>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Member
                     </Button>
@@ -584,7 +581,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                                                     user.role === 'SUPERVISOR' ? 'green' :
                                                     user.role === 'INSPECTOR' ? 'amber' : 'gray'
                                                 } size="sm">
-                                                    {(user.role || 'Unknown').replace('_', ' ')}
+                                                    {user.role.replace('_', ' ')}
                                                 </Badge>
                                             </td>
                                             <td className="py-3">

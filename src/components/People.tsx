@@ -133,7 +133,7 @@ export const People: React.FC = () => {
     ...invitedEmails.filter(i => i.org_id === activeOrg.id).map(i => ({
         id: i.email, name: i.name, email: i.email, role: i.role, status: 'invited' as const, org_id: i.org_id, avatar_url: '', project_id: (i as any).project_id
     }))
-  ].sort((a, b) => a.name.localeCompare(b.name));
+  ].sort((a, b) => (a.name || '').localeCompare(b.name || '')); // <--- FIXED: Safe localeCompare
 
   return (
     <div>
@@ -165,16 +165,16 @@ export const People: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
-                        {user.avatar_url ? <img src={user.avatar_url} className="h-10 w-10 rounded-full"/> : user.name.charAt(0)}
+                        {user.avatar_url ? <img src={user.avatar_url} className="h-10 w-10 rounded-full"/> : (user.name || '?').charAt(0)}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name || 'Unknown'}</div>
                         <div className="text-sm text-gray-500">{user.email}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                     {/* SAFE CHECK ADDED HERE */}
+                     {/* FIXED: Safe replace */}
                      <Badge color="blue">{(user.role || 'Unknown').replace(/_/g, ' ')}</Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
