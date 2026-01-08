@@ -34,6 +34,8 @@ const InspectionCard: React.FC<{
     };
     
     const findingsCount = inspection.findings?.length || 0;
+    // SAFE CHECK: Ensure status exists before replacing
+    const statusText = inspection.status ? inspection.status.replace(/_/g, ' ') : 'Unknown';
 
     return (
         <Card className="hover:border-blue-300 transition-colors">
@@ -44,11 +46,10 @@ const InspectionCard: React.FC<{
                     </div>
                     <div>
                         <h3 className="font-bold text-md text-text-primary pr-2">{inspection.title}</h3>
-                        <p className="text-xs text-text-secondary">{inspection.inspection_id || 'ID Pending'}</p>
+                        <p className="text-xs text-text-secondary">{inspection.id || 'ID Pending'}</p>
                     </div>
                 </div>
-                {/* @ts-ignore */}
-                <Badge color={getStatusColor(inspection.status)}>{inspection.status}</Badge>
+                <Badge color={getStatusColor(inspection.status)}>{statusText}</Badge>
             </div>
             
             <div className="grid grid-cols-2 gap-4 mt-4 py-3 border-t border-b border-gray-100 dark:border-gray-800">
@@ -75,8 +76,8 @@ const InspectionCard: React.FC<{
 };
 
 export const Inspections: React.FC = () => {
-  const { usersList, can } = useAppContext();
-  const { inspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection } = useDataContext();
+  const { activeOrg, usersList, can } = useAppContext();
+  const { inspectionList, setInspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection } = useDataContext();
   const { isInspectionCreationModalOpen, setIsInspectionCreationModalOpen } = useModalContext();
 
   const [isConductModalOpen, setConductModalOpen] = useState(false);
@@ -86,7 +87,6 @@ export const Inspections: React.FC = () => {
     let inspectionToConduct = inspection;
     // Auto-transition status when starting
     if (inspection.status === 'Draft' || inspection.status === 'Scheduled') {
-        // @ts-ignore
         inspectionToConduct = { ...inspection, status: 'In Progress' };
         handleUpdateInspection(inspectionToConduct);
     }
@@ -97,7 +97,7 @@ export const Inspections: React.FC = () => {
   const handleUpdateAndCloseConduct = (inspection: Inspection, action?: 'submit' | 'save' | 'approve' | 'close') => {
     // Logic to handle status transitions based on action
     let newStatus = inspection.status;
-    if (action === 'submit') newStatus = 'Pending Review' as any;
+    if (action === 'submit') newStatus = 'Pending Review';
     if (action === 'approve') newStatus = 'Approved';
     if (action === 'close') newStatus = 'Closed';
 
@@ -156,9 +156,7 @@ export const Inspections: React.FC = () => {
             isOpen={isConductModalOpen}
             onClose={() => setConductModalOpen(false)}
             inspection={selectedInspection}
-            // @ts-ignore
             onUpdate={handleUpdateAndCloseConduct}
-            onConvertToReport={() => {}} // Added missing prop
             projects={projects}
             users={usersList}
             checklistTemplates={checklistTemplates}
