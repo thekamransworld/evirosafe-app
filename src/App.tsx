@@ -6,7 +6,7 @@ import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
 import { roles as rolesConfig } from './config';
-import { Loader2 } from 'lucide-react'; // Import Loader
+import { Loader2 } from 'lucide-react';
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -112,7 +112,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser } = useAppContext();
+  const { activeUser, usersList } = useAppContext(); // <--- FIX: Get usersList from AppContext
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
@@ -133,7 +133,7 @@ const GlobalModals = () => {
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
     handleCreateStandaloneAction, handleCreateInspection,
-    projects, usersList, trainingCourseList, checklistTemplates
+    projects, trainingCourseList, checklistTemplates
   } = useDataContext();
 
   if (!activeUser) return null;
@@ -164,8 +164,8 @@ const GlobalModals = () => {
 // --- Main App Content ---
 const AppContent = () => {
   const { currentView, setCurrentView, activeUser } = useAppContext();
-  const { currentUser, loading: authLoading } = useAuth(); // <--- Get auth loading state
-  const { isLoading: dataLoading } = useDataContext(); // <--- Get data loading state
+  const { currentUser, loading: authLoading } = useAuth();
+  const { isLoading: dataLoading } = useDataContext();
 
   const {
     projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,

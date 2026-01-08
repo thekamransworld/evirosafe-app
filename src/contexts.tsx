@@ -59,7 +59,10 @@ const AppContext = createContext<AppContextType>(null!);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
-  const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || {});
+  
+  // FIX: Cast empty object to Organization to prevent type error during init
+  const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || {} as Organization);
+  
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
@@ -186,18 +189,18 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
+  handleCreateChecklistTemplate: (data: any) => void; // <--- FIX: Added missing function type
 }
 
 const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { activeOrg, activeUser, setUsersList } = useAppContext(); // <--- Added setUsersList
+    const { activeOrg, activeUser, setUsersList } = useAppContext();
     const { currentUser } = useAuth();
     const toast = useToast();
     
     const [isLoading, setIsLoading] = useState(true);
     
-    // Initialize with local data first (Instant Load)
     const [projects, setProjects] = useState<Project[]>(initialProjects || []);
     const [reportList, setReportList] = useState<Report[]>([]);
     const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
@@ -214,7 +217,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
-    // --- FETCH DATA FROM FIREBASE ---
     useEffect(() => {
       if (!currentUser) {
           setIsLoading(false);
@@ -230,7 +232,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
 
           await Promise.all([
-            fetchCol('users', setUsersList), // <--- CRITICAL FIX: Fetch users first
+            fetchCol('users', setUsersList),
             fetchCol('projects', setProjects),
             fetchCol('reports', setReportList),
             fetchCol('inspections', setInspectionList),
@@ -257,7 +259,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       fetchData();
     }, [currentUser, setUsersList]);
 
-    // --- HELPER: UPDATE DB ---
     const updateDB = async (collectionName: string, id: string, data: any) => {
         try {
             await updateDoc(doc(db, collectionName, id), data);
@@ -267,7 +268,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // --- CREATE HANDLERS ---
     const handleCreateReport = async (reportData: any) => {
         const newReport = {
             ...reportData,
@@ -324,7 +324,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
 
-    // --- UPDATE HANDLERS ---
+    // FIX: Added handleCreateChecklistTemplate implementation
+    const handleCreateChecklistTemplate = async (data: any) => {
+        const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
+        setChecklistTemplates(prev => [...prev, newTemplate]);
+        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
+    };
 
     const handleStatusChange = (id: string, status: any) => {
         setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
@@ -420,12 +425,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
 
-    // --- CREATE HANDLERS (Local for now, can be upgraded) ---
     const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
     const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
     const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
 
-    // --- DERIVED STATE ---
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
         (reportList || []).forEach(report => {
@@ -457,7 +460,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction 
+        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
+        handleCreateChecklistTemplate // <--- FIX: Added to value
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
