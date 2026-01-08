@@ -7,7 +7,8 @@ import { useAppContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
-  MapPin, User as UserIcon, CheckCircle
+  MapPin, User as UserIcon, CheckCircle,
+  Shield // <--- FIXED: Added missing import
 } from 'lucide-react';
 
 // === GEN 4 STYLES ===
