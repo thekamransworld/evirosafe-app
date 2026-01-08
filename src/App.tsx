@@ -7,6 +7,7 @@ import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
 import { roles as rolesConfig } from './config';
 import { Loader2 } from 'lucide-react';
+import type { User } from './types'; // Added import for type safety
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -73,14 +74,17 @@ const AuthSync: React.FC = () => {
       if (prev.some(u => u.id === uid)) return prev;
 
       const existingUser = prev[0];
-      const defaultPreferences = {
+      
+      // FIX: Explicitly typed to match User interface
+      const defaultPreferences: User['preferences'] = {
           language: 'en',
           default_view: 'dashboard',
-          units: { temperature: 'C', distance: 'km', weight: 'kg' },
-          notifications: { email: true, push: true, sms: false },
-          date_format: 'DD/MM/YYYY',
-          time_format: '24h',
-          theme: 'system'
+          units: { 
+            temperature: 'C', 
+            wind_speed: 'km/h', 
+            height: 'm', 
+            weight: 'kg' 
+          }
       };
 
       const template = existingUser ? {
@@ -97,14 +101,15 @@ const AuthSync: React.FC = () => {
         preferences: defaultPreferences
       };
 
-      const newUser = {
+      // Explicitly cast to User to satisfy TypeScript
+      const newUser: User = {
         ...template,
         id: uid,
         org_id: activeOrg?.id || template.org_id,
         email,
         name: displayName,
         status: 'active'
-      };
+      } as User;
 
       return [newUser, ...prev];
     });
