@@ -463,7 +463,7 @@ export const Settings: React.FC<SettingsProps> = () => {
           >
             <FormField label="Language">
               <select
-                value={editedUser.preferences.language}
+                value={editedUser.preferences?.language || 'en'} // FIX: Safe access
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,
@@ -482,7 +482,7 @@ export const Settings: React.FC<SettingsProps> = () => {
 
             <FormField label="Default Home Screen">
               <select
-                value={editedUser.preferences.default_view}
+                value={editedUser.preferences?.default_view || 'dashboard'} // FIX: Safe access
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,

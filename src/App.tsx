@@ -72,15 +72,8 @@ const AuthSync: React.FC = () => {
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
 
-      const template = prev[0] || {
-        id: uid,
-        org_id: activeOrg?.id || 'org1',
-        email,
-        name: displayName,
-        avatar_url: '',
-        role: 'ADMIN',
-        status: 'active',
-        preferences: {
+      const existingUser = prev[0];
+      const defaultPreferences = {
           language: 'en',
           default_view: 'dashboard',
           units: { temperature: 'C', distance: 'km', weight: 'kg' },
@@ -88,7 +81,20 @@ const AuthSync: React.FC = () => {
           date_format: 'DD/MM/YYYY',
           time_format: '24h',
           theme: 'system'
-        }
+      };
+
+      const template = existingUser ? {
+        ...existingUser,
+        preferences: existingUser.preferences || defaultPreferences
+      } : {
+        id: uid,
+        org_id: activeOrg?.id || 'org1',
+        email,
+        name: displayName,
+        avatar_url: '',
+        role: 'ADMIN',
+        status: 'active',
+        preferences: defaultPreferences
       };
 
       const newUser = {
@@ -112,7 +118,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser, usersList } = useAppContext(); // <--- FIX: Get usersList from AppContext
+  const { activeUser, usersList } = useAppContext();
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,

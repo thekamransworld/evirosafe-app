@@ -60,7 +60,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   
-  // FIX: Cast empty object to Organization to prevent type error during init
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || {} as Organization);
   
   const [isSidebarOpen, setSidebarOpen] = useState(true);
@@ -90,7 +89,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (user) {
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
-        setCurrentView(user.preferences.default_view);
+        // FIX: Safe access with fallback
+        const defaultView = user.preferences?.default_view || 'dashboard';
+        setCurrentView(defaultView);
     }
   };
   
@@ -122,7 +123,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return permission ? permission.actions.includes(action) : false;
   };
 
-  const language = activeUser?.preferences.language || 'en';
+  // FIX: Safe access with fallback
+  const language = activeUser?.preferences?.language || 'en';
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
@@ -189,7 +191,7 @@ interface DataContextType {
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
-  handleCreateChecklistTemplate: (data: any) => void; // <--- FIX: Added missing function type
+  handleCreateChecklistTemplate: (data: any) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -324,7 +326,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
 
-    // FIX: Added handleCreateChecklistTemplate implementation
     const handleCreateChecklistTemplate = async (data: any) => {
         const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
         setChecklistTemplates(prev => [...prev, newTemplate]);
@@ -461,7 +462,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate // <--- FIX: Added to value
+        handleCreateChecklistTemplate
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
