@@ -6,7 +6,7 @@ import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
 import { roles as rolesConfig } from './config';
-import type { User } from './types'; // Import User type
+import { Loader2 } from 'lucide-react'; // Import Loader
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -22,6 +22,7 @@ import { Trainings } from './components/Trainings';
 import { People } from './components/People';
 import { Roles } from './components/Roles';
 import { Organizations } from './components/Organizations';
+import { Projects } from './components/Projects';
 import { Signage } from './components/Signage';
 import { AiInsights } from './components/AiInsights';
 import { Settings } from './components/Settings';
@@ -49,8 +50,10 @@ import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
+import { ChecklistRunModal } from './components/ChecklistRunModal';
+import { ChecklistDetailModal } from './components/ChecklistDetailModal';
 
-// --- Auth Sync ---
+// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
   const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
@@ -65,21 +68,9 @@ const AuthSync: React.FC = () => {
     const email = currentUser.email || `user-${uid.slice(0, 6)}@evirosafe.local`;
     const displayName = currentUser.displayName || email.split('@')[0];
 
+    // Ensure user exists in local state
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
-
-      // Create a default template that matches the User type exactly
-      const defaultPreferences: User['preferences'] = {
-        language: 'en',
-        default_view: 'dashboard',
-        units: { 
-          temperature: 'C', 
-          wind_speed: 'km/h', 
-          height: 'm', 
-          weight: 'kg',
-          distance: 'km'
-        }
-      };
 
       const template = prev[0] || {
         id: uid,
@@ -89,22 +80,30 @@ const AuthSync: React.FC = () => {
         avatar_url: '',
         role: 'ADMIN',
         status: 'active',
-        preferences: defaultPreferences
+        preferences: {
+          language: 'en',
+          default_view: 'dashboard',
+          units: { temperature: 'C', distance: 'km', weight: 'kg' },
+          notifications: { email: true, push: true, sms: false },
+          date_format: 'DD/MM/YYYY',
+          time_format: '24h',
+          theme: 'system'
+        }
       };
 
-      const newUser: User = {
+      const newUser = {
         ...template,
         id: uid,
         org_id: activeOrg?.id || template.org_id,
         email,
         name: displayName,
-        status: 'active',
-        preferences: template.preferences // Use the strictly typed preferences
+        status: 'active'
       };
 
       return [newUser, ...prev];
     });
 
+    // Force login to set activeUser
     login(uid);
   }, [currentUser, activeOrg?.id]);
 
@@ -113,7 +112,7 @@ const AuthSync: React.FC = () => {
 
 // --- Global Modals Component ---
 const GlobalModals = () => {
-  const { activeUser, usersList } = useAppContext();
+  const { activeUser } = useAppContext();
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
@@ -127,14 +126,14 @@ const GlobalModals = () => {
   } = useModalContext();
 
   const {
-    handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
+    handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
     handleCreatePtw, handleUpdatePtw,
     handleCreatePlan, handlePlanStatusChange, handleUpdatePlan,
     handleCreateRams, handleRamsStatusChange, handleUpdateRams,
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
     handleCreateStandaloneAction, handleCreateInspection,
-    projects, trainingCourseList, checklistTemplates
+    projects, usersList, trainingCourseList, checklistTemplates
   } = useDataContext();
 
   if (!activeUser) return null;
@@ -164,9 +163,9 @@ const GlobalModals = () => {
 
 // --- Main App Content ---
 const AppContent = () => {
-  const { currentView, setCurrentView, activeUser, usersList } = useAppContext();
-  const { isLoading } = useDataContext();
-  const { currentUser } = useAuth();
+  const { currentView, setCurrentView, activeUser } = useAppContext();
+  const { currentUser, loading: authLoading } = useAuth(); // <--- Get auth loading state
+  const { isLoading: dataLoading } = useDataContext(); // <--- Get data loading state
 
   const {
     projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
@@ -181,16 +180,19 @@ const AppContent = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // --- LOADING STATE ---
+  if (authLoading || (currentUser && dataLoading)) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950 text-white flex-col gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
+        <p className="text-slate-400 animate-pulse">Loading EviroSafe...</p>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return <LoginScreen />;
   }
-
-  if (isLoading)
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-900 text-white">
-        Loading EviroSafe...
-      </div>
-    );
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 transition-all duration-300">
@@ -210,7 +212,7 @@ const AppContent = () => {
           {currentView === 'ptw' && (
             <Ptw
               ptws={ptwList}
-              users={usersList}
+              users={[]}
               projects={projects}
               onCreatePtw={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }}
               onAddExistingPtw={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}
@@ -248,7 +250,7 @@ const AppContent = () => {
           {currentView === 'people' && <People />}
           {currentView === 'roles' && <Roles roles={rolesConfig} />}
           {currentView === 'organizations' && <Organizations />}
-          {currentView === 'projects' && <Organizations />} 
+          {currentView === 'projects' && <Projects />}
           {currentView === 'signage' && <Signage />}
           {currentView === 'ai-insights' && <AiInsights />}
           {currentView === 'settings' && <Settings />}
