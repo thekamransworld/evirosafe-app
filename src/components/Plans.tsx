@@ -11,7 +11,6 @@ interface PlansProps {
   onNewPlan: () => void;
 }
 
-// MOVED OUTSIDE COMPONENT TO FIX SCOPE ERROR
 const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
   switch (status) {
     case 'published': return 'green';
@@ -24,16 +23,19 @@ const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red'
 };
 
 const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ plan, onSelect }) => {
+  // FIX: Ensure status string exists
+  const safeStatus = plan.status || 'draft';
+  
   return (
     <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
       <div className="flex-grow">
         <div className="flex justify-between items-start">
           <span className="text-xs font-semibold uppercase tracking-wider text-primary-700 bg-primary-100 dark:bg-primary-900/30 dark:text-primary-300 px-2 py-1 rounded-full">{plan.type}</span>
-          <Badge color={getStatusColor(plan.status)}>{plan.status.replace('_', ' ')}</Badge>
+          <Badge color={getStatusColor(safeStatus)}>{safeStatus.replace('_', ' ')}</Badge>
         </div>
         <h3 className="text-lg font-bold text-text-primary dark:text-white mt-3">{plan.title}</h3>
         <p className="text-sm text-text-secondary dark:text-gray-400">{plan.version}</p>
-        {plan.people.approved_by_client?.signed_at && (
+        {plan.people?.approved_by_client?.signed_at && (
             <div className="mt-3 flex items-center text-green-600 dark:text-green-400">
                 <CheckCircleIcon className="w-5 h-5 mr-2" />
                 <span className="text-sm font-semibold">Client Approved</span>
@@ -41,12 +43,12 @@ const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ pl
         )}
       </div>
       <div className="border-t dark:border-dark-border mt-4 pt-4 text-xs text-gray-500 dark:text-gray-400 space-y-2">
-        <p><strong>Prepared By:</strong> {plan.people.prepared_by?.name || 'Unknown'}</p>
-        <p><strong>Next Review:</strong> {plan.dates.next_review_at ? new Date(plan.dates.next_review_at).toLocaleDateString() : 'N/A'}</p>
+        <p><strong>Prepared By:</strong> {plan.people?.prepared_by?.name || 'Unknown'}</p>
+        <p><strong>Next Review:</strong> {plan.dates?.next_review_at ? new Date(plan.dates.next_review_at).toLocaleDateString() : 'N/A'}</p>
       </div>
       <div className="mt-4 flex justify-end">
         <Button variant="primary" size="sm" onClick={() => onSelect(plan)}>
-          {plan.status === 'draft' ? 'Edit Plan' : 'View Details'}
+          {safeStatus === 'draft' ? 'Edit Plan' : 'View Details'}
         </Button>
       </div>
     </Card>

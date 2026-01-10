@@ -63,10 +63,13 @@ export const Users: React.FC<UsersProps> = ({ users }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                     <Badge color={getRoleColor(user.role)}>{user.role.replace('_', ' ')}</Badge>
+                     {/* FIX: Check if role exists before replacing */}
+                     <Badge color={getRoleColor(user.role)}>{(user.role || 'User').replace('_', ' ')}</Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge color={getStatusColor(user.status)}>{user.status.charAt(0).toUpperCase() + user.status.slice(1)}</Badge>
+                    <Badge color={getStatusColor(user.status)}>
+                        {(user.status || 'unknown').charAt(0).toUpperCase() + (user.status || 'unknown').slice(1)}
+                    </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <a href="#" className="text-primary-600 hover:text-primary-900">Edit</a>

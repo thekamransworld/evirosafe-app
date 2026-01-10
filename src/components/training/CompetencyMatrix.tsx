@@ -55,8 +55,8 @@ export const CompetencyMatrix: React.FC<CompetencyMatrixProps> = ({ users, recor
                     </div>
                   </div>
                 </td>
-                {/* FIXED: Added safety check before replace */}
-                <td className="px-4 py-3 text-gray-500">{(user.role || 'Unknown').replace(/_/g, ' ')}</td>
+                {/* FIX: Safe role replacement */}
+                <td className="px-4 py-3 text-gray-500">{(user.role || 'Unknown').replace('_', ' ')}</td>
                 {['ind_001', 'wah_001', 'cs_001', 'elec_001', 'fa_001'].map(courseId => {
                    const status = getUserStatus(user.id, [courseId]);
                    return (
