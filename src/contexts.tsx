@@ -18,7 +18,7 @@ import { useToast } from './components/ui/Toast';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
 // --- APP CONTEXT ---
@@ -57,7 +57,15 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  // FIX: Load saved view from localStorage to persist navigation on refresh
+  const [currentView, setCurrentView] = useState<View>(() => {
+    return (localStorage.getItem('currentView') as View) || 'dashboard';
+  });
+
+  // Save view whenever it changes
+  useEffect(() => {
+    localStorage.setItem('currentView', currentView);
+  }, [currentView]);
   
   // Initialize with static data to prevent empty states before Firebase loads
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
@@ -103,8 +111,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
         
-        const defaultView = user.preferences?.default_view || 'dashboard';
-        setCurrentView(defaultView);
+        // Only set view if not already set (respects the localStorage load)
+        if (!localStorage.getItem('currentView')) {
+            const defaultView = user.preferences?.default_view || 'dashboard';
+            setCurrentView(defaultView);
+        }
         
         // Ensure Org is set
         const userOrg = organizations.find(o => o.id === user.org_id) || initialOrganizations.find(o => o.id === user.org_id);
@@ -289,16 +300,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       fetchData();
     }, [currentUser, setUsersList]);
 
-    // ... (All CRUD Handlers remain exactly the same as before) ...
-    // Keeping CRUD handlers identical to previous version to save space in this response blocks
-    // Just ensure the DataProvider uses the state initialized above.
-
     const updateDB = async (collectionName: string, id: string, data: any) => {
         try {
             await updateDoc(doc(db, collectionName, id), data);
         } catch (e) {
             console.error(`Error updating ${collectionName}:`, e);
-            // Don't show error toast on dev/demo environments if permission denied (offline mode)
         }
     };
 
@@ -346,10 +352,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'actions', newAction.id), newAction); toast.success("Action created."); } catch (e) { console.error(e); }
     };
     
+    // --- FIX: Use addDoc for Projects to avoid collision ---
     const handleCreateProject = async (data: any) => {
-        const newProj = { ...data, id: `proj_${Date.now()}`, org_id: activeOrg.id, status: 'active' };
-        setProjects(prev => [...prev, newProj]);
-        try { await setDoc(doc(db, 'projects', newProj.id), newProj); toast.success("Project created."); } catch (e) { console.error(e); }
+        try {
+            const projectData = {
+                ...data,
+                org_id: activeOrg.id,
+                status: 'active',
+                created_at: new Date().toISOString()
+            };
+            
+            // Use addDoc to let Firestore auto-generate ID
+            const docRef = await addDoc(collection(db, 'projects'), projectData);
+            
+            const newProj = { id: docRef.id, ...projectData };
+            setProjects(prev => [newProj, ...prev]);
+            toast.success("Project created.");
+        } catch (e) { 
+            console.error(e);
+            toast.error("Failed to create project");
+        }
     };
 
     const handleCreatePtw = async (data: any) => {
@@ -458,7 +480,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
 
-    // --- Correct Plan Creation with Sections ---
+    // --- FIXED: Correct mapping of sections for Plans ---
     const handleCreatePlan = (d: any) => {
         const newPlan: any = {
             id: `plan_${Date.now()}`,
@@ -495,7 +517,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch(e) { console.error(e); }
     };
 
-    // --- Correct RAMS Creation with AI Content ---
+    // --- FIXED: Correct mapping of AI Content for RAMS ---
     const handleCreateRams = (d: any) => {
         const newRams: any = {
             id: `rams_${Date.now()}`,

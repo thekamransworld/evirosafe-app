@@ -16,6 +16,9 @@ import {
   users as initialUsers, organizations, plans, rams, signs 
 } from '../data';
 
+// --- STORAGE SERVICE IMPORT ---
+import { uploadFileToCloud } from '../services/storageService';
+
 // --- EMAIL SERVICE IMPORT ---
 import { sendInviteEmail } from '../services/emailService';
 
@@ -92,6 +95,7 @@ export const Settings: React.FC<SettingsProps> = () => {
   const [newAvatarPreviewUrl, setNewAvatarPreviewUrl] = useState<string | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   // Invite State
   const [inviteEmail, setInviteEmail] = useState('');
@@ -104,9 +108,11 @@ export const Settings: React.FC<SettingsProps> = () => {
     if(activeUser) setEditedUser(activeUser);
   }, [activeUser]);
 
+  // Clean up object URL if component unmounts before save
   useEffect(() => {
     return () => {
-      if (newAvatarPreviewUrl) {
+      // Only revoke if it looks like a blob url (optional safety check)
+      if (newAvatarPreviewUrl && newAvatarPreviewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(newAvatarPreviewUrl);
       }
     };
@@ -121,14 +127,27 @@ export const Settings: React.FC<SettingsProps> = () => {
     toast.success("Profile updated successfully");
   };
 
-  const handlePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (newAvatarPreviewUrl) {
-      URL.revokeObjectURL(newAvatarPreviewUrl);
-    }
+  const handlePictureChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
-      const previewUrl = URL.createObjectURL(file);
-      setNewAvatarPreviewUrl(previewUrl);
+      setIsUploading(true);
+      
+      try {
+          // Show user that upload started
+          toast.info("Uploading profile picture...");
+          
+          // Actual upload to Firebase Storage
+          const url = await uploadFileToCloud(file, 'avatars');
+          
+          // Set the remote URL
+          setNewAvatarPreviewUrl(url);
+          toast.success("Image uploaded successfully");
+      } catch (e) {
+          console.error(e);
+          toast.error("Failed to upload image");
+      } finally {
+          setIsUploading(false);
+      }
     }
   };
 
@@ -305,8 +324,9 @@ export const Settings: React.FC<SettingsProps> = () => {
                     variant="secondary"
                     type="button"
                     onClick={handleChoosePictureClick}
+                    disabled={isUploading}
                   >
-                    Change Picture
+                    {isUploading ? 'Uploading...' : 'Change Picture'}
                   </Button>
                 </div>
               </div>
