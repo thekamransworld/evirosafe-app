@@ -426,8 +426,99 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
 
-    const handleCreatePlan = (d: any) => setPlanList(prev => [{ ...d, id: `plan_${Date.now()}`, content: { body_json: [], attachments: [] }, people: { prepared_by: { name: '', email: '' } }, dates: { created_at: '', updated_at: '', next_review_at: '' }, meta: { tags: [], change_note: '' }, audit_trail: [] } as any, ...prev]);
-    const handleCreateRams = (d: any) => setRamsList(prev => [{ ...d, id: `rams_${Date.now()}` } as any, ...prev]);
+    // --- FIXED: Correct mapping of sections for Plans ---
+    const handleCreatePlan = (d: any) => {
+        const newPlan: any = {
+            id: `plan_${Date.now()}`,
+            org_id: activeOrg.id,
+            project_id: d.project_id,
+            type: d.type,
+            title: d.title,
+            version: 'v1.0',
+            status: 'draft',
+            people: {
+                prepared_by: {
+                    name: activeUser?.name || 'Unknown',
+                    email: activeUser?.email || '',
+                    signed_at: new Date().toISOString()
+                }
+            },
+            dates: {
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            content: {
+                // IMPORTANT: This line maps the sections from the modal to the plan body
+                body_json: d.sections || [], 
+                attachments: []
+            },
+            meta: {
+                tags: [],
+                change_note: 'Initial creation'
+            },
+            audit_trail: []
+        };
+        
+        setPlanList(prev => [newPlan, ...prev]);
+        try {
+            setDoc(doc(db, 'plans', newPlan.id), newPlan);
+            toast.success("Plan created successfully.");
+        } catch(e) {
+            console.error(e);
+        }
+    };
+
+    // --- FIXED: Correct mapping of AI Content for RAMS ---
+    const handleCreateRams = (d: any) => {
+        const newRams: any = {
+            id: `rams_${Date.now()}`,
+            org_id: activeOrg.id,
+            project_id: d.project_id,
+            activity: d.activity,
+            location: d.location,
+            status: 'draft',
+            version: 'v1.0',
+            prepared_by: {
+                name: activeUser?.name || 'Unknown',
+                email: activeUser?.email || '',
+                role: activeUser?.role || 'User',
+                signed_at: new Date().toISOString()
+            },
+            times: {
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                valid_from: new Date().toISOString(),
+                valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            // IMPORTANT: Map the AI response to the method_statement structure
+            method_statement: d.aiContent ? {
+                overview: d.aiContent.overview || '',
+                competence: d.aiContent.competence || '',
+                sequence_of_operations: d.aiContent.sequence_of_operations || [],
+                emergency_arrangements: d.aiContent.emergency_arrangements || ''
+            } : {
+                overview: '',
+                competence: '',
+                sequence_of_operations: [],
+                emergency_arrangements: ''
+            },
+            overall_risk_before: 0,
+            overall_risk_after: 0,
+            attachments: [],
+            linked_ptw_types: [],
+            audit_log: []
+        };
+
+        setRamsList(prev => [newRams, ...prev]);
+        try {
+            setDoc(doc(db, 'rams', newRams.id), newRams);
+            toast.success("RAMS created successfully.");
+        } catch(e) {
+            console.error(e);
+        }
+    };
+
     const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
 
     const actionItems = useMemo<ActionItem[]>(() => {
