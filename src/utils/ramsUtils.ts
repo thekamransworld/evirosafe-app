@@ -12,7 +12,8 @@ export const getStatusColor = (status: RamsStatus): 'green' | 'blue' | 'yellow' 
   }
 };
 
-export const getStatusDisplayText = (status: RamsStatus): string => {
+export const getStatusDisplayText = (status: RamsStatus | undefined | null): string => {
+  if (!status) return 'Unknown'; // <--- FIXED: Safety check
   return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
