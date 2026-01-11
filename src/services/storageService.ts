@@ -13,21 +13,12 @@ export const uploadFileToCloud = async (file: File, folder: string = 'general'):
     
     // 3. Get URL
     const downloadURL = await getDownloadURL(snapshot.ref);
-    console.log("Upload success:", downloadURL);
     return downloadURL;
 
   } catch (error: any) {
-    // 4. Handle CORS or Network Errors gracefully
-    console.error("Storage Upload Error:", error);
+    console.error("Storage Upload Failed:", error);
     
-    // Check if it's a CORS or permission error
-    if (error.code === 'storage/unauthorized' || error.message.includes('CORS') || error.message.includes('access control')) {
-        console.warn("CORS issue detected. Using placeholder to allow report submission.");
-        // Return a placeholder so the report can still be saved
-        return `https://placehold.co/600x400/FF0000/FFFFFF?text=Image+Error+(CORS)`;
-    }
-
-    // Return a generic error placeholder for other issues
-    return `https://placehold.co/600x400/orange/white?text=Upload+Failed`;
+    // 4. If upload fails (CORS or Network), return a fake URL so the report still saves
+    return `https://placehold.co/600x400/FF0000/FFFFFF?text=Image+Upload+Failed`;
   }
 };
