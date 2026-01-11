@@ -130,15 +130,15 @@ export const InspectionCreationModal: React.FC<{
     if (!isOpen) return;
 
     const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    const isoLocal = now.toISOString().slice(0, 16);
+    // Adjust to local ISO string manually to keep timezone offset correct for inputs
+    const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
 
     setTitle('');
     setType('Safety');
     setProjectId((projects && projects.length > 0) ? projects[0].id : '');
     setPersonResponsibleId('');
     setChecklistTemplateId((checklistTemplates && checklistTemplates.length > 0) ? checklistTemplates[0].id : '');
-    setScheduleAt(isoLocal);
+    setScheduleAt(localIso);
     setTeamMemberIds([]);
     setObservers([]);
 
@@ -154,12 +154,14 @@ export const InspectionCreationModal: React.FC<{
 
   const selectedProject = useMemo(() => (projects || []).find(p => p.id === projectId), [projects, projectId]);
 
+  // Filter templates safely
   const filteredTemplates = useMemo(() => {
     const safeTemplates = checklistTemplates || [];
     const byType = safeTemplates.filter(tpl => (tpl.category || '').toLowerCase().includes(type.toLowerCase()));
     return byType.length > 0 ? byType : safeTemplates;
   }, [checklistTemplates, type]);
 
+  // Readiness score
   const readiness = useMemo(() => {
     const total = complianceLabels.length;
     const done = complianceLabels.filter(i => hseCompliance[i.key]).length;
@@ -306,30 +308,45 @@ export const InspectionCreationModal: React.FC<{
                         </div>
                         <div>
                             <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Type</label>
-                            <select
-                                value={type}
-                                onChange={(e) => setType(e.target.value as Inspection['type'])}
-                                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                            >
-                                <option value="Safety">Safety</option>
-                                <option value="Quality">Quality</option>
-                                <option value="Environmental">Environmental</option>
-                                <option value="Fire">Fire</option>
-                                <option value="Equipment">Equipment</option>
-                            </select>
+                            <div className="relative">
+                              <select
+                                  value={type}
+                                  onChange={(e) => setType(e.target.value as Inspection['type'])}
+                                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white appearance-none"
+                              >
+                                  <option value="Safety">Safety</option>
+                                  <option value="Quality">Quality</option>
+                                  <option value="Environmental">Environmental</option>
+                                  <option value="Fire">Fire</option>
+                                  <option value="Equipment">Equipment</option>
+                              </select>
+                              <ChevronRight className="w-4 h-4 text-gray-400 absolute right-3 top-4 rotate-90 pointer-events-none" />
+                            </div>
                         </div>
                         <div>
                             <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Project</label>
-                            <select
-                                value={projectId}
-                                onChange={(e) => setProjectId(e.target.value)}
-                                className={`w-full rounded-lg border px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:text-white ${!projectId ? 'border-red-400 ring-1 ring-red-200' : 'border-gray-300 dark:border-gray-700'}`}
-                            >
-                                <option value="">Select project...</option>
-                                {(projects || []).map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                              <select
+                                  value={projectId}
+                                  onChange={(e) => setProjectId(e.target.value)}
+                                  className={`w-full rounded-lg border px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:text-white appearance-none ${!projectId ? 'border-red-400 ring-1 ring-red-200' : 'border-gray-300 dark:border-gray-700'}`}
+                              >
+                                  <option value="">Select project...</option>
+                                  {(projects || []).map(p => (
+                                  <option key={p.id} value={p.id}>{p.name}</option>
+                                  ))}
+                              </select>
+                              <ChevronRight className="w-4 h-4 text-gray-400 absolute right-3 top-4 rotate-90 pointer-events-none" />
+                            </div>
+                        </div>
+                        <div className="md:col-span-2">
+                             <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1 block">Scope / Location / Area</label>
+                            <input
+                                value={locationArea}
+                                onChange={(e) => setLocationArea(e.target.value)}
+                                placeholder="e.g., Area-03, Workshop, Roof..."
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                            />
                         </div>
                     </div>
                 </CardSection>
@@ -422,39 +439,48 @@ export const InspectionCreationModal: React.FC<{
                             ))}
                         </select>
                     </div>
-                </CardSection>
-                
-                 {/* Evidence Upload moved here for better flow */}
-                <CardSection title="Pre-Inspection Media / Evidence">
-                    <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer relative group">
-                        <input 
-                            type="file" 
-                            multiple 
-                            accept="image/*,video/*" 
-                            onChange={handleFileChange} 
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        />
-                        <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 group-hover:scale-105 transition-transform">
-                            <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full">
-                              <Upload className="w-6 h-6" />
-                            </div>
-                            <span className="text-sm font-medium">Click to upload photos or videos</span>
-                            <span className="text-xs text-gray-400">Supports JPG, PNG, MP4</span>
-                        </div>
-                    </div>
-                    
-                    {evidenceFiles.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-                            {evidenceFiles.map((file, i) => (
-                                <div key={i} className="relative group bg-gray-100 dark:bg-gray-800 p-2 rounded-lg flex items-center gap-2 border border-gray-200 dark:border-gray-700">
-                                    <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0 flex items-center justify-center text-xs font-bold text-white">IMG</div>
-                                    <span className="text-xs truncate flex-1 text-gray-700 dark:text-gray-300">{file.name}</span>
-                                    <button onClick={() => handleRemoveFile(i)} className="text-gray-400 hover:text-red-500 p-1"><X className="w-4 h-4" /></button>
-                                </div>
+
+                     <div>
+                        <label className="text-sm font-bold text-gray-900 dark:text-gray-100 mb-2 block">Reference Standards</label>
+                        <div className="flex flex-wrap gap-2">
+                            {stdRefs.map(std => (
+                            <button
+                                key={std}
+                                type="button"
+                                onClick={() =>
+                                setSelectedStandards(prev => prev.includes(std) ? prev.filter(x => x !== std) : [...prev, std])
+                                }
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                                selectedStandards.includes(std)
+                                    ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
+                                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                                }`}
+                            >
+                                {std}
+                            </button>
                             ))}
                         </div>
-                    )}
+                    </div>
                 </CardSection>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <CardSection title="Briefing & Hazards" className="h-full">
+                         <textarea 
+                            value={preInspectionBriefing}
+                            onChange={(e) => setPreInspectionBriefing(e.target.value)}
+                            className="w-full h-32 p-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none" 
+                            placeholder="Key hazards discussed..."
+                        />
+                    </CardSection>
+                    <CardSection title="PPE Requirements" className="h-full">
+                         <textarea 
+                            value={ppeRequirements}
+                            onChange={(e) => setPpeRequirements(e.target.value)}
+                            className="w-full h-32 p-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-primary-500 focus:outline-none" 
+                            placeholder="Helmet, Boots, Vest..."
+                         />
+                    </CardSection>
+                </div>
               </div>
           )}
 
@@ -494,6 +520,43 @@ export const InspectionCreationModal: React.FC<{
                             ))}
                         </div>
                     </div>
+                </CardSection>
+
+                {/* Evidence Upload */}
+                <CardSection title="Pre-Inspection Media / Evidence">
+                    <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer relative group">
+                        <input 
+                            type="file" 
+                            multiple 
+                            accept="image/*,video/*" 
+                            onChange={handleFileChange} 
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 group-hover:scale-105 transition-transform">
+                            <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-full">
+                              <Upload className="w-6 h-6" />
+                            </div>
+                            <span className="text-sm font-medium">Click to upload photos or videos</span>
+                            <span className="text-xs text-gray-400">Supports JPG, PNG, MP4</span>
+                        </div>
+                    </div>
+                    
+                    {evidenceFiles.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+                            {evidenceFiles.map((file, i) => (
+                                <div key={i} className="relative group bg-gray-100 dark:bg-gray-800 p-2 rounded-lg flex items-center gap-2 border border-gray-200 dark:border-gray-700">
+                                    <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0 flex items-center justify-center text-xs font-bold text-white">IMG</div>
+                                    <span className="text-xs truncate flex-1 text-gray-700 dark:text-gray-300">{file.name}</span>
+                                    <button 
+                                        onClick={() => handleRemoveFile(i)}
+                                        className="text-gray-400 hover:text-red-500 p-1"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </CardSection>
               </div>
           )}
@@ -537,199 +600,6 @@ export const InspectionCreationModal: React.FC<{
           </div>
         </div>
       </div>
-    </div>
-  );
-};
-
-2. Fix `src/components/Inspections.tsx`
-Add the missing `onConvertToReport` handler prop.
-
-```tsx
-import React, { useState, useMemo } from 'react';
-import type { Inspection, InspectionStatus, InspectionFinding } from '../types';
-import { Card } from './ui/Card';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
-import { InspectionCreationModal } from './InspectionCreationModal';
-import { InspectionConductModal } from './InspectionConductModal';
-import { useAppContext, useDataContext, useModalContext } from '../contexts';
-
-// ICONS
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>;
-const ClipboardIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504 1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" /></svg>;
-
-const InspectionCard: React.FC<{
-    inspection: Inspection;
-    onConduct: (inspection: Inspection) => void;
-}> = ({ inspection, onConduct }) => {
-    const { usersList } = useAppContext();
-    const { projects } = useDataContext();
-    const responsible = usersList.find(u => u.id === inspection.person_responsible_id)?.name || 'Unknown';
-    const project = projects.find(p => p.id === inspection.project_id)?.name || 'Unknown';
-    
-    const getStatusColor = (status: Inspection['status']): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
-        switch (status) {
-            case 'Closed':
-            case 'Approved': return 'green';
-            case 'In Progress': return 'blue';
-            case 'Scheduled': return 'blue';
-            case 'Pending Review': return 'yellow';
-            case 'Draft': return 'gray';
-            case 'Overdue': return 'red';
-            default: return 'gray';
-        }
-    };
-    
-    const findingsCount = inspection.findings?.length || 0;
-
-    return (
-        <Card className="hover:border-blue-300 transition-colors">
-            <div className="flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <ClipboardIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-md text-text-primary pr-2">{inspection.title}</h3>
-                        <p className="text-xs text-text-secondary">{inspection.inspection_id || 'ID Pending'}</p>
-                    </div>
-                </div>
-                <Badge color={getStatusColor(inspection.status)}>{inspection.status}</Badge>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 mt-4 py-3 border-t border-b border-gray-100 dark:border-gray-800">
-                 <div>
-                    <span className="text-xs text-gray-500 block">Project</span>
-                    <span className="text-sm font-medium">{project}</span>
-                 </div>
-                 <div>
-                    <span className="text-xs text-gray-500 block">Assigned To</span>
-                    <span className="text-sm font-medium">{responsible}</span>
-                 </div>
-            </div>
-
-            <div className="flex justify-between items-center mt-4">
-                <div className="text-xs font-semibold text-red-500">
-                    {findingsCount > 0 ? `${findingsCount} Findings` : 'No Findings'}
-                </div>
-                <Button size="sm" onClick={() => onConduct(inspection)}>
-                    {inspection.status === 'Draft' || inspection.status === 'Scheduled' ? 'Start' : 'Continue'}
-                </Button>
-            </div>
-        </Card>
-    );
-};
-
-export const Inspections: React.FC = () => {
-  const { activeOrg, usersList, can } = useAppContext();
-  const { inspectionList, setInspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection } = useDataContext();
-  
-  // Destructure report modal controls
-  const { 
-    isInspectionCreationModalOpen, 
-    setIsInspectionCreationModalOpen,
-    setIsReportCreationModalOpen,
-    setReportInitialData
-  } = useModalContext();
-
-  const [isConductModalOpen, setConductModalOpen] = useState(false);
-  const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
-
-  const handleStartConduct = (inspection: Inspection) => {
-    let inspectionToConduct = inspection;
-    // Auto-transition status when starting
-    if (inspection.status === 'Draft' || inspection.status === 'Scheduled') {
-        inspectionToConduct = { ...inspection, status: 'In Progress' };
-        handleUpdateInspection(inspectionToConduct);
-    }
-    setSelectedInspection(inspectionToConduct);
-    setConductModalOpen(true);
-  };
-
-  const handleUpdateAndCloseConduct = (inspection: Inspection, action?: 'submit' | 'save' | 'approve' | 'close') => {
-    // Logic to handle status transitions based on action
-    let newStatus = inspection.status;
-    if (action === 'submit') newStatus = 'Pending Review';
-    if (action === 'approve') newStatus = 'Approved';
-    if (action === 'close') newStatus = 'Closed';
-
-    const updated = { ...inspection, status: newStatus };
-    handleUpdateInspection(updated);
-    
-    if (action !== 'save') {
-        setConductModalOpen(false);
-        setSelectedInspection(null);
-    }
-  };
-
-  // Convert Finding to Report Logic
-  const handleConvertToReport = (finding: InspectionFinding) => {
-    setReportInitialData({
-        description: finding.description,
-        type: 'Unsafe Condition', // Default type
-        risk_pre_control: { 
-            severity: finding.risk_level === 'High' ? 3 : finding.risk_level === 'Medium' ? 2 : 1, 
-            likelihood: 2 
-        },
-        evidence_urls: finding.evidence_urls
-    });
-    // Open report modal (optional: close inspection modal)
-    setIsReportCreationModalOpen(true);
-  };
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-            <h1 className="text-3xl font-bold text-text-primary dark:text-dark-text-primary">Inspections</h1>
-            <p className="text-text-secondary">Manage and conduct safety audits.</p>
-        </div>
-        {can('create', 'inspections') && (
-            <Button onClick={() => setIsInspectionCreationModalOpen(true)}>
-              <PlusIcon className="w-5 h-5 mr-2" />
-              New Inspection
-            </Button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {inspectionList.map((inspection) => (
-            <InspectionCard 
-                key={inspection.id}
-                inspection={inspection}
-                onConduct={handleStartConduct}
-            />
-        ))}
-         {inspectionList.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-500 border-2 border-dashed rounded-lg">
-                <p>No inspections scheduled. Create one to get started.</p>
-            </div>
-        )}
-      </div>
-
-      {isInspectionCreationModalOpen && (
-        <InspectionCreationModal
-            isOpen={isInspectionCreationModalOpen}
-            onClose={() => setIsInspectionCreationModalOpen(false)}
-            onSubmit={handleCreateInspection}
-            projects={projects}
-            users={usersList}
-            checklistTemplates={checklistTemplates}
-        />
-      )}
-
-      {isConductModalOpen && selectedInspection && (
-        <InspectionConductModal
-            isOpen={isConductModalOpen}
-            onClose={() => setConductModalOpen(false)}
-            inspection={selectedInspection}
-            onUpdate={handleUpdateAndCloseConduct}
-            onConvertToReport={handleConvertToReport} // <--- Added this prop
-            projects={projects}
-            users={usersList}
-            checklistTemplates={checklistTemplates}
-        />
-      )}
     </div>
   );
 };
