@@ -386,7 +386,8 @@ export const Settings: React.FC<SettingsProps> = () => {
             <>
             <Section title="Organization Details" description="Manage your company branding and details.">
                 <div className="flex items-center gap-4 mb-4">
-                    <img src={activeOrg.branding.logoUrl} alt="Logo" className="w-16 h-16 rounded-lg border dark:border-gray-700" />
+                    {/* FIX: Safe access to logoUrl */}
+                    <img src={activeOrg.branding?.logoUrl || 'https://via.placeholder.com/50'} alt="Logo" className="w-16 h-16 rounded-lg border dark:border-gray-700" />
                     <div>
                         <h3 className="text-xl font-bold text-gray-900 dark:text-white">{activeOrg.name}</h3>
                         <p className="text-sm text-gray-500">{activeOrg.industry} • {activeOrg.country}</p>

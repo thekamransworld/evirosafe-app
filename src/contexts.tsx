@@ -8,7 +8,7 @@ import {
   plans as initialPlans,
   rams as initialRams
 } from './data';
-import { translations, supportedLanguages, roles } from './config';
+import { translations, supportedLanguages, roles, logoSrc } from './config'; // Ensure logoSrc is imported
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
@@ -57,17 +57,14 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // FIX: Load saved view from localStorage to persist navigation on refresh
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
 
-  // Save view whenever it changes
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
   }, [currentView]);
   
-  // Initialize with static data to prevent empty states before Firebase loads
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || initialOrganizations[0]);
   
@@ -88,36 +85,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-  // --- CRITICAL FIX: Fallback to initialUsers if usersList (from Firebase) hasn't loaded yet ---
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
-    
-    // 1. Try to find in current state (Firebase data)
     const foundInState = usersList.find(u => u.id === activeUserId);
     if (foundInState) return foundInState;
-
-    // 2. Fallback to static data (prevents "missing buttons" on refresh)
     const foundInStatic = initialUsers.find(u => u.id === activeUserId);
     if (foundInStatic) return foundInStatic;
-
     return null;
   }, [activeUserId, usersList]);
 
   const login = (userId: string) => {
-    // Check both lists to ensure valid login even if offline
     const user = usersList.find(u => u.id === userId) || initialUsers.find(u => u.id === userId);
-    
     if (user) {
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
-        
-        // Only set view if not already set (respects the localStorage load)
         if (!localStorage.getItem('currentView')) {
             const defaultView = user.preferences?.default_view || 'dashboard';
             setCurrentView(defaultView);
         }
-        
-        // Ensure Org is set
         const userOrg = organizations.find(o => o.id === user.org_id) || initialOrganizations.find(o => o.id === user.org_id);
         if(userOrg) setActiveOrg(userOrg);
     }
@@ -145,12 +130,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const can = (action: Action, resource: Resource): boolean => {
     if (!activeUser) return false;
-    
-    // Find role definition
     const userRole = roles.find(r => r.key === activeUser.role);
-    if (!userRole) return false; // Fail safe
-
-    // Check specific resource permission
+    if (!userRole) return false;
     const permission = userRole.permissions.find(p => p.resource === resource);
     return permission ? permission.actions.includes(action) : false;
   };
@@ -159,7 +140,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-  const handleCreateOrganization = (data: any) => setOrganizations(prev => [...prev, { ...data, id: `org_${Date.now()}`, status: 'active' }]);
+  
+  // --- FIX: Add default branding when creating an organization ---
+  const handleCreateOrganization = (data: any) => {
+      const newOrg: Organization = {
+          ...data,
+          id: `org_${Date.now()}`,
+          status: 'active',
+          branding: {
+              logoUrl: logoSrc, // Default logo
+              primaryColor: '#00A86B'
+          },
+          slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+          domain: '',
+          timezone: 'GMT+0',
+          primaryLanguage: 'en',
+          secondaryLanguages: []
+      };
+      setOrganizations(prev => [...prev, newOrg]);
+  };
+
   const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
   const handleSignUp = () => {};
   const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
@@ -234,9 +234,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const [isLoading, setIsLoading] = useState(true);
     
-    // Initialize with static data to ensure UI paints immediately
     const [projects, setProjects] = useState<Project[]>(initialProjects || []);
-    const [reportList, setReportList] = useState<Report[]>([]); // Reports typically fetched fresh
+    const [reportList, setReportList] = useState<Report[]>([]);
     const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
     const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
     const [planList, setPlanList] = useState<PlanType[]>(initialPlans || []);
@@ -252,7 +251,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
     useEffect(() => {
-      // If no user, stop loading immediately
       if (!currentUser) {
           setIsLoading(false);
           return;
@@ -260,14 +258,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const fetchData = async () => {
         try {
-          // Helper to fetch and MERGE with existing data if needed
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             const snap = await getDocs(collection(db, name));
             const data = snap.docs.map(d => d.data());
             if (data.length > 0) {
                  setter(data);
             } else {
-                 // If Firebase is empty, keep initial data
                  setter(initialData); 
             }
           };
@@ -361,10 +357,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 status: 'active',
                 created_at: new Date().toISOString()
             };
-            
-            // Use addDoc to let Firestore auto-generate ID
             const docRef = await addDoc(collection(db, 'projects'), projectData);
-            
             const newProj = { id: docRef.id, ...projectData };
             setProjects(prev => [newProj, ...prev]);
             toast.success("Project created.");
@@ -480,7 +473,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
 
-    // --- FIXED: Correct mapping of sections for Plans ---
     const handleCreatePlan = (d: any) => {
         const newPlan: any = {
             id: `plan_${Date.now()}`,
@@ -517,7 +509,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch(e) { console.error(e); }
     };
 
-    // --- FIXED: Correct mapping of AI Content for RAMS ---
     const handleCreateRams = (d: any) => {
         const newRams: any = {
             id: `rams_${Date.now()}`,

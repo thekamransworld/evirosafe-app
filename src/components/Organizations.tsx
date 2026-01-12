@@ -1,156 +1,223 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Organization } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
-import { OrganizationDetails } from './OrganizationDetails'; // <--- Import Details
+import { ProjectCreationModal } from './ProjectCreationModal';
+import { ProjectDetails } from './ProjectDetails';
 
-// --- Organization Creation Modal ---
-interface OrganizationCreationModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: { name: string; industry: string; country: string }) => void;
+interface OrganizationDetailsProps {
+  org: Organization;
+  onBack: () => void;
 }
 
-const OrganizationCreationModal: React.FC<OrganizationCreationModalProps> = ({ isOpen, onClose, onSubmit }) => {
-    const [formData, setFormData] = useState({
-        name: '',
-        industry: 'Construction',
-        country: 'United Arab Emirates',
-    });
-    const [error, setError] = useState('');
+type Tab = 'Overview' | 'Projects' | 'People' | 'Settings';
 
-    const handleSubmit = () => {
-        if (!formData.name.trim() || !formData.industry.trim() || !formData.country.trim()) {
-            setError('All fields are required.');
-            return;
-        }
-        onSubmit(formData);
-    };
+export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, onBack }) => {
+  const { usersList } = useAppContext();
+  const { projects, handleCreateProject } = useDataContext();
+  const [activeTab, setActiveTab] = useState<Tab>('Overview');
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
 
-    if (!isOpen) return null;
+  // Filter data for this specific organization
+  const orgProjects = useMemo(() => projects.filter(p => p.org_id === org.id), [projects, org.id]);
+  const orgUsers = useMemo(() => usersList.filter(u => u.org_id === org.id), [usersList, org.id]);
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create Organization</h3>
-                </div>
-                <div className="p-6 space-y-4">
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Organization Name</label>
-                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. EGO Corporation" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Industry</label>
-                        <input type="text" value={formData.industry} onChange={e => setFormData(p => ({...p, industry: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
-                    </div>
-                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Country</label>
-                        <input type="text" value={formData.country} onChange={e => setFormData(p => ({...p, country: e.target.value}))} className="mt-1 w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" />
-                    </div>
-                    {error && <p className="text-sm text-red-500">{error}</p>}
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Create</Button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export const Organizations: React.FC = () => {
-  const { organizations, usersList, activeUser, handleCreateOrganization } = useAppContext();
-  const { projects } = useDataContext();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null); // <--- State for selected org
-
-  const getStatusColor = (status: Organization['status']): 'green' | 'gray' => {
-    switch (status) {
-      case 'active': return 'green';
-      case 'suspended': return 'gray';
-      default: return 'gray';
-    }
+  const stats = {
+    activeProjects: orgProjects.filter(p => p.status === 'active').length,
+    totalUsers: orgUsers.length,
+    admins: orgUsers.filter(u => u.role === 'ORG_ADMIN').length,
   };
 
-  const handleSubmit = (data: { name: string, industry: string, country: string }) => {
-    handleCreateOrganization(data);
-    setIsModalOpen(false);
-  }
+  const handleProjectSubmit = (data: any) => {
+      handleCreateProject({ ...data, org_id: org.id });
+      setIsProjectModalOpen(false);
+  };
 
-  // If an organization is selected, show its details view
-  if (selectedOrg) {
-      return <OrganizationDetails org={selectedOrg} onBack={() => setSelectedOrg(null)} />;
+  // If a project is selected, show its details
+  if (selectedProject) {
+      return (
+          <ProjectDetails 
+              project={selectedProject} 
+              onBack={() => setSelectedProject(null)}
+              onEdit={() => console.log("Edit project clicked")}
+          />
+      );
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
-        {activeUser?.role === 'ADMIN' && (
-            <Button onClick={() => setIsModalOpen(true)}>
-                <PlusIcon className="w-5 h-5 mr-2" />
-                New Organization
-            </Button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between bg-white dark:bg-dark-card p-6 rounded-xl shadow-sm border border-gray-200 dark:border-dark-border">
+        <div className="flex items-center gap-4">
+          <Button variant="secondary" size="sm" onClick={onBack} leftIcon={<ArrowLeftIcon />}>
+            Back
+          </Button>
+          <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center p-2">
+            {/* FIX: Safe access to logoUrl */}
+            <img src={org.branding?.logoUrl || 'https://via.placeholder.com/50'} alt={org.name} className="max-h-full max-w-full" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{org.name}</h1>
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <span>{org.domain}</span>
+              <span>•</span>
+              <Badge color={org.status === 'active' ? 'green' : 'gray'}>{org.status}</Badge>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2">
+           <Button variant="outline">Edit Details</Button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-dark-border">
+        <nav className="-mb-px flex space-x-8">
+          {['Overview', 'Projects', 'People', 'Settings'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as Tab)}
+              className={`
+                whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                ${activeTab === tab
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'}
+              `}
+            >
+              {tab}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Content */}
+      <div className="min-h-[400px]">
+        {activeTab === 'Overview' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Projects</h3>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats.activeProjects}</p>
+            </Card>
+            <Card>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Team Members</h3>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats.totalUsers}</p>
+            </Card>
+            <Card>
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Org Admins</h3>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{stats.admins}</p>
+            </Card>
+            
+            <Card className="md:col-span-3">
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Organization Details</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm text-gray-700 dark:text-gray-300">
+                    <div>
+                        <p className="text-gray-500">Industry</p>
+                        <p className="font-medium">{org.industry || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500">Country</p>
+                        <p className="font-medium">{org.country || 'N/A'}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500">Timezone</p>
+                        <p className="font-medium">{org.timezone}</p>
+                    </div>
+                    <div>
+                        <p className="text-gray-500">Primary Language</p>
+                        <p className="font-medium uppercase">{org.primaryLanguage}</p>
+                    </div>
+                </div>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'Projects' && (
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">Projects List</h3>
+                    <Button onClick={() => setIsProjectModalOpen(true)}>
+                        <PlusIcon className="w-5 h-5 mr-2" />
+                        New Project
+                    </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {orgProjects.map(p => (
+                        <Card 
+                            key={p.id} 
+                            className="hover:border-primary-500 transition-colors cursor-pointer"
+                            onClick={() => setSelectedProject(p)}
+                        >
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h4 className="font-bold text-lg text-gray-900 dark:text-white">{p.name}</h4>
+                                    <p className="text-sm text-gray-500">{p.code}</p>
+                                </div>
+                                <Badge color={p.status === 'active' ? 'green' : 'gray'}>{p.status}</Badge>
+                            </div>
+                            <div className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+                                <p>📍 {p.location}</p>
+                                <p className="text-xs text-gray-500 mt-1">Manager: {usersList.find(u => u.id === p.manager_id)?.name || 'Unassigned'}</p>
+                            </div>
+                        </Card>
+                    ))}
+                    {orgProjects.length === 0 && (
+                        <div className="col-span-2 text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+                            <p className="text-gray-500">No projects found for this organization.</p>
+                            <Button variant="ghost" className="mt-2" onClick={() => setIsProjectModalOpen(true)}>Create First Project</Button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'People' && (
+             <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Team Members</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {orgUsers.map(u => (
+                        <Card key={u.id} className="flex items-center gap-4">
+                            <img src={u.avatar_url} alt={u.name} className="w-10 h-10 rounded-full bg-gray-200" />
+                            <div>
+                                <p className="font-bold text-gray-900 dark:text-white">{u.name}</p>
+                                <p className="text-xs text-gray-500">{u.role}</p>
+                            </div>
+                        </Card>
+                    ))}
+                    {orgUsers.length === 0 && <p className="text-gray-500">No users found.</p>}
+                </div>
+             </div>
+        )}
+
+        {activeTab === 'Settings' && (
+            <Card>
+                <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Organization Settings</h3>
+                <p className="text-gray-500">Global settings for {org.name} will go here.</p>
+            </Card>
         )}
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {organizations.map(org => {
-          const projectCount = projects.filter(p => p.org_id === org.id).length;
-          const userCount = usersList.filter(u => u.org_id === org.id).length;
 
-          return (
-            <Card 
-                key={org.id} 
-                className="flex flex-col cursor-pointer hover:border-primary-500 transition-colors"
-                onClick={() => setSelectedOrg(org)} // <--- Click to view details
-            >
-              <div className="flex-1">
-                  <div className="flex justify-between items-start">
-                      <div className="flex items-center space-x-4">
-                        <img src={org.branding?.logoUrl || 'https://via.placeholder.com/50'} alt={org.name} className="h-12 w-12 rounded-lg" />
-                        <div>
-                          <h3 className="text-lg font-bold text-text-primary dark:text-white">{org.name}</h3>
-                          <p className="text-sm text-text-secondary dark:text-gray-400 font-mono">{org.domain}</p>
-                        </div>
-                      </div>
-                      <Badge color={getStatusColor(org.status)}>
-                          {org.status.charAt(0).toUpperCase() + org.status.slice(1)}
-                      </Badge>
-                  </div>
-                  <div className="mt-4 flex space-x-6 text-sm text-gray-600 dark:text-gray-300">
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white">{projectCount}</div>
-                      <div>Projects</div>
-                    </div>
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white">{userCount}</div>
-                      <div>Users</div>
-                    </div>
-                  </div>
-              </div>
-              <div className="mt-6 border-t dark:border-dark-border pt-4 flex justify-end space-x-2">
-                  <Button variant="secondary" size="sm">Settings</Button>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-
-      <OrganizationCreationModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
+      <ProjectCreationModal 
+        isOpen={isProjectModalOpen} 
+        onClose={() => setIsProjectModalOpen(false)}
+        onSubmit={handleProjectSubmit}
+        users={orgUsers}
       />
     </div>
   );
 };
 
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-    </svg>
+const ArrowLeftIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+  </svg>
+);
+
+const PlusIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
 );
