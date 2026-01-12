@@ -59,7 +59,7 @@ const FindingForm: React.FC<{
             ...finding,
             ...formData,
             id: finding.id || `find_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-            status: 'Open'
+            status: 'open' // FIX: Changed 'Open' to 'open' to match type definition
         } as InspectionFinding);
     };
 
