@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, AlertTriangle, Trash2, AlertCircle } from 'lucide-react';
-import { HSEInspection, HSEFinding } from '../../../types/hse-inspection';
+// FIX: Updated import path
+import { HSEInspection, HSEFinding } from '../../../types';
 import { Button } from '../../ui/Button';
 
 interface Step6Props {
@@ -42,7 +43,7 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
       },
       created_at: new Date(),
       updated_at: new Date(),
-      created_by: 'current_user', // Replace with context user
+      created_by: 'current_user',
       evidence_ids: [],
       corrective_action_required: risk.score > 5
     };
@@ -52,7 +53,6 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
       findings: [...(formData.findings || []), finding]
     });
     
-    // Reset form
     setNewFinding({
       description: '',
       risk_assessment: { severity: 1, likelihood: 1, risk_level: 'low', risk_score: 1, people_at_risk: 1, potential_consequences: [] },
@@ -149,8 +149,8 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
             <div key={finding.id} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg flex justify-between items-start hover:shadow-md transition-shadow">
                 <div className="flex gap-3">
                     <div className={`p-2 rounded-lg h-fit ${
-                        finding.risk_assessment.risk_level === 'extreme' ? 'bg-red-100 text-red-600' :
-                        finding.risk_assessment.risk_level === 'high' ? 'bg-orange-100 text-orange-600' :
+                        finding.risk_assessment?.risk_level === 'extreme' ? 'bg-red-100 text-red-600' :
+                        finding.risk_assessment?.risk_level === 'high' ? 'bg-orange-100 text-orange-600' :
                         'bg-blue-100 text-blue-600'
                     }`}>
                         <AlertTriangle className="w-5 h-5" />
@@ -160,12 +160,12 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
                             <span className="font-bold text-gray-900 dark:text-white">{finding.finding_number}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full uppercase font-bold ${
                                 finding.type === 'non_conformity' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
-                            }`}>{finding.type.replace(/_/g, ' ')}</span>
+                            }`}>{finding.type?.replace(/_/g, ' ')}</span>
                         </div>
                         <p className="text-gray-600 dark:text-gray-300 mt-1">{finding.description}</p>
                         <div className="text-xs text-gray-500 mt-2 flex gap-4">
-                            <span>Risk Score: <strong>{finding.risk_assessment.risk_score}</strong></span>
-                            <span>Level: <strong className="uppercase">{finding.risk_assessment.risk_level}</strong></span>
+                            <span>Risk Score: <strong>{finding.risk_assessment?.risk_score}</strong></span>
+                            <span>Level: <strong className="uppercase">{finding.risk_assessment?.risk_level}</strong></span>
                         </div>
                     </div>
                 </div>

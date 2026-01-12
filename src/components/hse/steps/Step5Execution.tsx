@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CheckCircle, XCircle, MinusCircle, 
   MessageSquare, Camera, ChevronDown, ChevronUp 
 } from 'lucide-react';
-import { HSEInspection, ChecklistItem } from '../../../types/hse-inspection';
+// FIX: Updated import path
+import { HSEInspection, ChecklistItem } from '../../../types';
 
 interface Step5Props {
   formData: Partial<HSEInspection>;
@@ -11,14 +12,10 @@ interface Step5Props {
 }
 
 export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) => {
-  // If checklist items are empty, we might need to load them from the template (mock logic here)
-  // In a real app, Step 4 would have populated formData.checklist_items
-  
   const [items, setItems] = useState<ChecklistItem[]>(formData.checklist_items || []);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
   useEffect(() => {
-    // Sync local state back to parent
     setFormData({ ...formData, checklist_items: items });
   }, [items]);
 
@@ -31,15 +28,13 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
             ...item.response,
             value: value,
             timestamp: new Date(),
-            responder: 'Current User', // Replace with activeUser.name
+            responder: 'Current User',
             evidence_ids: item.response?.evidence_ids || []
           }
         };
       }
       return item;
     }));
-    
-    // Auto-collapse and move to next (optional UX improvement)
     setExpandedItem(null);
   };
 
@@ -51,7 +46,6 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
     ));
   };
 
-  // Group items by category for better UI
   const groupedItems = useMemo(() => {
     const groups: Record<string, ChecklistItem[]> = {};
     items.forEach(item => {
@@ -66,7 +60,6 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
 
   return (
     <div className="space-y-6">
-      {/* Progress Header */}
       <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 sticky top-0 z-10 shadow-sm">
         <div className="flex justify-between items-center mb-2">
           <h3 className="font-bold text-gray-900 dark:text-white">Inspection Progress</h3>
@@ -138,7 +131,6 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
                 </div>
               </div>
 
-              {/* Expanded Area for Comments/Evidence (Auto expands on Fail) */}
               {(expandedItem === item.id || item.response?.value === 'fail') && (
                 <div className="px-4 pb-4 pt-0 animate-fade-in-down">
                   <div className="flex gap-3 mt-3">
@@ -173,6 +165,3 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
     </div>
   );
 };
-
-// Helper for useMemo
-import { useMemo } from 'react';

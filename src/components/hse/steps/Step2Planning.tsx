@@ -1,5 +1,6 @@
 import React from 'react';
-import { HSEInspection } from '../../../types/hse-inspection';
+// FIX: Updated import path
+import { HSEInspection } from '../../../types';
 
 interface Step2Props {
   formData: Partial<HSEInspection>;

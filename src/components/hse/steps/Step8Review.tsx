@@ -1,5 +1,6 @@
 import React from 'react';
-import { HSEInspection } from '../../../types/hse-inspection';
+// FIX: Updated import path
+import { HSEInspection } from '../../../types';
 import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
 import { CheckCircle, AlertTriangle, Camera, Users, Calendar } from 'lucide-react';
@@ -16,7 +17,7 @@ export const Step8Review: React.FC<Step8Props> = ({ formData, projects, users })
   const lead = users.find(u => u.id === formData.inspection_team?.team_lead?.id);
 
   const findingsCount = formData.findings?.length || 0;
-  const criticalCount = formData.findings?.filter(f => f.risk_assessment.risk_level === 'high' || f.risk_assessment.risk_level === 'extreme').length || 0;
+  const criticalCount = formData.findings?.filter(f => f.risk_assessment?.risk_level === 'high' || f.risk_assessment?.risk_level === 'extreme').length || 0;
   const evidenceCount = formData.evidence?.length || 0;
 
   return (

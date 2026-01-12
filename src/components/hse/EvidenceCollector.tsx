@@ -3,7 +3,8 @@ import {
   Camera, Video, Mic, FileText,
   X, Upload, ZoomIn, RotateCw, Trash2, Eye
 } from 'lucide-react';
-import { Evidence } from '../../types/hse-inspection';
+// FIX: Updated import path
+import { Evidence } from '../../types';
 
 // Define locally since it wasn't exported from types
 type EvidenceType = 'photograph' | 'video_recording' | 'audio_note' | 'document_scan';
@@ -287,117 +288,4 @@ export const EvidenceCollector: React.FC<EvidenceCollectorProps> = ({
         gps_coordinates: location ? { latitude: location.lat, longitude: location.lng, accuracy: 10 } : undefined,
         timestamp: new Date(),
         device_info: deviceInfo,
-        tags: ['uploaded', fileType, 'hse'],
-        encrypted: false,
-        access_control: []
-      };
-      
-      onEvidenceCaptured(evidence);
-    }
-    
-    setUploading(false);
-    event.target.value = '';
-  };
-  
-  const getEvidenceType = (fileType: string): EvidenceType => {
-    if (fileType.startsWith('image/')) return 'photograph';
-    if (fileType.startsWith('video/')) return 'video_recording';
-    if (fileType.startsWith('audio/')) return 'audio_note';
-    return 'document_scan';
-  };
-  
-  const renderEvidencePreview = (evidence: Evidence) => {
-    const isImage = evidence.type === 'photograph';
-    const isVideo = evidence.type === 'video_recording';
-    const isAudio = evidence.type === 'audio_note';
-
-    return (
-      <div key={evidence.id} className="relative group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="aspect-square bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
-          {isImage ? (
-            <img src={evidence.url} alt={evidence.title} className="w-full h-full object-cover" />
-          ) : isVideo ? (
-            <video src={evidence.url} className="w-full h-full object-cover" controls />
-          ) : isAudio ? (
-            <div className="p-4 text-center">
-              <Mic className="w-12 h-12 text-blue-500 mx-auto mb-2" />
-              <audio src={evidence.url} controls className="w-full" />
-            </div>
-          ) : (
-            <div className="p-4 text-center">
-              <FileText className="w-12 h-12 text-gray-500 mx-auto mb-2" />
-              <p className="text-sm font-medium truncate">{evidence.file_name}</p>
-              <p className="text-xs text-gray-500">{(evidence.file_size / 1024 / 1024).toFixed(2)} MB</p>
-            </div>
-          )}
-        </div>
-        
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-          <button onClick={() => window.open(evidence.url, '_blank')} className="p-2 bg-white rounded-full hover:bg-gray-100" title="View"><Eye className="w-4 h-4" /></button>
-          <button onClick={() => onEvidenceRemoved(evidence.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>
-        </div>
-      </div>
-    );
-  };
-  
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evidence Collection</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Capture photos, videos, audio notes, and upload documents</p>
-        </div>
-        <div className="text-sm text-gray-500">{existingEvidence.length} / {maxFiles} files</div>
-      </div>
-      
-      <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <button onClick={capturePhoto} disabled={capturing === 'photo' || existingEvidence.length >= maxFiles} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-colors flex flex-col items-center gap-2">
-            <Camera className="w-10 h-10 text-blue-500" />
-            <span className="font-medium dark:text-white">Take Photo</span>
-          </button>
-          
-          <button onClick={capturing === 'video' ? stopVideoRecording : startVideoRecording} disabled={existingEvidence.length >= maxFiles} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-colors flex flex-col items-center gap-2">
-            <Video className={`w-10 h-10 ${capturing === 'video' ? 'text-red-500 animate-pulse' : 'text-red-500'}`} />
-            <span className="font-medium dark:text-white">{capturing === 'video' ? 'Stop' : 'Record Video'}</span>
-          </button>
-          
-          <button onClick={capturing === 'audio' ? stopAudioRecording : startAudioRecording} disabled={existingEvidence.length >= maxFiles} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-colors flex flex-col items-center gap-2">
-            <Mic className={`w-10 h-10 ${capturing === 'audio' ? 'text-green-500 animate-pulse' : 'text-green-500'}`} />
-            <span className="font-medium dark:text-white">{capturing === 'audio' ? 'Stop' : 'Record Audio'}</span>
-          </button>
-          
-          <label className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 transition-colors cursor-pointer flex flex-col items-center gap-2">
-            <Upload className="w-10 h-10 text-purple-500" />
-            <span className="font-medium dark:text-white">Upload Files</span>
-            <input type="file" multiple onChange={handleFileUpload} className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx" />
-          </label>
-        </div>
-        
-        {(capturing === 'photo' || capturing === 'video') && (
-          <div className="mt-4 relative">
-            <video ref={videoRef} className="w-full h-64 object-cover rounded-lg" autoPlay muted playsInline />
-            <div className="absolute top-4 right-4 flex gap-2">
-                <button className="p-2 bg-black/50 text-white rounded-full"><ZoomIn className="w-4 h-4" /></button>
-                <button className="p-2 bg-black/50 text-white rounded-full"><RotateCw className="w-4 h-4" /></button>
-                <button onClick={() => setCapturing(null)} className="p-2 bg-black/50 text-white rounded-full"><X className="w-4 h-4" /></button>
-            </div>
-          </div>
-        )}
-        
-        {uploading && <div className="text-center mt-2 text-sm text-blue-500">Uploading...</div>}
-      </div>
-      
-      {existingEvidence.length > 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {existingEvidence.map(renderEvidencePreview)}
-        </div>
-      ) : (
-        <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl">
-          <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-500">No evidence collected yet</p>
-        </div>
-      )}
-    </div>
-  );
-};
+        tags: ['uploaded', fileType,

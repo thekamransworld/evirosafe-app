@@ -18,7 +18,6 @@ export interface Organization {
   country: string;
 }
 
-// 1. Define the String Union for Users
 export type UserRole = 
   | 'ADMIN' 
   | 'ORG_ADMIN' 
@@ -36,7 +35,7 @@ export interface User {
   email: string;
   name: string;
   avatar_url: string;
-  role: UserRole; // Use the string union here
+  role: UserRole;
   status: 'active' | 'inactive' | 'invited' | 'pending_approval' | string; 
   mobile?: string;
   designation?: string;
@@ -85,7 +84,6 @@ export interface Permission {
   scope: Scope;
 }
 
-// 2. Define the Interface for Role Configuration
 export interface Role {
   org_id: string | null;
   key: string;
@@ -230,35 +228,99 @@ export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review
 export interface InspectionFinding {
     id: string;
     checklist_item_id?: string;
+    finding_number?: string; // Added for compatibility
     description: string;
-    risk_level: 'Low' | 'Medium' | 'High';
+    risk_level: 'Low' | 'Medium' | 'High' | 'extreme'; // Added extreme for compatibility
+    risk_assessment?: { // Added for compatibility
+        severity: Severity;
+        likelihood: Likelihood;
+        risk_score: number;
+        risk_level: 'low' | 'medium' | 'high' | 'extreme';
+        people_at_risk: number;
+        potential_consequences: string[];
+    };
     category: 'Unsafe Act' | 'Unsafe Condition' | 'Documentation' | 'Equipment' | 'Environmental';
+    type?: 'non_conformity' | 'observation' | 'opportunity_for_improvement' | 'compliment'; // Added for compatibility
     evidence_urls: string[];
+    evidence_ids?: string[]; // Added for compatibility
     corrective_action_required: boolean;
     responsible_person_id?: string;
     due_date?: string;
     gps_tag?: { lat: number, lng: number };
+    created_at?: Date;
+    updated_at?: Date;
+    created_by?: string;
+    status?: 'open' | 'closed';
 }
 
 export interface Inspection {
     id: string;
     org_id: string;
     project_id: string;
+    entity_id?: string; // Added for compatibility
     title: string;
-    type: 'Safety' | 'Quality' | 'Environmental' | 'Fire' | 'Equipment';
+    type: 'Safety' | 'Quality' | 'Environmental' | 'Fire' | 'Equipment' | 'safety' | 'environmental' | 'health' | 'fire' | 'equipment' | 'process'; // Expanded types
     status: InspectionStatus;
     person_responsible_id: string;
     checklist_template_id: string;
     schedule_at: string;
+    schedule?: { scheduled_date: Date; scheduled_time: string; }; // Added for compatibility
     team_member_ids: string[];
+    inspection_team?: { team_lead?: any; inspectors?: any[]; }; // Added for compatibility
     observers: string[];
     findings: InspectionFinding[];
     overall_comments?: string;
     audit_trail: AuditLogEntry[];
     inspection_id?: string;
+    checklist_items?: ChecklistItem[]; // Added for compatibility
+    evidence?: Evidence[]; // Added for compatibility
 }
 
-export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
+// --- EVIDENCE TYPE (Restored) ---
+export interface Evidence {
+  id: string;
+  type: 'photograph' | 'video_recording' | 'audio_note' | 'document_scan';
+  title: string;
+  description: string;
+  url: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  uploaded_by: string;
+  uploaded_at: Date;
+  gps_coordinates?: { latitude: number; longitude: number; accuracy: number };
+  timestamp: Date;
+  device_info?: any;
+  tags: string[];
+  encrypted: boolean;
+  access_control: string[];
+}
+
+// --- ALIASES FOR COMPATIBILITY ---
+export type HSEInspection = Inspection;
+export type HSEFinding = InspectionFinding;
+export type InspectionType = Inspection['type'];
+
+export interface ChecklistResponse {
+  value: 'pass' | 'fail' | 'na';
+  comments?: string;
+  evidence_ids?: string[];
+  timestamp: Date;
+  responder: string;
+}
+
+export interface ChecklistItem { 
+    id: string; 
+    text: Record<string, string>; 
+    description: Record<string, string>; 
+    riskLevel?: string;
+    // Added for compatibility with HSE Inspection
+    category?: string;
+    requirement?: string;
+    criteria?: string;
+    response?: ChecklistResponse;
+}
+
 export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
 export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }

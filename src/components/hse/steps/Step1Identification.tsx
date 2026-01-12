@@ -1,5 +1,6 @@
 import React from 'react';
-import { HSEInspection, InspectionType } from '../../../types/hse-inspection';
+// FIX: Updated import path
+import { HSEInspection, InspectionType } from '../../../types';
 import { Shield, Globe, Users, Target, FileText, AlertTriangle } from 'lucide-react';
 
 interface Step1Props {
