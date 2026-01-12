@@ -3,10 +3,8 @@ import {
   Camera, Video, Mic, FileText,
   X, Upload, ZoomIn, RotateCw, Trash2, Eye
 } from 'lucide-react';
-// FIX: Updated import path
 import { Evidence } from '../../types';
 
-// Define locally since it wasn't exported from types
 type EvidenceType = 'photograph' | 'video_recording' | 'audio_note' | 'document_scan';
 
 interface EvidenceCollectorProps {
@@ -19,12 +17,12 @@ interface EvidenceCollectorProps {
 }
 
 export const EvidenceCollector: React.FC<EvidenceCollectorProps> = ({
-  inspectionId: _inspectionId, // Prefix with _ to ignore unused
+  inspectionId: _inspectionId,
   onEvidenceCaptured,
   onEvidenceRemoved,
   existingEvidence = [],
   maxFiles = 20,
-  allowedTypes: _allowedTypes // Prefix with _ to ignore unused
+  allowedTypes: _allowedTypes
 }) => {
   const [capturing, setCapturing] = useState<'photo' | 'video' | 'audio' | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -35,257 +33,172 @@ export const EvidenceCollector: React.FC<EvidenceCollectorProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   
-  // Get device information
   useEffect(() => {
-    const info = {
+    setDeviceInfo({
       userAgent: navigator.userAgent,
       platform: navigator.platform,
       language: navigator.language,
-      online: navigator.onLine,
-      // @ts-ignore
-      deviceMemory: navigator.deviceMemory,
-      hardwareConcurrency: navigator.hardwareConcurrency
-    };
-    setDeviceInfo(info);
+      online: navigator.onLine
+    });
     
-    // Get geolocation
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.warn('Failed to get location:', error);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (err) => console.warn('Location error:', err),
+        { enableHighAccuracy: true }
       );
     }
   }, []);
   
-  // Capture photo using camera
+  const createEvidence = (blob: Blob, type: EvidenceType, ext: string): Evidence => ({
+    id: `ev_${Date.now()}`,
+    type,
+    title: `${type} - ${new Date().toLocaleTimeString()}`,
+    description: `Captured via app`,
+    url: URL.createObjectURL(blob),
+    file_name: `${type}_${Date.now()}.${ext}`,
+    file_size: blob.size,
+    file_type: blob.type,
+    uploaded_by: 'current_user',
+    uploaded_at: new Date(),
+    gps_coordinates: location ? { latitude: location.lat, longitude: location.lng, accuracy: 10 } : undefined,
+    timestamp: new Date(),
+    device_info: deviceInfo,
+    tags: ['site', type],
+    encrypted: false,
+    access_control: []
+  });
+
   const capturePhoto = async () => {
     try {
       setCapturing('photo');
-      
-      // Request camera access
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false
-      });
-      
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
       
-      // Wait for stream to be ready
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for focus
+      await new Promise(r => setTimeout(r, 500));
       
-      // Capture frame
       const canvas = document.createElement('canvas');
-      const video = videoRef.current;
-      
-      if (video) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
+      if (videoRef.current) {
+        canvas.width = videoRef.current.videoWidth;
+        canvas.height = videoRef.current.videoHeight;
+        canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
         
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // Convert to blob
-          canvas.toBlob(async (blob) => {
-            if (blob) {
-              // Create evidence object
-              const evidence: Evidence = {
-                id: `evidence_${Date.now()}`,
-                type: 'photograph',
-                title: `Photo Evidence - ${new Date().toLocaleString()}`,
-                description: 'Photo captured during HSE inspection',
-                url: URL.createObjectURL(blob),
-                file_name: `photo_${Date.now()}.jpg`,
-                file_size: blob.size,
-                file_type: 'image/jpeg',
-                uploaded_by: 'current_user', 
-                uploaded_at: new Date(),
-                gps_coordinates: location ? {
-                  latitude: location.lat,
-                  longitude: location.lng,
-                  accuracy: 10
-                } : undefined,
-                timestamp: new Date(),
-                device_info: deviceInfo,
-                tags: ['photo', 'onsite', 'hse'],
-                encrypted: false,
-                access_control: []
-              };
-              
-              onEvidenceCaptured(evidence);
-              stream.getTracks().forEach(track => track.stop());
-            }
-          }, 'image/jpeg', 0.9);
-        }
+        canvas.toBlob(blob => {
+          if (blob) {
+            onEvidenceCaptured(createEvidence(blob, 'photograph', 'jpg'));
+            stream.getTracks().forEach(t => t.stop());
+            setCapturing(null);
+          }
+        }, 'image/jpeg', 0.8);
       }
-      
-    } catch (error) {
-      console.error('Failed to capture photo:', error);
-      alert('Camera access denied or not available');
-    } finally {
+    } catch (e) {
+      alert('Camera error');
       setCapturing(null);
     }
   };
   
-  // Record video
-  const startVideoRecording = async () => {
+  const startRecording = async (type: 'video' | 'audio') => {
     try {
-      setCapturing('video');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
+      setCapturing(type);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: type === 'video', 
+        audio: true 
       });
       
-      if (videoRef.current) {
+      if (type === 'video' && videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        videoRef.current.play();
       }
       
-      // Setup media recorder
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: type === 'video' ? 'video/mp4' : 'audio/wav' });
+        onEvidenceCaptured(createEvidence(blob, type === 'video' ? 'video_recording' : 'audio_note', type === 'video' ? 'mp4' : 'wav'));
+        stream.getTracks().forEach(t => t.stop());
       };
       
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
-        
-        const evidence: Evidence = {
-          id: `evidence_${Date.now()}`,
-          type: 'video_recording',
-          title: `Video Evidence - ${new Date().toLocaleString()}`,
-          description: 'Video recorded during HSE inspection',
-          url: URL.createObjectURL(blob),
-          file_name: `video_${Date.now()}.mp4`,
-          file_size: blob.size,
-          file_type: 'video/mp4',
-          uploaded_by: 'current_user',
-          uploaded_at: new Date(),
-          gps_coordinates: location ? { latitude: location.lat, longitude: location.lng, accuracy: 10 } : undefined,
-          timestamp: new Date(),
-          device_info: deviceInfo,
-          tags: ['video', 'onsite', 'hse'],
-          encrypted: false,
-          access_control: []
-        };
-        
-        onEvidenceCaptured(evidence);
-        stream.getTracks().forEach(track => track.stop());
-      };
-      
-      mediaRecorder.start();
-      
-    } catch (error) {
-      console.error('Failed to start video recording:', error);
+      recorder.start();
+    } catch (e) {
+      console.error(e);
       setCapturing(null);
     }
   };
   
-  const stopVideoRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state !== 'inactive') {
+      mediaRecorderRef.current?.stop();
       setCapturing(null);
     }
   };
   
-  // Record audio
-  const startAudioRecording = async () => {
-    try {
-      setCapturing('audio');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (event) => {
-        chunksRef.current.push(event.data);
-      };
-      
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/wav' });
-        
-        const evidence: Evidence = {
-          id: `evidence_${Date.now()}`,
-          type: 'audio_note',
-          title: `Audio Note - ${new Date().toLocaleString()}`,
-          description: 'Audio note recorded during inspection',
-          url: URL.createObjectURL(blob),
-          file_name: `audio_${Date.now()}.wav`,
-          file_size: blob.size,
-          file_type: 'audio/wav',
-          uploaded_by: 'current_user',
-          uploaded_at: new Date(),
-          timestamp: new Date(),
-          device_info: deviceInfo,
-          tags: ['audio', 'note', 'hse'],
-          encrypted: false,
-          access_control: []
-        };
-        
-        onEvidenceCaptured(evidence);
-        stream.getTracks().forEach(track => track.stop());
-      };
-      
-      mediaRecorder.start();
-      
-    } catch (error) {
-      console.error('Failed to start audio recording:', error);
-      setCapturing(null);
-    }
-  };
-  
-  const stopAudioRecording = () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop();
-      setCapturing(null);
-    }
-  };
-  
-  // Handle file upload
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
-    
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
     setUploading(true);
-    
-    for (const file of Array.from(files)) {
-      if (file.size > 50 * 1024 * 1024) {
-        alert(`File ${file.name} is too large. Maximum size is 50MB.`);
-        continue;
-      }
+    Array.from(e.target.files).forEach(file => {
+      const type = file.type.startsWith('image') ? 'photograph' : file.type.startsWith('video') ? 'video_recording' : 'document_scan';
+      onEvidenceCaptured(createEvidence(file, type, file.name.split('.').pop() || 'dat'));
+    });
+    setUploading(false);
+  };
+  
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Evidence ({existingEvidence.length}/{maxFiles})</h3>
+      </div>
       
-      const fileType = getEvidenceType(file.type);
+      <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button onClick={capturePhoto} disabled={!!capturing} className="p-4 bg-white dark:bg-gray-700 rounded-lg flex flex-col items-center gap-2 hover:bg-blue-50">
+            <Camera className="w-8 h-8 text-blue-500" /> <span className="text-sm dark:text-white">Photo</span>
+          </button>
+          <button onClick={() => capturing === 'video' ? stopRecording() : startRecording('video')} disabled={capturing === 'photo' || capturing === 'audio'} className="p-4 bg-white dark:bg-gray-700 rounded-lg flex flex-col items-center gap-2 hover:bg-red-50">
+            <Video className={`w-8 h-8 ${capturing === 'video' ? 'text-red-600 animate-pulse' : 'text-red-500'}`} /> 
+            <span className="text-sm dark:text-white">{capturing === 'video' ? 'Stop' : 'Video'}</span>
+          </button>
+          <button onClick={() => capturing === 'audio' ? stopRecording() : startRecording('audio')} disabled={capturing === 'photo' || capturing === 'video'} className="p-4 bg-white dark:bg-gray-700 rounded-lg flex flex-col items-center gap-2 hover:bg-green-50">
+            <Mic className={`w-8 h-8 ${capturing === 'audio' ? 'text-green-600 animate-pulse' : 'text-green-500'}`} />
+            <span className="text-sm dark:text-white">{capturing === 'audio' ? 'Stop' : 'Audio'}</span>
+          </button>
+          <label className="p-4 bg-white dark:bg-gray-700 rounded-lg flex flex-col items-center gap-2 cursor-pointer hover:bg-purple-50">
+            <Upload className="w-8 h-8 text-purple-500" /> <span className="text-sm dark:text-white">Upload</span>
+            <input type="file" multiple onChange={handleFileUpload} className="hidden" />
+          </label>
+        </div>
+        
+        {(capturing === 'photo' || capturing === 'video') && (
+          <div className="mt-4 relative bg-black rounded-lg overflow-hidden">
+            <video ref={videoRef} className="w-full h-64 object-cover" autoPlay muted playsInline />
+            <button onClick={() => setCapturing(null)} className="absolute top-2 right-2 p-2 bg-black/50 text-white rounded-full"><X className="w-4 h-4" /></button>
+          </div>
+        )}
+      </div>
       
-      const evidence: Evidence = {
-        id: `evidence_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        type: fileType,
-        title: file.name,
-        description: `Uploaded file: ${file.name}`,
-        url: URL.createObjectURL(file),
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type,
-        uploaded_by: 'current_user',
-        uploaded_at: new Date(),
-        gps_coordinates: location ? { latitude: location.lat, longitude: location.lng, accuracy: 10 } : undefined,
-        timestamp: new Date(),
-        device_info: deviceInfo,
-        tags: ['uploaded', fileType,
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {existingEvidence.map(ev => (
+          <div key={ev.id} className="relative group bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden aspect-square border dark:border-gray-700">
+            {ev.type === 'photograph' ? (
+              <img src={ev.url} alt="evidence" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-500">
+                {ev.type === 'video_recording' ? <Video className="w-8 h-8" /> : <FileText className="w-8 h-8" />}
+              </div>
+            )}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+              <a href={ev.url} target="_blank" rel="noreferrer" className="p-2 bg-white rounded-full"><Eye className="w-4 h-4 text-black" /></a>
+              <button onClick={() => onEvidenceRemoved(ev.id)} className="p-2 bg-red-500 rounded-full text-white"><Trash2 className="w-4 h-4" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
