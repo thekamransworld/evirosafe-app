@@ -1,33 +1,31 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+// src/firebase.ts
+import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+// Replace with your actual config from Firebase Console
 const firebaseConfig = {
-  apiKey: "AIzaSyBsG6olIcDkJpNNVcK3RPoH0jScmocZanM",
+  apiKey: "AIzaSy...", 
   authDomain: "evirosafe-auth.firebaseapp.com",
   projectId: "evirosafe-auth",
   storageBucket: "evirosafe-auth.firebasestorage.app",
   messagingSenderId: "549739145640",
-  appId: "1:549739145640:web:aa0d67ab931bfc7cdcd59d",
-  measurementId: "G-NLZV3LWNEM"
+  appId: "1:549739145640:web:..."
 };
 
-// Initialize Firebase
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 const storage = getStorage(app);
 
-// --- ENABLE OFFLINE PERSISTENCE ---
-// This allows the app to work without internet
+// Enable offline persistence
 enableIndexedDbPersistence(db).catch((err) => {
     if (err.code == 'failed-precondition') {
-        console.warn("Offline persistence failed: Multiple tabs open.");
+        console.warn('Multiple tabs open, persistence can only be enabled in one tab at a a time.');
     } else if (err.code == 'unimplemented') {
-        console.warn("Offline persistence not supported by browser.");
+        console.warn('The current browser does not support all of the features required to enable persistence');
     }
 });
 
-export { app, db, auth, storage };
+export { auth, db, storage };

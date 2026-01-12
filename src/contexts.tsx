@@ -305,6 +305,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await updateDoc(doc(db, collectionName, id), data);
         } catch (e) {
             console.error(`Error updating ${collectionName}:`, e);
+            toast.error("Failed to save changes to database.");
         }
     };
 
@@ -352,7 +353,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'actions', newAction.id), newAction); toast.success("Action created."); } catch (e) { console.error(e); }
     };
     
-    // --- FIX: Use addDoc for Projects to avoid collision ---
     const handleCreateProject = async (data: any) => {
         try {
             const projectData = {
