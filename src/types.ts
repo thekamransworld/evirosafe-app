@@ -1,34 +1,6 @@
 // src/types.ts
 
-// --- CORE TYPES ---
-export type Role = 'ADMIN' | 'ORG_ADMIN' | 'HSE_MANAGER' | 'SUPERVISOR' | 'INSPECTOR' | 'WORKER' | 'CLIENT_VIEWER' | 'CUSTOM_SITE_LEAD';
-export type Status = 'active' | 'inactive' | 'invited' | 'pending' | 'suspended';
-
-export interface User {
-  id: string;
-  org_id: string;
-  email: string;
-  name: string;
-  avatar_url: string;
-  role: Role;
-  status: Status;
-  mobile?: string;
-  designation?: string;
-  company?: string;
-  preferences: {
-    language: string;
-    default_view: string;
-    units: {
-      temperature: 'C' | 'F';
-      wind_speed?: 'km/h' | 'mph';
-      height?: 'm' | 'ft';
-      weight: 'kg' | 'lbs';
-      distance?: 'km' | 'mi';
-    };
-  };
-  project_ids?: string[];
-}
-
+// --- CORE ---
 export interface Organization {
   id: string;
   name: string;
@@ -44,6 +16,43 @@ export interface Organization {
   };
   industry: string;
   country: string;
+}
+
+// 1. Define the String Union for Users
+export type UserRole = 
+  | 'ADMIN' 
+  | 'ORG_ADMIN' 
+  | 'HSE_MANAGER' 
+  | 'HSE_OFFICER' 
+  | 'SUPERVISOR' 
+  | 'INSPECTOR' 
+  | 'WORKER' 
+  | 'CLIENT_VIEWER' 
+  | 'CUSTOM_SITE_LEAD';
+
+export interface User {
+  id: string;
+  org_id: string;
+  email: string;
+  name: string;
+  avatar_url: string;
+  role: UserRole; // Use the string union here
+  status: 'active' | 'inactive' | 'invited' | 'pending_approval' | string; 
+  mobile?: string;
+  designation?: string;
+  company?: string;
+  preferences: {
+    language: string;
+    default_view: string;
+    units: {
+      temperature: 'C' | 'F';
+      wind_speed?: 'km/h' | 'mph';
+      height?: 'm' | 'ft';
+      weight: 'kg' | 'lbs';
+      distance?: 'km' | 'mi';
+    };
+  };
+  project_ids?: string[];
 }
 
 export interface Project {
@@ -63,11 +72,10 @@ export interface Project {
   budget_spent?: number;
 }
 
-// --- PERMISSIONS ---
 export type Resource = 
   | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights';
 
-export type View = Resource | string;
+export type View = string;
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
 export type Scope = 'org' | 'project' | 'own';
 
@@ -77,7 +85,8 @@ export interface Permission {
   scope: Scope;
 }
 
-export interface RoleDefinition {
+// 2. Define the Interface for Role Configuration
+export interface Role {
   org_id: string | null;
   key: string;
   label: string;
@@ -85,8 +94,55 @@ export interface RoleDefinition {
   permissions: Permission[];
 }
 
-// --- REPORTS (INCIDENTS) ---
-export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed' | 'active';
+export interface Notification {
+  id: string;
+  user_id: string;
+  report_id: string;
+  message: string;
+  timestamp: string;
+  is_read: boolean;
+}
+
+export interface AuditLogEntry {
+  user_id: string;
+  timestamp: string;
+  action: string;
+  details?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  action: string;
+  owner_id: string;
+  due_date: string;
+  status: 'Open' | 'In Progress' | 'Closed';
+  project_id: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Critical';
+  source: {
+    type: 'Report' | 'Inspection' | 'Standalone';
+    id: string;
+    description: string;
+  };
+  origin: {
+      type: 'report-capa' | 'standalone';
+      parentId: string;
+      itemId: string;
+  }
+}
+
+export interface ActivityItem {
+    id: string;
+    type: 'report' | 'inspection' | 'ptw' | 'rams' | 'equipment' | 'training' | 'message' | 'incident' | 'milestone';
+    title: string;
+    description: string;
+    user: User;
+    timestamp: string;
+    data: any;
+    status?: string;
+    priority?: 'low' | 'medium' | 'high';
+}
+
+export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed';
 export type ReportClassification = 'To Be Determined' | 'Minor' | 'Moderate' | 'Major' | 'Fatal';
 export type ImpactedParty = 'Employee' | 'Contractor' | 'Visitor' | 'Public' | 'Environment';
 export type RootCause = 'Human Error' | 'Equipment Failure' | 'Process Deficiency' | 'Environment' | 'Other';
@@ -127,7 +183,6 @@ export interface ReportAcknowledgement {
   acknowledged_at: string;
 }
 
-// Report Details Interfaces
 export interface AccidentDetails { person_name: string; designation: string; nature_of_injury: string; body_part_affected: string; treatment_given: string; days_lost?: number; medical_report_urls?: string[]; }
 export interface IncidentDetails { property_damage_details?: string; environmental_impact: { type_of_impact: string; quantity_extent: string; containment_action: string; authority_notified: boolean; notification_ref?: string; } | null; }
 export interface NearMissDetails { potential_consequence: string; }
@@ -136,13 +191,6 @@ export interface UnsafeConditionDetails { condition_category: string; temporary_
 export interface LeadershipEventDetails { event_type_code: string; leader_name?: string; attendees_count?: number; key_observations?: string; }
 
 export type ReportDetails = AccidentDetails | IncidentDetails | NearMissDetails | UnsafeActDetails | UnsafeConditionDetails | LeadershipEventDetails;
-
-export interface AuditLogEntry {
-  user_id: string;
-  timestamp: string;
-  action: string;
-  details?: string;
-}
 
 export interface Report {
     id: string;
@@ -177,7 +225,6 @@ export interface Report {
     created_at?: string;
 }
 
-// --- INSPECTIONS ---
 export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue';
 
 export interface InspectionFinding {
@@ -211,13 +258,11 @@ export interface Inspection {
     inspection_id?: string;
 }
 
-// --- CHECKLISTS ---
 export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
 export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
-export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score: number; results: ChecklistRunResult[]; }
+export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
 
-// --- PLANS ---
 export type PlanStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
 export type PlanType = 'HSEMP' | 'Lifting' | 'Work at Height' | 'Confined Space' | 'Fire' | 'ERP' | 'EMP' | 'Waste';
 export interface PlanContentSection { title: string; content: string; is_complete: boolean; }
@@ -236,7 +281,6 @@ export interface Plan {
     audit_trail: AuditLogEntry[];
 }
 
-// --- RAMS ---
 export type RamsStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
 export type RamsHierarchy = 'elimination' | 'substitution' | 'engineering' | 'administrative' | 'ppe';
 export interface RamsHazard { id: string; description: string; }
@@ -260,7 +304,23 @@ export interface Rams {
     audit_log: AuditLogEntry[];
 }
 
-// --- PTW (PERMIT TO WORK) ---
+export type SignCategory = 'Prohibition' | 'Mandatory' | 'Warning' | 'Emergency' | 'Fire' | 'Environmental' | 'Traffic' | 'Informational';
+export type HazardType = 'Fire' | 'Fall' | 'Electrical' | 'Chemical' | 'Noise' | 'Dropped Object' | 'Overhead Load' | 'Trip' | 'Slippery' | 'Explosion' | 'Moving Machinery' | 'Confined Space' | 'Excavation';
+export interface Sign { id: string; org_id: string; category: SignCategory; title: Record<string, string>; icon_url: string; description: Record<string, string>; matched_activities: PtwType[]; hazards: HazardType[]; }
+
+export interface TbtAttendee { name: string; company: string; role: string; signature: string; attendance_time: string; }
+export interface TbtSession {
+    id: string; org_id: string; project_id: string; title: string; topic_category: string; method: 'daily' | 'weekly' | 'ad-hoc'; location: string;
+    conducted_by: { name: string; role: string; signature: string; };
+    date: string; time: string; summary: string; hazards_discussed: string[]; controls_discussed: string[]; discussion_points: string[];
+    attendees: TbtAttendee[]; attachments: { name: string, url: string }[]; linked_rams_ids: string[]; linked_ptw_types: PtwType[]; linked_plan_ids: string[];
+    status: 'draft' | 'scheduled' | 'delivered' | 'closed' | 'archived'; audit_log: AuditLogEntry[];
+}
+
+export interface TrainingCourse { id: string; org_id: string; title: string; category: string; validity_months: number; syllabus: string; learning_objectives: string[]; requires_assessment: boolean; }
+export interface TrainingSession { id: string; course_id: string; project_id: string; scheduled_at: string; trainer_id: string; status: 'scheduled' | 'completed' | 'cancelled'; roster: string[]; attendance: { user_id: string; attended: boolean; score?: number; }[]; }
+export interface TrainingRecord { id: string; org_id: string; user_id: string; course_id: string; session_id: string; issued_at: string; expires_at: string; score?: number; status: 'valid' | 'expiring_soon' | 'expired'; }
+
 export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work';
 export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
 export type PtwCategory = 'standard' | 'high_risk' | 'operational' | 'emergency' | 'urgent';
@@ -282,8 +342,6 @@ export interface PtwSignoff { name: string; designation: string; email: string; 
 export interface PtwStoppage { time: string; reason: string; stopped_by: string; informed_to: string; restarted_time: string; signature: string; }
 export interface PtwExtension { is_requested: boolean; reason: string; days: { from: string; to: string }; hours: { from: string; to: string }; requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; }
 export interface PtwClosure { note: string; permit_requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; }
-
-// PTW Payloads
 export interface CanonicalPtwPayload {
     creator_id: string; permit_no: string; category: PtwCategory;
     requester: any; contractor_safety_personnel?: any;
@@ -323,46 +381,6 @@ export interface PtwGeneralWorkPayload extends CanonicalPtwPayload {}
 
 export type PtwPayload = CanonicalPtwPayload | PtwHotWorkPayload | PtwWorkAtHeightPayload | PtwConfinedSpacePayload | PtwExcavationPayload | PtwRoadClosurePayload | PtwLiftingPayload;
 export interface Ptw { id: string; org_id: string; project_id: string; type: PtwType; status: PtwStatus; title: string; payload: PtwPayload; approvals: any[]; audit_log: AuditLogEntry[]; compliance_level?: 'FULL' | 'PARTIAL' | 'NONE'; updated_at: string; workflow_log?: PtwWorkflowLog[]; }
-
-// --- OTHER ---
-export type SignCategory = 'Prohibition' | 'Mandatory' | 'Warning' | 'Emergency' | 'Fire' | 'Environmental' | 'Traffic' | 'Informational';
-export type HazardType = 'Fire' | 'Fall' | 'Electrical' | 'Chemical' | 'Noise' | 'Dropped Object' | 'Overhead Load' | 'Trip' | 'Slippery' | 'Explosion' | 'Moving Machinery' | 'Confined Space' | 'Excavation';
-export interface Sign { id: string; org_id: string; category: SignCategory; title: Record<string, string>; icon_url: string; description: Record<string, string>; matched_activities: PtwType[]; hazards: HazardType[]; }
-
-export interface TbtAttendee { name: string; company: string; role: string; signature: string; attendance_time: string; }
-export interface TbtSession {
-    id: string; org_id: string; project_id: string; title: string; topic_category: string; method: 'daily' | 'weekly' | 'ad-hoc'; location: string;
-    conducted_by: { name: string; role: string; signature: string; };
-    date: string; time: string; summary: string; hazards_discussed: string[]; controls_discussed: string[]; discussion_points: string[];
-    attendees: TbtAttendee[]; attachments: { name: string, url: string }[]; linked_rams_ids: string[]; linked_ptw_types: PtwType[]; linked_plan_ids: string[];
-    status: 'draft' | 'scheduled' | 'delivered' | 'closed' | 'archived'; audit_log: AuditLogEntry[];
-}
-
-export interface TrainingCourse { id: string; org_id: string; title: string; category: string; validity_months: number; syllabus: string; learning_objectives: string[]; requires_assessment: boolean; }
-export interface TrainingSession { id: string; course_id: string; project_id: string; scheduled_at: string; trainer_id: string; status: 'scheduled' | 'completed' | 'cancelled'; roster: string[]; attendance: { user_id: string; attended: boolean; score?: number; }[]; }
-export interface TrainingRecord { id: string; org_id: string; user_id: string; course_id: string; session_id: string; issued_at: string; expires_at: string; score?: number; status: 'valid' | 'expiring_soon' | 'expired'; }
-
-export interface Notification { id: string; user_id: string; report_id: string; message: string; timestamp: string; is_read: boolean; }
-
-export interface ActionItem {
-  id: string;
-  action: string;
-  owner_id: string;
-  due_date: string;
-  status: 'Open' | 'In Progress' | 'Closed';
-  project_id: string;
-  priority?: 'Low' | 'Medium' | 'High' | 'Critical';
-  source: {
-    type: 'Report' | 'Inspection' | 'Standalone';
-    id: string;
-    description: string;
-  };
-  origin: {
-      type: 'report-capa' | 'standalone';
-      parentId: string;
-      itemId: string;
-  }
-}
 
 export type CertificationLevel = 'Beginner' | 'Competent' | 'Advanced' | 'Expert' | 'Certified Professional';
 export interface Qualification { id: string; title: string; issuer: string; date_obtained: string; expiry_date?: string; verification_status: 'Pending' | 'Verified' | 'Rejected'; attachment_url?: string; }
