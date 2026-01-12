@@ -3,6 +3,7 @@ import type { Plan, PlanContentSection, PlanStatus } from '../types';
 import { Button } from './ui/Button';
 import ReactMarkdown from 'react-markdown';
 import { useToast } from './ui/Toast'; // Import Toast for feedback
+import { FileText as FileTextIcon, X as CloseIcon, Paperclip as PaperClipIcon, Plus } from 'lucide-react';
 
 interface PlanEditorModalProps {
   plan: Plan;
@@ -55,6 +56,20 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({ plan, onClose,
       setEditedPlan(p => ({ ...p, meta: { ...p.meta, [field]: value }}));
   }
 
+  // --- FIX: Implemented Add Section Logic ---
+  const handleAddSection = () => {
+      const newSection: PlanContentSection = {
+          title: `New Section ${editedPlan.content.body_json.length + 1}`,
+          content: 'Enter content here...',
+          is_complete: false
+      };
+      
+      const newSections = [...editedPlan.content.body_json, newSection];
+      setEditedPlan(p => ({ ...p, content: { ...p.content, body_json: newSections } }));
+      setActiveSection(newSection);
+      toast.success("New section added.");
+  };
+
   const handleSaveDraft = () => {
       onSave(editedPlan);
       toast.success("Draft saved successfully.");
@@ -62,18 +77,13 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({ plan, onClose,
   };
 
   const handleSaveAndSubmit = () => {
-    // 1. Save the current state of the plan
     onSave(editedPlan);
-    // 2. Trigger the status change
     onSubmitForReview(editedPlan.id, 'under_review');
-    // 3. Close the modal
     toast.success("Plan submitted for review.");
     onClose();
   };
 
   const handleLinkItem = (type: string) => {
-      // Placeholder for linking functionality
-      // In a real app, this would open a selector modal
       toast.info(`Link ${type} feature coming soon.`);
   };
 
@@ -106,7 +116,10 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({ plan, onClose,
             <nav className="w-72 bg-white dark:bg-dark-card border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0">
                 <div className="flex justify-between items-center mb-4 px-2">
                     <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider">Sections</h3>
-                    <button className="text-blue-600 hover:text-blue-700 text-xs font-bold" onClick={() => toast.info("Add Section feature coming soon")}>+ ADD</button>
+                    {/* FIX: Connected Add Button */}
+                    <button className="text-blue-600 hover:text-blue-700 text-xs font-bold flex items-center gap-1" onClick={handleAddSection}>
+                        <Plus className="w-3 h-3" /> ADD
+                    </button>
                 </div>
                 <ul className="space-y-1">
                     {editedPlan.content.body_json.map(section => (
@@ -222,17 +235,3 @@ export const PlanEditorModal: React.FC<PlanEditorModalProps> = ({ plan, onClose,
     </div>
   );
 };
-
-
-// Icons
-const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
-const PaperClipIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.122 2.122l7.81-7.81" />
-    </svg>
-);
-const FileTextIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-    </svg>
-);

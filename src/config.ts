@@ -133,18 +133,51 @@ export const roles: Role[] = [
 
 export const planTypes: PlanType[] = ['HSEMP', 'Lifting', 'Work at Height', 'Confined Space', 'Fire', 'ERP', 'EMP', 'Waste'];
 
+// --- FIXED: Added default sections for ALL plan types ---
 export const planTemplates: Record<PlanType, PlanContentSection[]> = {
     'HSEMP': [
         { title: '1. Purpose', content: 'Define the objectives of this plan...', is_complete: false },
         { title: '2. Scope', content: 'This plan covers...', is_complete: false },
+        { title: '3. Leadership & Commitment', content: 'Management responsibilities...', is_complete: false },
+        { title: '4. Risk Management', content: 'Hazard identification process...', is_complete: false },
     ],
     'Lifting': [
         { title: '1. Lift Details', content: 'Specify the load, location, and equipment.', is_complete: false },
+        { title: '2. Crane Configuration', content: 'Boom length, radius, capacity...', is_complete: false },
+        { title: '3. Ground Conditions', content: 'Bearing pressure and matting...', is_complete: false },
+        { title: '4. Rigging', content: 'Shackles, slings, and certification...', is_complete: false },
     ],
     'Work at Height': [
-        { title: '1. Access Method', content: 'Describe the method of access.', is_complete: false },
+        { title: '1. Access Method', content: 'Scaffolding, MEWP, or Ladders...', is_complete: false },
+        { title: '2. Fall Protection', content: 'Guardrails, nets, or harnesses...', is_complete: false },
+        { title: '3. Rescue Plan', content: 'Procedures for retrieval...', is_complete: false },
     ],
-    'Confined Space': [], 'Fire': [], 'ERP': [], 'EMP': [], 'Waste': [],
+    'Confined Space': [
+        { title: '1. Space Description', content: 'Location and nature of space...', is_complete: false },
+        { title: '2. Gas Testing', content: 'Atmospheric monitoring requirements...', is_complete: false },
+        { title: '3. Ventilation', content: 'Forced air or natural...', is_complete: false },
+        { title: '4. Emergency Rescue', content: 'Tripod, winch, and standby man...', is_complete: false },
+    ],
+    'Fire': [
+        { title: '1. Fire Prevention', content: 'Control of combustibles and ignition sources...', is_complete: false },
+        { title: '2. Fire Fighting Equipment', content: 'Extinguishers and hoses...', is_complete: false },
+        { title: '3. Evacuation Routes', content: 'Maps and assembly points...', is_complete: false },
+    ],
+    'ERP': [
+        { title: '1. Emergency Scenarios', content: 'Fire, Medical, Spill, Collapse...', is_complete: false },
+        { title: '2. Response Team', content: 'Roles and responsibilities...', is_complete: false },
+        { title: '3. Communication', content: 'Emergency numbers and protocols...', is_complete: false },
+    ],
+    'EMP': [
+        { title: '1. Waste Management', content: 'Segregation and disposal...', is_complete: false },
+        { title: '2. Spill Control', content: 'Prevention and response...', is_complete: false },
+        { title: '3. Noise & Dust', content: 'Mitigation measures...', is_complete: false },
+    ],
+    'Waste': [
+        { title: '1. Waste Types', content: 'Hazardous vs Non-hazardous...', is_complete: false },
+        { title: '2. Storage', content: 'Bins, skips, and labeling...', is_complete: false },
+        { title: '3. Disposal', content: 'Licensed carriers and tracking...', is_complete: false },
+    ],
 };
 
 export const tbtTopicsLibrary = {
