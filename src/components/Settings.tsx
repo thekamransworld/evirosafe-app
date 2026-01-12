@@ -108,10 +108,8 @@ export const Settings: React.FC<SettingsProps> = () => {
     if(activeUser) setEditedUser(activeUser);
   }, [activeUser]);
 
-  // Clean up object URL if component unmounts before save
   useEffect(() => {
     return () => {
-      // Only revoke if it looks like a blob url (optional safety check)
       if (newAvatarPreviewUrl && newAvatarPreviewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(newAvatarPreviewUrl);
       }
@@ -133,13 +131,8 @@ export const Settings: React.FC<SettingsProps> = () => {
       setIsUploading(true);
       
       try {
-          // Show user that upload started
           toast.info("Uploading profile picture...");
-          
-          // Actual upload to Firebase Storage
           const url = await uploadFileToCloud(file, 'avatars');
-          
-          // Set the remote URL
           setNewAvatarPreviewUrl(url);
           toast.success("Image uploaded successfully");
       } catch (e) {
@@ -155,7 +148,6 @@ export const Settings: React.FC<SettingsProps> = () => {
     fileInputRef.current?.click();
   };
 
-  // --- INVITE MEMBER LOGIC ---
   const handleSendInvite = async () => {
       if(!inviteEmail || !inviteName) {
           toast.error("Please fill in name and email");
@@ -164,7 +156,6 @@ export const Settings: React.FC<SettingsProps> = () => {
       
       setIsSendingInvite(true);
 
-      // Create new user object
       const newUser: User = {
           id: `user_${Date.now()}`,
           org_id: activeOrg.id,
@@ -181,13 +172,8 @@ export const Settings: React.FC<SettingsProps> = () => {
       };
 
       try {
-          // 1. Save to Firestore (So they can log in later)
           await setDoc(doc(db, 'users', newUser.id), newUser);
-          
-          // 2. Update Local State
           handleInviteUser(newUser);
-          
-          // 3. Send Real Email via EmailJS
           await sendInviteEmail(
               inviteEmail, 
               inviteName, 
@@ -207,7 +193,6 @@ export const Settings: React.FC<SettingsProps> = () => {
       }
   };
 
-  // --- DATABASE SEEDING LOGIC ---
   const handleSeedDatabase = async () => {
     if (!window.confirm("⚠️ WARNING: This will upload initial data to your database. Continue?")) return;
     
@@ -312,6 +297,9 @@ export const Settings: React.FC<SettingsProps> = () => {
                     src={newAvatarPreviewUrl || editedUser.avatar_url}
                     alt="Profile"
                     className="w-16 h-16 rounded-full object-cover border dark:border-gray-600"
+                    onError={(e) => {
+                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(editedUser.name || 'User')}&background=random`;
+                    }}
                   />
                   <input
                     type="file"
@@ -483,7 +471,7 @@ export const Settings: React.FC<SettingsProps> = () => {
           >
             <FormField label="Language">
               <select
-                value={editedUser.preferences?.language || 'en'} // FIX: Safe access
+                value={editedUser.preferences?.language || 'en'}
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,
@@ -502,7 +490,7 @@ export const Settings: React.FC<SettingsProps> = () => {
 
             <FormField label="Default Home Screen">
               <select
-                value={editedUser.preferences?.default_view || 'dashboard'} // FIX: Safe access
+                value={editedUser.preferences?.default_view || 'dashboard'}
                 onChange={(e) =>
                   setEditedUser({
                     ...editedUser,

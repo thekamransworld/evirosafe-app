@@ -55,8 +55,6 @@ export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organiz
   }, []);
 
   const unreadNotifications = notifications.filter(n => !n.is_read);
-  
-  // SAFE CHECK: Ensure user.role exists before replacing
   const userRole = user?.role ? user.role.replace('_', ' ') : 'User';
 
   return (
@@ -99,7 +97,6 @@ export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organiz
        </div>
 
       <div className="flex items-center space-x-2 sm:space-x-3">
-         {/* Theme Toggle */}
          <button 
             onClick={toggleTheme} 
             className="p-2 rounded-full text-slate-500 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white transition-colors"
@@ -171,7 +168,14 @@ export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organiz
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200 leading-tight">{user?.name || 'User'}</span>
                 <span className="text-xs text-slate-500 dark:text-slate-400 leading-tight">{userRole}</span>
             </div>
-            <img className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-600" src={user?.avatar_url || 'https://i.pravatar.cc/150'} alt="Avatar" />
+            <img 
+                className="h-8 w-8 rounded-full object-cover border border-slate-200 dark:border-slate-600" 
+                src={user?.avatar_url || 'https://i.pravatar.cc/150'} 
+                alt="Avatar"
+                onError={(e) => {
+                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=random`;
+                }}
+            />
           </button>
           {userDropdownOpen && (
             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-dark-card rounded-lg shadow-lg border border-border-color dark:border-dark-border z-50">
