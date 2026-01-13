@@ -101,6 +101,9 @@ export const Organizations: React.FC = () => {
         {organizations.map(org => {
           const projectCount = projects.filter(p => p.org_id === org.id).length;
           const userCount = usersList.filter(u => u.org_id === org.id).length;
+          
+          // Safe branding access
+          const logoUrl = org.branding?.logoUrl || 'https://via.placeholder.com/50';
 
           return (
             <Card 
@@ -111,7 +114,7 @@ export const Organizations: React.FC = () => {
               <div className="flex-1">
                   <div className="flex justify-between items-start">
                       <div className="flex items-center space-x-4">
-                        <img src={org.branding?.logoUrl || 'https://via.placeholder.com/50'} alt={org.name} className="h-12 w-12 rounded-lg" />
+                        <img src={logoUrl} alt={org.name} className="h-12 w-12 rounded-lg" />
                         <div>
                           <h3 className="text-lg font-bold text-text-primary dark:text-white">{org.name}</h3>
                           <p className="text-sm text-text-secondary dark:text-gray-400 font-mono">{org.domain}</p>

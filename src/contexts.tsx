@@ -8,7 +8,7 @@ import {
   plans as initialPlans,
   rams as initialRams
 } from './data';
-import { translations, supportedLanguages, roles } from './config';
+import { translations, supportedLanguages, roles, logoSrc } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
@@ -140,7 +140,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-  const handleCreateOrganization = (data: any) => setOrganizations(prev => [...prev, { ...data, id: `org_${Date.now()}`, status: 'active' }]);
+  
+  const handleCreateOrganization = (data: any) => {
+      const newOrg: Organization = {
+          ...data,
+          id: `org_${Date.now()}`,
+          status: 'active',
+          branding: {
+              logoUrl: logoSrc,
+              primaryColor: '#00A86B'
+          },
+          slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+          domain: '',
+          timezone: 'GMT+0',
+          primaryLanguage: 'en',
+          secondaryLanguages: []
+      };
+      setOrganizations(prev => [...prev, newOrg]);
+  };
+
   const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
   const handleSignUp = () => {};
   const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
@@ -241,7 +259,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             const snap = await getDocs(collection(db, name));
-            const data = snap.docs.map(d => d.data());
+            const data = snap.docs.map(d => {
+                const docData = d.data();
+                // --- FIX: Sanitize Organization Data ---
+                if (name === 'organizations') {
+                    return {
+                        ...docData,
+                        id: d.id,
+                        // If branding is missing, provide default
+                        branding: docData.branding || { logoUrl: logoSrc, primaryColor: '#00A86B' }
+                    };
+                }
+                return { id: d.id, ...docData };
+            });
+            
             if (data.length > 0) {
                  setter(data);
             } else {
@@ -330,18 +361,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'actions', newAction.id), newAction); toast.success("Action created."); } catch (e) { console.error(e); }
     };
     
-    // --- FIX: Use the org_id passed in data, fallback to activeOrg.id ---
     const handleCreateProject = async (data: any) => {
         try {
             const projectData = {
                 ...data,
-                org_id: data.org_id || activeOrg.id, // <--- FIXED HERE
+                org_id: data.org_id || activeOrg.id,
                 status: 'active',
                 created_at: new Date().toISOString()
             };
-            
             const docRef = await addDoc(collection(db, 'projects'), projectData);
-            
             const newProj = { id: docRef.id, ...projectData };
             setProjects(prev => [newProj, ...prev]);
             toast.success("Project created.");
