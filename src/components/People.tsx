@@ -53,7 +53,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ i
                     <FormField label="Full Name"><input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" /></FormField>
                     <FormField label="Email Address"><input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" /></FormField>
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Role">
+                        <FormField label="Access Level (Role)">
                             <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value as User['role']}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
                                 {rolesData.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
                             </select>
@@ -133,7 +133,7 @@ export const People: React.FC = () => {
     ...invitedEmails.filter(i => i.org_id === activeOrg.id).map(i => ({
         id: i.email, name: i.name, email: i.email, role: i.role, status: 'invited' as const, org_id: i.org_id, avatar_url: '', project_id: (i as any).project_id
     }))
-  ].sort((a, b) => (a.name || '').localeCompare(b.name || '')); // <--- FIXED: Safe localeCompare
+  ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
     <div>
@@ -164,8 +164,15 @@ export const People: React.FC = () => {
                 <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
-                        {user.avatar_url ? <img src={user.avatar_url} className="h-10 w-10 rounded-full"/> : (user.name || '?').charAt(0)}
+                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold overflow-hidden">
+                        <img 
+                            src={user.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`} 
+                            className="h-full w-full object-cover"
+                            alt={user.name}
+                            onError={(e) => {
+                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
+                            }}
+                        />
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name || 'Unknown'}</div>
@@ -174,7 +181,6 @@ export const People: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                     {/* FIXED: Safe replace */}
                      <Badge color="blue">{(user.role || 'Unknown').replace(/_/g, ' ')}</Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

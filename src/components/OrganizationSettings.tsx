@@ -7,12 +7,16 @@ import { roles } from '../config';
 import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useToast } from './ui/Toast';
+import type { User } from '../types';
 
 export const OrganizationSettings: React.FC = () => {
   const { activeOrg, activeUser } = useAppContext();
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
+
+  // Only ADMIN or ORG_ADMIN can see this page
+  const canManageAccess = activeUser?.role === 'ADMIN' || activeUser?.role === 'ORG_ADMIN';
 
   // Fetch users from Firebase
   useEffect(() => {
@@ -21,7 +25,7 @@ export const OrganizationSettings: React.FC = () => {
       try {
         const q = query(collection(db, 'users'), where('org_id', '==', activeOrg.id));
         const snapshot = await getDocs(q);
-        const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(userList);
       } catch (error) {
         console.error("Error fetching users:", error);
@@ -33,13 +37,19 @@ export const OrganizationSettings: React.FC = () => {
   }, [activeOrg]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
+    // Prevent changing own role to avoid locking yourself out
+    if (userId === activeUser?.id) {
+        toast.error("You cannot change your own role.");
+        return;
+    }
+
     try {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, { role: newRole });
       
       // Update local state
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      toast.success("User role updated successfully.");
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole as User['role'] } : u));
+      toast.success("User access level updated.");
     } catch (error) {
       console.error("Error updating role:", error);
       toast.error("Failed to update role.");
@@ -47,6 +57,7 @@ export const OrganizationSettings: React.FC = () => {
   };
 
   const handleStatusChange = async (userId: string, newStatus: string) => {
+    if (userId === activeUser?.id) return;
     try {
       const userRef = doc(db, 'users', userId);
       await updateDoc(userRef, { status: newStatus });
@@ -58,6 +69,15 @@ export const OrganizationSettings: React.FC = () => {
     }
   };
 
+  if (!canManageAccess) {
+      return (
+          <div className="p-8 text-center border-2 border-dashed border-red-200 rounded-xl bg-red-50 dark:bg-red-900/10">
+              <h3 className="text-lg font-bold text-red-600">Access Denied</h3>
+              <p className="text-gray-600 dark:text-gray-400">Only Administrators can manage user permissions.</p>
+          </div>
+      )
+  }
+
   if (loading) return <div className="p-8 text-center">Loading users...</div>;
 
   return (
@@ -65,8 +85,8 @@ export const OrganizationSettings: React.FC = () => {
       <Card>
         <div className="flex justify-between items-center mb-6 border-b pb-4 dark:border-gray-700">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{activeOrg.name} Team</h2>
-            <p className="text-sm text-gray-500">Manage user access and permissions.</p>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Access Control</h2>
+            <p className="text-sm text-gray-500">Manage user roles and permissions for {activeOrg.name}.</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-400 uppercase">Total Users</p>
@@ -80,7 +100,7 @@ export const OrganizationSettings: React.FC = () => {
               <tr>
                 <th className="px-6 py-3">User</th>
                 <th className="px-6 py-3">Email</th>
-                <th className="px-6 py-3">Current Role</th>
+                <th className="px-6 py-3">Access Level (Role)</th>
                 <th className="px-6 py-3">Status</th>
                 <th className="px-6 py-3 text-right">Actions</th>
               </tr>
@@ -96,8 +116,8 @@ export const OrganizationSettings: React.FC = () => {
                     <select 
                       value={user.role}
                       onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                      className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-primary-500"
-                      disabled={user.id === activeUser?.id} // Prevent changing own role
+                      className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                      disabled={user.id === activeUser?.id}
                     >
                       {roles.map(r => (
                         <option key={r.key} value={r.key}>{r.label}</option>
@@ -114,9 +134,10 @@ export const OrganizationSettings: React.FC = () => {
                       <Button 
                         size="sm" 
                         variant="secondary"
-                        onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'inactive' : 'active')}
+                        onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')}
+                        className={user.status === 'active' ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}
                       >
-                        {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                        {user.status === 'active' ? 'Suspend' : 'Activate'}
                       </Button>
                     )}
                   </td>
