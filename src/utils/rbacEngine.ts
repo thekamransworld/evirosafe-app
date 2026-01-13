@@ -1,73 +1,87 @@
-// src/utils/rbacEngine.ts
 import { ROLE_DEFINITIONS } from '../config/permissions';
 import type { User } from '../types';
-import type { Action, Resource, PermissionRule } from '../types/rbac';
+import type { Action, Resource, PermissionRule, Scope } from '../types/rbac';
 
-// Helper to recursively get all permissions including inherited ones
+// Helper: Flatten inheritance tree
 const getEffectivePermissions = (roleKey: string): PermissionRule[] => {
   const roleDef = ROLE_DEFINITIONS[roleKey];
   if (!roleDef) return [];
-
   let permissions = [...roleDef.permissions];
-
-  // Recursive inheritance
   if (roleDef.inheritsFrom) {
     permissions = [...permissions, ...getEffectivePermissions(roleDef.inheritsFrom)];
   }
-
   return permissions;
+};
+
+// Helper: Check Ownership
+const isOwner = (user: User, data: any) => {
+  if (!data) return true; // If no data, we can't check ownership, assume list view (allow)
+  if ('reporter_id' in data) return data.reporter_id === user.id;
+  if ('creator_id' in data) return data.creator_id === user.id;
+  if ('payload' in data && data.payload.creator_id) return data.payload.creator_id === user.id;
+  if ('owner_id' in data) return data.owner_id === user.id;
+  return false;
+};
+
+// Helper: Check Project Scope
+const isInProject = (user: User, data: any) => {
+  if (!data || !data.project_id) return true; // No project data, assume global/allow
+  // In a real app, user.project_ids would be an array. 
+  // For this MVP, we assume if they have the role, they are in the project context.
+  return true; 
 };
 
 export const checkPermission = (
   user: User | null,
   action: Action,
   resource: Resource,
-  data?: any // The specific record (Report, PTW, etc.)
+  data?: any
 ): boolean => {
   if (!user) return false;
-  
-  // 1. Super Admin Bypass
-  if (user.role === 'ADMIN') return true;
+  if (user.role === 'ADMIN') return true; // Super Admin Bypass
 
-  // 2. Get all permissions for the user's role
+  const roleDef = ROLE_DEFINITIONS[user.role];
+  if (!roleDef) return false;
+
   const permissions = getEffectivePermissions(user.role);
-
-  // 3. Find matching permission rules
+  
+  // 1. Find matching rule
   const matchingRules = permissions.filter(p => 
     p.resource === resource && p.actions.includes(action)
   );
 
   if (matchingRules.length === 0) return false; // Default Deny
 
-  // 4. Evaluate Scopes and Conditions
-  // If ANY of the matching rules pass, we allow access (OR logic)
+  // 2. Evaluate Rules (OR logic - if any rule passes, allow)
   return matchingRules.some(rule => {
-    
+    const effectiveScope = rule.scope || roleDef.defaultScope;
+
     // A. Scope Check
-    if (rule.scope === 'own') {
-      // If data is provided, check ownership. If no data (e.g. viewing a list), we assume true for now 
-      // but the UI should filter the list.
-      if (data && !isOwner(user, data)) return false;
+    if (effectiveScope === 'own' && data) {
+      if (!isOwner(user, data)) return false;
     }
-    
-    if (rule.scope === 'project') {
-      // In a real app, check if user.project_ids includes data.project_id
-      // For now, we assume if they have the role, they have access to the project context
+    if (effectiveScope === 'project' && data) {
+      if (!isInProject(user, data)) return false;
     }
 
-    // B. Condition Check
+    // B. Segregation of Duties (Creator cannot Approve)
+    if (action === 'approve' && data && isOwner(user, data)) {
+        return false; // Hard block: You cannot approve your own work
+    }
+
+    // C. Status Gates (Update only allowed if Draft/Requested)
+    if (action === 'update' && data && data.status) {
+        const lockedStatuses = ['approved', 'closed', 'archived', 'published', 'active'];
+        if (lockedStatuses.includes(data.status.toLowerCase())) {
+            return false; // Cannot edit locked records
+        }
+    }
+
+    // D. Custom Conditions (Risk, etc.)
     if (rule.condition) {
       return rule.condition(user, data);
     }
 
     return true;
   });
-};
-
-// Helper to check ownership
-const isOwner = (user: User, data: any) => {
-  if ('reporter_id' in data) return data.reporter_id === user.id;
-  if ('creator_id' in data) return data.creator_id === user.id;
-  if ('payload' in data && data.payload.creator_id) return data.payload.creator_id === user.id;
-  return false;
 };
