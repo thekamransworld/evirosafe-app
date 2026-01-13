@@ -5,9 +5,8 @@ import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
-import { roles as rolesConfig } from './config';
 import { Loader2 } from 'lucide-react';
-import type { User } from './types'; // Added import for type safety
+import type { User } from './types';
 
 // --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
@@ -51,8 +50,6 @@ import { SessionAttendanceModal } from './components/SessionAttendanceModal';
 import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
-import { ChecklistRunModal } from './components/ChecklistRunModal';
-import { ChecklistDetailModal } from './components/ChecklistDetailModal';
 
 // --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" ---
 const AuthSync: React.FC = () => {
@@ -75,7 +72,6 @@ const AuthSync: React.FC = () => {
 
       const existingUser = prev[0];
       
-      // FIX: Explicitly typed to match User interface
       const defaultPreferences: User['preferences'] = {
           language: 'en',
           default_view: 'dashboard',
@@ -101,7 +97,6 @@ const AuthSync: React.FC = () => {
         preferences: defaultPreferences
       };
 
-      // Explicitly cast to User to satisfy TypeScript
       const newUser: User = {
         ...template,
         id: uid,
@@ -259,7 +254,7 @@ const AppContent = () => {
             />
           )}
           {currentView === 'people' && <People />}
-          {currentView === 'roles' && <Roles roles={rolesConfig} />}
+          {currentView === 'roles' && <Roles />}
           {currentView === 'organizations' && <Organizations />}
           {currentView === 'projects' && <Projects />}
           {currentView === 'signage' && <Signage />}
