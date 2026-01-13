@@ -8,12 +8,17 @@ import {
   plans as initialPlans,
   rams as initialRams
 } from './data';
-import { translations, supportedLanguages, roles, logoSrc } from './config';
+import { translations, supportedLanguages, roles } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
+  Project, View, Ptw, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
+
+// --- NEW RBAC IMPORTS ---
+import type { Action, Resource } from './types/rbac';
+import { checkPermission } from './utils/rbacEngine';
+
 import { useToast } from './components/ui/Toast';
 
 // --- FIREBASE IMPORTS ---
@@ -21,7 +26,6 @@ import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
-// --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
@@ -46,7 +50,10 @@ interface AppContextType {
   t: (key: string, fallback?: string) => string;
   login: (userId: string) => void;
   logout: () => void;
-  can: (action: Action, resource: Resource) => boolean;
+  
+  // --- UPDATED CAN SIGNATURE ---
+  can: (action: Action, resource: Resource, data?: any) => boolean;
+  
   impersonatingAdmin: User | null;
   impersonateUser: (userId: string) => void;
   stopImpersonating: () => void;
@@ -128,12 +135,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const can = (action: Action, resource: Resource): boolean => {
-    if (!activeUser) return false;
-    const userRole = roles.find(r => r.key === activeUser.role);
-    if (!userRole) return false;
-    const permission = userRole.permissions.find(p => p.resource === resource);
-    return permission ? permission.actions.includes(action) : false;
+  // --- NEW PERMISSION ENGINE INTEGRATION ---
+  const can = (action: Action, resource: Resource, data?: any): boolean => {
+    return checkPermission(activeUser, action, resource, data);
   };
 
   const language = activeUser?.preferences?.language || 'en';
@@ -146,10 +150,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...data,
           id: `org_${Date.now()}`,
           status: 'active',
-          branding: {
-              logoUrl: logoSrc,
-              primaryColor: '#00A86B'
-          },
+          branding: { logoUrl: '/logo.svg', primaryColor: '#00A86B' },
           slug: data.name.toLowerCase().replace(/\s+/g, '-'),
           domain: '',
           timezone: 'GMT+0',
@@ -261,13 +262,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const snap = await getDocs(collection(db, name));
             const data = snap.docs.map(d => {
                 const docData = d.data();
-                // --- FIX: Sanitize Organization Data ---
                 if (name === 'organizations') {
                     return {
                         ...docData,
                         id: d.id,
-                        // If branding is missing, provide default
-                        branding: docData.branding || { logoUrl: logoSrc, primaryColor: '#00A86B' }
+                        branding: docData.branding || { logoUrl: '/logo.svg', primaryColor: '#00A86B' }
                     };
                 }
                 return { id: d.id, ...docData };

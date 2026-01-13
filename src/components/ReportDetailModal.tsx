@@ -49,7 +49,9 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
   
   if (!report) return null;
 
-  const canApprove = can('approve', 'reports');
+  const canApprove = can('approve', 'reports', report);
+  const canDelete = can('delete', 'reports', report);
+
   const [editedClassification, setEditedClassification] = useState<ReportClassification>(report.classification || 'To Be Determined');
   const [editedRootCause, setEditedRootCause] = useState<RootCause | undefined>(report.root_cause);
 
@@ -280,18 +282,23 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = (props) => {
           <footer className="p-4 border-t dark:border-dark-border bg-gray-100 dark:bg-black/20 flex-shrink-0 flex justify-between items-center">
             {canAcknowledge && <Button variant="secondary" onClick={() => onAcknowledgeReport(report.id)}>Acknowledge Receipt</Button>}
             <div></div>
-            {canApprove && report.status !== 'closed' && (
-                <div className="flex items-center space-x-2">
-                    <Button variant="secondary">Request More Info</Button>
-                    <Button 
-                      onClick={() => onStatusChange(report.id, 'closed')} 
-                      disabled={selfApprovalBlocked}
-                      title={selfApprovalBlocked ? "Cannot approve a High/Critical report you created." : ""}
-                    >
-                      Verify & Close Report
-                    </Button>
-                </div>
-            )}
+            <div className="flex items-center space-x-2">
+                {canDelete && (
+                    <Button variant="danger" onClick={() => console.log("Delete logic here")}>Delete Report</Button>
+                )}
+                {canApprove && report.status !== 'closed' && (
+                    <>
+                        <Button variant="secondary">Request More Info</Button>
+                        <Button 
+                          onClick={() => onStatusChange(report.id, 'closed')} 
+                          disabled={selfApprovalBlocked}
+                          title={selfApprovalBlocked ? "Cannot approve a High/Critical report you created." : ""}
+                        >
+                          Verify & Close Report
+                        </Button>
+                    </>
+                )}
+            </div>
           </footer>
         </div>
       </div>

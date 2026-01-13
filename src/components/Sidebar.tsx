@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAppContext, useDataContext } from '../contexts';
 import { NotificationsPanel } from './NotificationsPanel';
 import { Bell } from 'lucide-react';
+import type { Resource } from '../types/rbac';
 
 interface SidebarProps {
   currentView: string;
@@ -89,32 +90,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { logout, currentUser } = useAuth();
   const { notifications } = useDataContext();
-  const { activeUser } = useAppContext();
+  const { activeUser, can } = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Calculate unread notifications for the current user
   const unreadCount = notifications.filter(n => n.user_id === activeUser?.id && !n.is_read).length;
 
   const menuItems = [
-    { label: 'Dashboard', view: 'dashboard' },
-    { label: 'AI Insights', view: 'ai-insights' },
-    { label: 'HSE Statistics', view: 'hse-statistics' },
-    { label: 'Site Map', view: 'site-map' },
-    { label: 'My Certificate', view: 'certification' },
-    { label: 'Reporting', view: 'reports' },
-    { label: 'Action Tracker', view: 'actions' },
-    { label: 'Inspections', view: 'inspections' },
-    { label: 'Permit to Work', view: 'ptw' },
-    { label: 'Checklists', view: 'checklists' },
-    { label: 'Plans', view: 'plans' },
-    { label: 'RAMS', view: 'rams' },
-    { label: 'Signage', view: 'signage' },
-    { label: 'Toolbox Talks', view: 'tbt' },
-    { label: 'Training', view: 'training' },
-    { label: 'People', view: 'people' },
-    { label: 'Organizations', view: 'organizations' },
-    // Projects removed from here to enforce Organization -> Project workflow
-    { label: 'Settings', view: 'settings' },
+    { label: 'Dashboard', view: 'dashboard', resource: 'dashboard' },
+    { label: 'AI Insights', view: 'ai-insights', resource: 'ai-insights' },
+    { label: 'HSE Statistics', view: 'hse-statistics', resource: 'hse-statistics' },
+    { label: 'Site Map', view: 'site-map', resource: 'site-map' },
+    { label: 'My Certificate', view: 'certification', resource: 'certification' },
+    { label: 'Reporting', view: 'reports', resource: 'reports' },
+    { label: 'Action Tracker', view: 'actions', resource: 'actions' },
+    { label: 'Inspections', view: 'inspections', resource: 'inspections' },
+    { label: 'Permit to Work', view: 'ptw', resource: 'ptw' },
+    { label: 'Checklists', view: 'checklists', resource: 'checklists' },
+    { label: 'Plans', view: 'plans', resource: 'plans' },
+    { label: 'RAMS', view: 'rams', resource: 'rams' },
+    { label: 'Signage', view: 'signage', resource: 'signage' },
+    { label: 'Toolbox Talks', view: 'tbt', resource: 'tbt' },
+    { label: 'Training', view: 'training', resource: 'training' },
+    { label: 'Housekeeping', view: 'housekeeping', resource: 'housekeeping' },
+    { label: 'People', view: 'people', resource: 'people' },
+    { label: 'Organizations', view: 'organizations', resource: 'organizations' },
+    { label: 'Settings', view: 'settings', resource: 'settings' },
   ];
 
   return (
@@ -143,21 +143,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
         {menuItems.map((item) => (
-          <NavItem
-            key={item.view}
-            label={item.label}
-            view={item.view}
-            isOpen={isOpen}
-            currentView={currentView}
-            setCurrentView={setCurrentView}
-          />
+          // Only render if user has 'read' permission for the resource
+          can('read', item.resource as Resource) && (
+            <NavItem
+              key={item.view}
+              label={item.label}
+              view={item.view}
+              isOpen={isOpen}
+              currentView={currentView}
+              setCurrentView={setCurrentView}
+            />
+          )
         ))}
       </nav>
 
       {/* Notification & Toggle */}
       <div className="p-2 border-t border-slate-800/60 bg-slate-950/70 flex flex-col gap-2">
         
-        {/* Notification Button */}
         <button
           onClick={() => setShowNotifications(true)}
           className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors relative"
@@ -213,7 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-sm font-medium text-slate-100 truncate">
                 {currentUser?.email}
               </p>
-              <p className="text-xs text-slate-500 truncate">Admin</p>
+              <p className="text-xs text-slate-500 truncate">{activeUser?.role || 'User'}</p>
             </div>
           )}
         </div>
@@ -226,7 +228,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </div>
 
-    {/* Notification Panel Overlay */}
     {showNotifications && (
         <NotificationsPanel onClose={() => setShowNotifications(false)} />
     )}
