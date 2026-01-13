@@ -14,24 +14,24 @@ import {
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 
-// --- CONFIGURATION ---
+// --- CONFIGURATION MATCHING YOUR SCREENSHOT ---
 
 const RESOURCES: { key: Resource; label: string; icon: React.ReactNode }[] = [
   { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
   { key: 'reports', label: 'Reports', icon: <FileText className="w-4 h-4" /> },
   { key: 'inspections', label: 'Inspections', icon: <ClipboardCheck className="w-4 h-4" /> },
-  { key: 'ptw', label: 'Permit to Work', icon: <FileCheck className="w-4 h-4" /> },
+  { key: 'ptw', label: 'Ptw', icon: <FileCheck className="w-4 h-4" /> },
   { key: 'checklists', label: 'Checklists', icon: <ListTodo className="w-4 h-4" /> },
   { key: 'housekeeping', label: 'Housekeeping', icon: <Brush className="w-4 h-4" /> },
   { key: 'plans', label: 'Plans', icon: <FileSpreadsheet className="w-4 h-4" /> },
-  { key: 'rams', label: 'RAMS', icon: <ShieldAlert className="w-4 h-4" /> },
+  { key: 'rams', label: 'Rams', icon: <ShieldAlert className="w-4 h-4" /> },
   { key: 'signage', label: 'Signage', icon: <AlertTriangle className="w-4 h-4" /> },
-  { key: 'tbt', label: 'Toolbox Talks', icon: <Megaphone className="w-4 h-4" /> },
-  { key: 'training', label: 'Trainings', icon: <GraduationCap className="w-4 h-4" /> },
+  { key: 'tbt', label: 'Tbt', icon: <Megaphone className="w-4 h-4" /> },
+  { key: 'training', label: 'Training', icon: <GraduationCap className="w-4 h-4" /> },
   { key: 'actions', label: 'Actions', icon: <Activity className="w-4 h-4" /> },
   { key: 'organizations', label: 'Organizations', icon: <Building2 className="w-4 h-4" /> },
   { key: 'projects', label: 'Projects', icon: <FolderKanban className="w-4 h-4" /> },
-  { key: 'people', label: 'People & Access', icon: <Users className="w-4 h-4" /> },
+  { key: 'people', label: 'People', icon: <Users className="w-4 h-4" /> },
   { key: 'roles', label: 'Roles', icon: <Key className="w-4 h-4" /> },
   { key: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" /> },
 ];
@@ -80,7 +80,7 @@ export const Roles: React.FC = () => {
   }, [selectedRoleKey, rolesConfig]);
 
   const hasPermission = (resource: Resource, action: Action) => {
-    // Admin bypass
+    // Admin bypass - visually check everything
     if (selectedRoleKey === 'ADMIN') return true;
 
     return effectivePermissions.some(p => 
@@ -160,7 +160,7 @@ export const Roles: React.FC = () => {
                     >
                         <span>{role.label}</span>
                         {/* Simple heuristic for "System" roles */}
-                        {['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR', 'WORKER'].includes(role.key) && (
+                        {['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR', 'HSE_OFFICER', 'INSPECTOR', 'WORKER', 'CLIENT_VIEWER'].includes(role.key) && (
                             <span className="text-[10px] uppercase tracking-wider text-slate-400 font-normal">(System)</span>
                         )}
                     </button>
