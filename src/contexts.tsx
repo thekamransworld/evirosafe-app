@@ -8,14 +8,14 @@ import {
   plans as initialPlans,
   rams as initialRams
 } from './data';
-import { translations, supportedLanguages } from './config';
-import { ROLE_DEFINITIONS } from './config/permissions'; // Import defaults
+import { translations, supportedLanguages, roles } from './config';
+import { ROLE_DEFINITIONS } from './config/permissions';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
-import type { RoleDefinition } from './types/rbac'; // Import Role Type
+import type { RoleDefinition } from './types/rbac';
 import { checkPermission } from './utils/rbacEngine';
 import { useToast } from './components/ui/Toast';
 
@@ -174,7 +174,7 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
-  rolesList: RoleDefinition[]; // Added Roles List
+  rolesList: RoleDefinition[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -203,7 +203,8 @@ interface DataContextType {
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
-  handleUpdateRole: (role: RoleDefinition) => void; // Added Role Update
+  handleUpdateRole: (role: RoleDefinition) => void;
+  handleCreateRole: (role: RoleDefinition) => void; // <--- ADDED THIS
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -231,7 +232,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
     
-    // Initialize roles with defaults, will be overwritten by DB if exists
     const [rolesList, setRolesList] = useState<RoleDefinition[]>(Object.values(ROLE_DEFINITIONS));
 
     useEffect(() => {
@@ -269,7 +269,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('training_records', setTrainingRecordList),
             fetchCol('training_sessions', setTrainingSessionList),
             fetchCol('notifications', setNotifications),
-            fetchCol('roles', setRolesList, Object.values(ROLE_DEFINITIONS)), // Fetch Roles
+            fetchCol('roles', setRolesList, Object.values(ROLE_DEFINITIONS)),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -292,16 +292,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // --- ROLE MANAGEMENT ---
     const handleUpdateRole = async (role: RoleDefinition) => {
-        // Update local state
         setRolesList(prev => prev.map(r => r.key === role.key ? role : r));
-        
-        // Save to Firebase
         try {
             await setDoc(doc(db, 'roles', role.key), role);
             toast.success("Permissions updated successfully.");
         } catch (e) {
             console.error("Error saving role:", e);
             toast.error("Failed to save permissions.");
+        }
+    };
+
+    // --- NEW: CREATE ROLE ---
+    const handleCreateRole = async (role: RoleDefinition) => {
+        setRolesList(prev => [...prev, role]);
+        try {
+            await setDoc(doc(db, 'roles', role.key), role);
+            toast.success("Role created successfully.");
+        } catch (e) {
+            console.error("Error creating role:", e);
+            toast.error("Failed to create role.");
         }
     };
 
@@ -377,14 +386,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems, rolesList, // Added rolesList
+        actionItems, rolesList,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate, handleUpdateRole // Added handleUpdateRole
+        handleCreateChecklistTemplate, handleUpdateRole, handleCreateRole // Added handleCreateRole
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

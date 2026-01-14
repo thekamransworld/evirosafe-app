@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Resource, Action, Scope } from '../types/rbac';
+import type { Resource, Action, Scope, RoleDefinition } from '../types/rbac';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { useAppContext, useDataContext } from '../contexts';
 import { Plus, Save, Shield, Info } from 'lucide-react';
+import { FormField } from './ui/FormField';
 
-// Define the matrix structure matching your screenshot
+// Define the matrix structure
 const RESOURCES: Resource[] = [
   'dashboard', 'reports', 'inspections', 'ptw', 'checklists', 
   'housekeeping', 'plans', 'rams', 'signage', 'tbt', 
@@ -15,15 +16,85 @@ const RESOURCES: Resource[] = [
 
 const ACTIONS: Action[] = ['read', 'create', 'update', 'approve', 'delete', 'export', 'assign'];
 
+// --- Role Creation Modal ---
+const RoleCreationModal: React.FC<{ isOpen: boolean; onClose: () => void; onSubmit: (role: RoleDefinition) => void; existingRoles: RoleDefinition[] }> = ({ isOpen, onClose, onSubmit, existingRoles }) => {
+    const [name, setName] = useState('');
+    const [inheritsFrom, setInheritsFrom] = useState('');
+    const [error, setError] = useState('');
+
+    const handleSubmit = () => {
+        if (!name.trim()) {
+            setError('Role name is required.');
+            return;
+        }
+        
+        const key = name.toUpperCase().replace(/\s+/g, '_');
+        if (existingRoles.some(r => r.key === key)) {
+            setError('Role with this name already exists.');
+            return;
+        }
+
+        const newRole: RoleDefinition = {
+            key,
+            label: name,
+            inheritsFrom: inheritsFrom || undefined,
+            permissions: [],
+            defaultScope: 'project'
+        };
+
+        onSubmit(newRole);
+        onClose();
+        setName('');
+        setInheritsFrom('');
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b dark:border-dark-border">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create Custom Role</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <FormField label="Role Name">
+                        <input 
+                            type="text" 
+                            value={name} 
+                            onChange={e => setName(e.target.value)} 
+                            className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" 
+                            placeholder="e.g. Site Engineer" 
+                        />
+                    </FormField>
+                    <FormField label="Inherits Permissions From (Optional)">
+                        <select 
+                            value={inheritsFrom} 
+                            onChange={e => setInheritsFrom(e.target.value)} 
+                            className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white"
+                        >
+                            <option value="">None (Start Empty)</option>
+                            {existingRoles.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                        </select>
+                    </FormField>
+                    {error && <p className="text-sm text-red-500">{error}</p>}
+                </div>
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Create Role</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const Roles: React.FC = () => {
   const { can } = useAppContext();
-  const { rolesList, handleUpdateRole } = useDataContext();
+  const { rolesList, handleUpdateRole, handleCreateRole } = useDataContext();
   
-  // Local state for editing before saving
   const [roles, setRoles] = useState(rolesList);
   const [selectedRoleKey, setSelectedRoleKey] = useState<string>('HSE_MANAGER');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Sync local state if context updates (e.g. initial load)
   useEffect(() => {
       if (rolesList.length > 0) {
           setRoles(rolesList);
@@ -50,7 +121,6 @@ export const Roles: React.FC = () => {
       if (existingRuleIndex >= 0) {
         const rule = { ...newPermissions[existingRuleIndex] };
         if (rule.actions.includes(action)) {
-          // Remove action
           rule.actions = rule.actions.filter(a => a !== action);
           if (rule.actions.length === 0) {
             newPermissions.splice(existingRuleIndex, 1);
@@ -58,16 +128,14 @@ export const Roles: React.FC = () => {
             newPermissions[existingRuleIndex] = rule;
           }
         } else {
-          // Add action
           rule.actions.push(action);
           newPermissions[existingRuleIndex] = rule;
         }
       } else {
-        // Create new rule
         newPermissions.push({
           resource,
           actions: [action],
-          scope: role.defaultScope || 'org' // Default to role scope
+          scope: role.defaultScope || 'org'
         });
       }
 
@@ -85,6 +153,11 @@ export const Roles: React.FC = () => {
       }
   };
 
+  const handleCreateSubmit = (newRole: RoleDefinition) => {
+      handleCreateRole(newRole);
+      setSelectedRoleKey(newRole.key);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -93,7 +166,7 @@ export const Roles: React.FC = () => {
           <p className="text-slate-400 mt-1">Configure access levels using the RBAC Matrix.</p>
         </div>
         {can('create', 'roles') && (
-          <Button>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
             <Plus className="w-5 h-5 mr-2" />
             Create Custom Role
           </Button>
@@ -101,7 +174,6 @@ export const Roles: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar: Role List */}
         <div className="lg:col-span-1 space-y-4">
           <Card className="p-0 overflow-hidden">
             <div className="p-4 border-b dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
@@ -126,14 +198,13 @@ export const Roles: React.FC = () => {
           </Card>
         </div>
 
-        {/* Main: Permission Matrix */}
         <div className="lg:col-span-3">
           <Card className="overflow-hidden">
             <div className="flex justify-between items-center mb-6 border-b dark:border-slate-700 pb-4">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{selectedRole.label}</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                    Define what this role can do across the platform.
+                    {selectedRole.inheritsFrom ? <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded dark:bg-blue-900 dark:text-blue-200">Inherits from: {roles.find(r => r.key === selectedRole.inheritsFrom)?.label}</span> : 'Configure permissions for this role.'}
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -199,12 +270,19 @@ export const Roles: React.FC = () => {
                 <Info className="w-4 h-4 mt-0.5 shrink-0" />
                 <p>
                     <strong>Note:</strong> Permissions are additive. Checking a box grants the capability. 
-                    The "Scope" setting determines <em>which</em> data they can act upon (e.g., "Read Reports" with "Own" scope means they only see their own reports).
+                    The "Scope" setting determines <em>which</em> data they can act upon.
                 </p>
             </div>
           </Card>
         </div>
       </div>
+
+      <RoleCreationModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        onSubmit={handleCreateSubmit}
+        existingRoles={roles}
+      />
     </div>
   );
 };
