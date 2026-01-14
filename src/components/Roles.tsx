@@ -5,7 +5,7 @@ import { Button } from './ui/Button';
 import { useAppContext, useDataContext } from '../contexts';
 import { Plus, Save, Shield, Info } from 'lucide-react';
 
-// Define the matrix structure
+// Define the matrix structure matching your screenshot
 const RESOURCES: Resource[] = [
   'dashboard', 'reports', 'inspections', 'ptw', 'checklists', 
   'housekeeping', 'plans', 'rams', 'signage', 'tbt', 

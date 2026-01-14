@@ -1,3 +1,4 @@
+// src/config/permissions.ts
 import type { RoleDefinition, PermissionCondition } from '../types/rbac';
 import type { Ptw } from '../types';
 
@@ -6,12 +7,7 @@ const isCreator: PermissionCondition = (user, data) => {
   if (!data) return true;
   if ('reporter_id' in data) return data.reporter_id === user.id;
   if ('creator_id' in data) return data.creator_id === user.id;
-  if ('payload' in data && data.payload.creator_id) return data.payload.creator_id === user.id;
   return false;
-};
-
-const isNotCreator: PermissionCondition = (user, data) => {
-  return !isCreator(user, data);
 };
 
 const isHighRiskPtw: PermissionCondition = (_, data) => {
@@ -20,86 +16,84 @@ const isHighRiskPtw: PermissionCondition = (_, data) => {
   return ['Hot Work', 'Confined Space Entry', 'Lifting', 'Electrical Work'].includes(ptw.type);
 };
 
-// --- ROLES ---
+// --- ROLES CONFIGURATION ---
 export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
   'ADMIN': {
     key: 'ADMIN',
     label: 'Administrator',
     defaultScope: 'org',
     permissions: [
-      { resource: 'organizations', actions: ['create', 'delete', 'read', 'update'] },
-      { resource: 'roles', actions: ['create', 'update', 'delete'] }
+      // Admin has access to everything. We list base permissions here.
+      { resource: 'organizations', actions: ['create', 'delete', 'read', 'update'], scope: 'org' }
     ]
   },
   'ORG_ADMIN': {
     key: 'ORG_ADMIN',
     label: 'Organization Admin',
     defaultScope: 'org',
-    inheritsFrom: 'HSE_MANAGER',
     permissions: [
-      { resource: 'organizations', actions: ['read', 'update'] },
-      { resource: 'projects', actions: ['read', 'create', 'update'] },
-      { resource: 'people', actions: ['read', 'create', 'update', 'delete', 'assign'] },
-      { resource: 'roles', actions: ['read'] },
-      { resource: 'settings', actions: ['read', 'update'] },
-      { resource: 'signage', actions: ['create', 'update'] },
+      { resource: 'organizations', actions: ['read', 'update'], scope: 'org' },
+      { resource: 'projects', actions: ['read', 'create', 'update'], scope: 'org' },
+      { resource: 'people', actions: ['read', 'create', 'update', 'assign'], scope: 'org' },
+      { resource: 'roles', actions: ['read', 'create', 'update'], scope: 'org' },
+      { resource: 'settings', actions: ['read', 'update'], scope: 'org' },
+      { resource: 'reports', actions: ['read', 'export'], scope: 'org' },
+      { resource: 'inspections', actions: ['read', 'export'], scope: 'org' },
     ]
   },
   'HSE_MANAGER': {
     key: 'HSE_MANAGER',
     label: 'HSE Manager',
-    defaultScope: 'project',
-    inheritsFrom: 'HSE_OFFICER',
+    defaultScope: 'org',
     permissions: [
-      { resource: 'dashboard', actions: ['read', 'export'] },
-      { resource: 'reports', actions: ['approve', 'close', 'export', 'assign'] },
-      { resource: 'inspections', actions: ['approve', 'export'] },
-      { resource: 'ptw', actions: ['approve', 'reject', 'close', 'export'], condition: isNotCreator },
-      { resource: 'rams', actions: ['approve', 'export'], condition: isNotCreator },
-      { resource: 'plans', actions: ['approve', 'export'] },
-      { resource: 'hse-statistics', actions: ['read', 'export'] },
-      { resource: 'ai-insights', actions: ['read'] },
-      { resource: 'actions', actions: ['approve', 'close', 'export'] },
+      { resource: 'dashboard', actions: ['read'], scope: 'org' },
+      { resource: 'reports', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'inspections', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'ptw', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'checklists', actions: ['read', 'create', 'update', 'export', 'assign'], scope: 'org' },
+      { resource: 'plans', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'rams', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'training', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'actions', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
+      { resource: 'people', actions: ['read', 'assign'], scope: 'org' },
     ]
   },
   'SUPERVISOR': {
     key: 'SUPERVISOR',
     label: 'Supervisor',
-    defaultScope: 'team',
-    inheritsFrom: 'INSPECTOR',
+    defaultScope: 'project',
     permissions: [
-      { resource: 'reports', actions: ['update', 'assign'] },
-      { resource: 'inspections', actions: ['assign'] },
-      { resource: 'ptw', actions: ['update'] },
-      { resource: 'tbt', actions: ['read', 'create', 'update', 'assign'] },
-      { resource: 'training', actions: ['assign'] },
-      { resource: 'actions', actions: ['read', 'update', 'assign'] },
+      { resource: 'reports', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'inspections', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'ptw', actions: ['read', 'create', 'update'], scope: 'project' },
+      { resource: 'checklists', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'tbt', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'training', actions: ['read', 'assign'], scope: 'project' },
+      { resource: 'actions', actions: ['read', 'update', 'assign'], scope: 'project' },
     ]
   },
   'HSE_OFFICER': {
     key: 'HSE_OFFICER',
     label: 'HSE Officer',
     defaultScope: 'project',
-    inheritsFrom: 'SUPERVISOR',
     permissions: [
-      { resource: 'dashboard', actions: ['read'] },
-      { resource: 'reports', actions: ['read', 'create', 'update', 'assign'] },
-      { resource: 'plans', actions: ['read', 'create', 'update'] },
-      { resource: 'rams', actions: ['read', 'create', 'update'] },
-      { resource: 'ptw', actions: ['approve'], condition: (u, d) => !isHighRiskPtw(u, d) && isNotCreator(u, d) },
+      { resource: 'dashboard', actions: ['read'], scope: 'project' },
+      { resource: 'reports', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'inspections', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'ptw', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'checklists', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'tbt', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'actions', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
     ]
   },
   'INSPECTOR': {
     key: 'INSPECTOR',
     label: 'Inspector',
     defaultScope: 'project',
-    inheritsFrom: 'WORKER',
     permissions: [
-      { resource: 'inspections', actions: ['create', 'read', 'update'], scope: 'project' },
-      { resource: 'checklists', actions: ['read', 'create'], scope: 'project' },
+      { resource: 'inspections', actions: ['read', 'create', 'update'], scope: 'project' },
+      { resource: 'checklists', actions: ['read', 'create', 'update'], scope: 'project' },
       { resource: 'reports', actions: ['read', 'create'], scope: 'project' },
-      { resource: 'housekeeping', actions: ['read', 'create'], scope: 'project' },
-      { resource: 'site-map', actions: ['read'], scope: 'project' },
     ]
   },
   'WORKER': {
@@ -107,12 +101,12 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
     label: 'Worker',
     defaultScope: 'own',
     permissions: [
-      { resource: 'dashboard', actions: ['read'], scope: 'own' },
-      { resource: 'reports', actions: ['create', 'read'], scope: 'own' },
-      { resource: 'reports', actions: ['update'], scope: 'own', condition: isCreator },
-      { resource: 'training', actions: ['read'], scope: 'own' },
+      { resource: 'reports', actions: ['read', 'create', 'update'], scope: 'own', condition: isCreator },
+      { resource: 'ptw', actions: ['read', 'create', 'update'], scope: 'own', condition: isCreator },
+      { resource: 'checklists', actions: ['read', 'create'], scope: 'own' },
+      { resource: 'tbt', actions: ['read'], scope: 'own' },
+      { resource: 'training', actions: ['read', 'update'], scope: 'own' },
       { resource: 'certification', actions: ['read', 'update'], scope: 'own' },
-      { resource: 'tbt', actions: ['read'], scope: 'project' },
     ]
   },
   'CLIENT_VIEWER': {
@@ -120,12 +114,11 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
     label: 'Client Viewer',
     defaultScope: 'project',
     permissions: [
-      { resource: 'dashboard', actions: ['read'] },
-      { resource: 'reports', actions: ['read', 'export'] },
-      { resource: 'inspections', actions: ['read', 'export'] },
-      { resource: 'plans', actions: ['read'] },
-      { resource: 'rams', actions: ['read'] },
-      { resource: 'hse-statistics', actions: ['read'] },
+      { resource: 'dashboard', actions: ['read'], scope: 'project' },
+      { resource: 'reports', actions: ['read', 'export'], scope: 'project' },
+      { resource: 'inspections', actions: ['read', 'export'], scope: 'project' },
+      { resource: 'plans', actions: ['read', 'export'], scope: 'project' },
+      { resource: 'rams', actions: ['read', 'export'], scope: 'project' },
     ]
   },
   'CUSTOM_SITE_LEAD': {
@@ -133,11 +126,10 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
     label: 'Custom Site Lead',
     defaultScope: 'project',
     permissions: [
-        { resource: 'reports', actions: ['read', 'create', 'update', 'assign'] },
-        { resource: 'inspections', actions: ['read', 'create', 'update', 'assign'] },
-        { resource: 'ptw', actions: ['read', 'create', 'update', 'assign'] },
-        { resource: 'actions', actions: ['read', 'create', 'update', 'assign'] },
-        { resource: 'dashboard', actions: ['read'] }
+      { resource: 'reports', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'inspections', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'ptw', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'actions', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
     ]
   }
 };
