@@ -93,8 +93,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setOpen,
 }) => {
   const { logout, currentUser } = useAuth();
-  const { notifications, can } = useAppContext();
-  const { activeUser } = useAppContext();
+  const { can, activeUser } = useAppContext();
+  const { notifications } = useDataContext(); // <--- FIXED: Getting notifications from DataContext
   const [showNotifications, setShowNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => n.user_id === activeUser?.id && !n.is_read).length;
