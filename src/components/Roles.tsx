@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import type { Resource, Action, Scope } from '../types/rbac';
+import React, { useState, useMemo } from 'react';
+import type { Role, Resource, Action, Scope } from '../types';
+import { ROLE_DEFINITIONS } from '../config/permissions';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
-import { useAppContext, useDataContext } from '../contexts';
+import { useAppContext } from '../contexts';
 import { Plus, Save, Shield, Info } from 'lucide-react';
 
 // Define the matrix structure
@@ -17,18 +18,10 @@ const ACTIONS: Action[] = ['read', 'create', 'update', 'approve', 'delete', 'exp
 
 export const Roles: React.FC = () => {
   const { can } = useAppContext();
-  const { rolesList, handleUpdateRole } = useDataContext();
-  
-  // Local state for editing before saving
-  const [roles, setRoles] = useState(rolesList);
+  // Convert config object to array for the list
+  const initialRoles = Object.values(ROLE_DEFINITIONS);
+  const [roles, setRoles] = useState(initialRoles);
   const [selectedRoleKey, setSelectedRoleKey] = useState<string>('HSE_MANAGER');
-
-  // Sync local state if context updates (e.g. initial load)
-  useEffect(() => {
-      if (rolesList.length > 0) {
-          setRoles(rolesList);
-      }
-  }, [rolesList]);
 
   const selectedRole = useMemo(() => 
     roles.find(r => r.key === selectedRoleKey) || roles[0], 
@@ -77,12 +70,6 @@ export const Roles: React.FC = () => {
 
   const handleScopeChange = (newScope: Scope) => {
       setRoles(prev => prev.map(r => r.key === selectedRoleKey ? { ...r, defaultScope: newScope } : r));
-  };
-
-  const handleSave = () => {
-      if (selectedRole) {
-          handleUpdateRole(selectedRole);
-      }
   };
 
   return (
@@ -150,7 +137,7 @@ export const Roles: React.FC = () => {
                           <option value="own">Own / Self</option>
                       </select>
                   </div>
-                  <Button onClick={handleSave} leftIcon={<Save className="w-4 h-4"/>}>Save Changes</Button>
+                  <Button leftIcon={<Save className="w-4 h-4"/>}>Save Changes</Button>
               </div>
             </div>
 
