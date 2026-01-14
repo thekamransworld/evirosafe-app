@@ -8,13 +8,14 @@ import {
   plans as initialPlans,
   rams as initialRams
 } from './data';
-import { translations, supportedLanguages, roles } from './config';
+import { translations, supportedLanguages } from './config';
+import { ROLE_DEFINITIONS } from './config/permissions'; // Import defaults
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
+  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
-import type { Action, Resource } from './types/rbac';
+import type { RoleDefinition } from './types/rbac'; // Import Role Type
 import { checkPermission } from './utils/rbacEngine';
 import { useToast } from './components/ui/Toast';
 
@@ -23,7 +24,6 @@ import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
-// --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
@@ -59,35 +59,14 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // FIX: Load saved view from localStorage to persist navigation on refresh
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
 
-  // Save view whenever it changes
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
   }, [currentView]);
-
-  // --- THEME LOGIC ---
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('theme');
-        return (saved === 'light' || saved === 'dark') ? saved : 'dark';
-    }
-    return 'dark';
-  });
-
-  useEffect(() => {
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(theme);
-      localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
   
-  // Initialize with static data to prevent empty states before Firebase loads
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || initialOrganizations[0]);
   
@@ -96,39 +75,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
   const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
   const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   const toast = useToast();
 
-  // --- CRITICAL FIX: Fallback to initialUsers if usersList (from Firebase) hasn't loaded yet ---
+  useEffect(() => {
+      const root = window.document.documentElement;
+      root.classList.remove('light', 'dark');
+      root.classList.add(theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
-    
-    // 1. Try to find in current state (Firebase data)
     const foundInState = usersList.find(u => u.id === activeUserId);
     if (foundInState) return foundInState;
-
-    // 2. Fallback to static data (prevents "missing buttons" on refresh)
     const foundInStatic = initialUsers.find(u => u.id === activeUserId);
     if (foundInStatic) return foundInStatic;
-
     return null;
   }, [activeUserId, usersList]);
 
   const login = (userId: string) => {
-    // Check both lists to ensure valid login even if offline
     const user = usersList.find(u => u.id === userId) || initialUsers.find(u => u.id === userId);
-    
     if (user) {
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
-        
-        // Only set view if not already set (respects the localStorage load)
         if (!localStorage.getItem('currentView')) {
             const defaultView = user.preferences?.default_view || 'dashboard';
             setCurrentView(defaultView);
         }
-        
-        // Ensure Org is set
         const userOrg = organizations.find(o => o.id === user.org_id) || initialOrganizations.find(o => o.id === user.org_id);
         if(userOrg) setActiveOrg(userOrg);
     }
@@ -154,7 +130,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // --- PERMISSION ENGINE ---
   const can = (action: Action, resource: Resource, data?: any): boolean => {
     return checkPermission(activeUser, action, resource, data);
   };
@@ -199,6 +174,7 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
+  rolesList: RoleDefinition[]; // Added Roles List
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -227,6 +203,7 @@ interface DataContextType {
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
+  handleUpdateRole: (role: RoleDefinition) => void; // Added Role Update
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -238,9 +215,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const [isLoading, setIsLoading] = useState(true);
     
-    // Initialize with static data to ensure UI paints immediately
     const [projects, setProjects] = useState<Project[]>(initialProjects || []);
-    const [reportList, setReportList] = useState<Report[]>([]); // Reports typically fetched fresh
+    const [reportList, setReportList] = useState<Report[]>([]);
     const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
     const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
     const [planList, setPlanList] = useState<PlanType[]>(initialPlans || []);
@@ -254,9 +230,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
+    
+    // Initialize roles with defaults, will be overwritten by DB if exists
+    const [rolesList, setRolesList] = useState<RoleDefinition[]>(Object.values(ROLE_DEFINITIONS));
 
     useEffect(() => {
-      // If no user, stop loading immediately
       if (!currentUser) {
           setIsLoading(false);
           return;
@@ -264,14 +242,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const fetchData = async () => {
         try {
-          // Helper to fetch and MERGE with existing data if needed
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             const snap = await getDocs(collection(db, name));
             const data = snap.docs.map(d => d.data());
             if (data.length > 0) {
                  setter(data);
             } else {
-                 // If Firebase is empty, keep initial data
                  setter(initialData); 
             }
           };
@@ -293,6 +269,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('training_records', setTrainingRecordList),
             fetchCol('training_sessions', setTrainingSessionList),
             fetchCol('notifications', setNotifications),
+            fetchCol('roles', setRolesList, Object.values(ROLE_DEFINITIONS)), // Fetch Roles
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -313,256 +290,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const handleCreateReport = async (reportData: any) => {
-        const newReport = {
-            ...reportData,
-            id: `rep_${Date.now()}`,
-            org_id: activeOrg.id,
-            reporter_id: activeUser?.id || 'unknown',
-            status: 'submitted',
-            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
-            capa: [],
-            acknowledgements: []
-        };
-        setReportList(prev => [newReport, ...prev]);
-        try { await setDoc(doc(db, 'reports', newReport.id), newReport); toast.success("Report saved."); } catch (e) { console.error(e); }
-    };
-
-    const handleCreateInspection = async (data: any) => {
-        const newInspection = {
-            ...data,
-            id: `insp_${Date.now()}`,
-            org_id: activeOrg.id,
-            findings: [],
-            status: data.status || 'Ongoing',
-            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }]
-        };
-        setInspectionList(prev => [newInspection, ...prev]);
-        try { await setDoc(doc(db, 'inspections', newInspection.id), newInspection); toast.success("Inspection created."); } catch (e) { console.error(e); }
-    };
-
-    const handleCreateStandaloneAction = async (data: any) => {
-        const newAction = {
-            id: `act_${Date.now()}`,
-            action: data.action,
-            owner_id: data.owner_id,
-            due_date: data.due_date,
-            status: 'Open',
-            priority: data.priority,
-            project_id: data.project_id,
-            source: { type: 'Standalone', id: '-', description: 'Direct Entry' },
-            origin: { type: 'standalone', parentId: '', itemId: '' }
-        };
-        setStandaloneActions(prev => [newAction as any, ...prev]);
-        try { await setDoc(doc(db, 'actions', newAction.id), newAction); toast.success("Action created."); } catch (e) { console.error(e); }
-    };
-    
-    const handleCreateProject = async (data: any) => {
+    // --- ROLE MANAGEMENT ---
+    const handleUpdateRole = async (role: RoleDefinition) => {
+        // Update local state
+        setRolesList(prev => prev.map(r => r.key === role.key ? role : r));
+        
+        // Save to Firebase
         try {
-            const projectData = {
-                ...data,
-                org_id: data.org_id || activeOrg.id,
-                status: 'active',
-                created_at: new Date().toISOString()
-            };
-            
-            // Use addDoc to let Firestore auto-generate ID
-            const docRef = await addDoc(collection(db, 'projects'), projectData);
-            
-            const newProj = { id: docRef.id, ...projectData };
-            setProjects(prev => [newProj, ...prev]);
-            toast.success("Project created.");
-        } catch (e) { 
-            console.error(e);
-            toast.error("Failed to create project");
+            await setDoc(doc(db, 'roles', role.key), role);
+            toast.success("Permissions updated successfully.");
+        } catch (e) {
+            console.error("Error saving role:", e);
+            toast.error("Failed to save permissions.");
         }
     };
 
+    // ... (Keep all other handlers exactly as they were) ...
+    const handleCreateReport = async (reportData: any) => {
+        const newReport = { ...reportData, id: `rep_${Date.now()}`, org_id: activeOrg.id, reporter_id: activeUser?.id || 'unknown', status: 'submitted', audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }], capa: [], acknowledgements: [] };
+        setReportList(prev => [newReport, ...prev]);
+        try { await setDoc(doc(db, 'reports', newReport.id), newReport); toast.success("Report saved."); } catch (e) { console.error(e); }
+    };
+    const handleCreateInspection = async (data: any) => {
+        const newInspection = { ...data, id: `insp_${Date.now()}`, org_id: activeOrg.id, findings: [], status: data.status || 'Ongoing', audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }] };
+        setInspectionList(prev => [newInspection, ...prev]);
+        try { await setDoc(doc(db, 'inspections', newInspection.id), newInspection); toast.success("Inspection created."); } catch (e) { console.error(e); }
+    };
+    const handleCreateStandaloneAction = async (data: any) => {
+        const newAction = { id: `act_${Date.now()}`, action: data.action, owner_id: data.owner_id, due_date: data.due_date, status: 'Open', priority: data.priority, project_id: data.project_id, source: { type: 'Standalone', id: '-', description: 'Direct Entry' }, origin: { type: 'standalone', parentId: '', itemId: '' } };
+        setStandaloneActions(prev => [newAction as any, ...prev]);
+        try { await setDoc(doc(db, 'actions', newAction.id), newAction); toast.success("Action created."); } catch (e) { console.error(e); }
+    };
+    const handleCreateProject = async (data: any) => {
+        try { const projectData = { ...data, org_id: data.org_id || activeOrg.id, status: 'active', created_at: new Date().toISOString() }; const docRef = await addDoc(collection(db, 'projects'), projectData); const newProj = { id: docRef.id, ...projectData }; setProjects(prev => [newProj, ...prev]); toast.success("Project created."); } catch (e) { console.error(e); toast.error("Failed to create project"); }
+    };
     const handleCreatePtw = async (data: any) => {
         const newPtw = { ...data, id: `ptw_${Date.now()}`, status: 'DRAFT' };
         setPtwList(prev => [newPtw, ...prev]);
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
-
     const handleCreateChecklistTemplate = async (data: any) => {
         const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
         setChecklistTemplates(prev => [...prev, newTemplate]);
         try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
     };
-
-    const handleStatusChange = (id: string, status: any) => {
-        setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-        updateDB('reports', id, { status });
-    };
-
-    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
-        const report = reportList.find(r => r.id === reportId);
-        if (report) {
-            const newCapa = [...report.capa];
-            if (newCapa[capaIndex]) {
-                newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
-                setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
-                updateDB('reports', reportId, { capa: newCapa });
-            }
-        }
-    };
-
-    const handleUpdateActionStatus = (origin: any, newStatus: any) => {
-        if (origin.type === 'report-capa') {
-            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
-        } else if (origin.type === 'standalone') {
-             setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a));
-             updateDB('actions', origin.parentId, { status: newStatus });
-        }
-    };
-
-    const handleUpdateInspection = (inspection: any, action?: any) => {
-        let updatedInspection = { ...inspection };
-        if (action === 'submit') updatedInspection.status = 'Submitted';
-        if (action === 'approve') updatedInspection.status = 'Approved';
-        if (action === 'close') updatedInspection.status = 'Closed';
-        if (action === 'request_revision') updatedInspection.status = 'Ongoing';
-
-        setInspectionList(prev => prev.map(x => x.id === inspection.id ? updatedInspection : x));
-        updateDB('inspections', inspection.id, updatedInspection);
-        toast.success("Inspection updated.");
-    };
-
-    const handleUpdatePtw = (ptw: any, action?: any) => {
-        let updatedPtw = { ...ptw };
-        if (action === 'submit') updatedPtw.status = 'SUBMITTED';
-        if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL';
-        if (action === 'approve_hse') updatedPtw.status = 'ACTIVE';
-        if (action === 'reject') updatedPtw.status = 'DRAFT';
-        if (action === 'suspend') updatedPtw.status = 'HOLD';
-        if (action === 'resume') updatedPtw.status = 'ACTIVE';
-        if (action === 'close') updatedPtw.status = 'CLOSED';
-
-        setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p));
-        updateDB('ptws', ptw.id, updatedPtw);
-        toast.success("Permit updated.");
-    };
-
-    const handleUpdatePlan = (plan: any) => {
-        setPlanList(prev => prev.map(p => p.id === plan.id ? plan : p));
-        updateDB('plans', plan.id, plan);
-        toast.success("Plan saved.");
-    };
-
-    const handlePlanStatusChange = (id: string, status: any) => {
-        setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p));
-        updateDB('plans', id, { status });
-    };
-
-    const handleUpdateRams = (rams: any) => {
-        setRamsList(prev => prev.map(r => r.id === rams.id ? rams : r));
-        updateDB('rams', rams.id, rams);
-        toast.success("RAMS saved.");
-    };
-
-    const handleRamsStatusChange = (id: string, status: any) => {
-        setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-        updateDB('rams', id, { status });
-    };
-
-    const handleUpdateTbt = (tbt: any) => {
-        setTbtList(prev => prev.map(t => t.id === tbt.id ? tbt : t));
-        updateDB('tbt_sessions', tbt.id, tbt);
-        toast.success("TBT updated.");
-    };
-
-    const handleAcknowledgeReport = (id: string) => {
-        const report = reportList.find(r => r.id === id);
-        if (report) {
-            const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }];
-            setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: newAcks } : r));
-            updateDB('reports', id, { acknowledgements: newAcks });
-        }
-    };
-
+    const handleStatusChange = (id: string, status: any) => { setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r)); updateDB('reports', id, { status }); };
+    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => { const report = reportList.find(r => r.id === reportId); if (report) { const newCapa = [...report.capa]; if (newCapa[capaIndex]) { newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus }; setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r)); updateDB('reports', reportId, { capa: newCapa }); } } };
+    const handleUpdateActionStatus = (origin: any, newStatus: any) => { if (origin.type === 'report-capa') { handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus); } else if (origin.type === 'standalone') { setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a)); updateDB('actions', origin.parentId, { status: newStatus }); } };
+    const handleUpdateInspection = (inspection: any, action?: any) => { let updatedInspection = { ...inspection }; if (action === 'submit') updatedInspection.status = 'Submitted'; if (action === 'approve') updatedInspection.status = 'Approved'; if (action === 'close') updatedInspection.status = 'Closed'; if (action === 'request_revision') updatedInspection.status = 'Ongoing'; setInspectionList(prev => prev.map(x => x.id === inspection.id ? updatedInspection : x)); updateDB('inspections', inspection.id, updatedInspection); toast.success("Inspection updated."); };
+    const handleUpdatePtw = (ptw: any, action?: any) => { let updatedPtw = { ...ptw }; if (action === 'submit') updatedPtw.status = 'SUBMITTED'; if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL'; if (action === 'approve_hse') updatedPtw.status = 'ACTIVE'; if (action === 'reject') updatedPtw.status = 'DRAFT'; if (action === 'suspend') updatedPtw.status = 'HOLD'; if (action === 'resume') updatedPtw.status = 'ACTIVE'; if (action === 'close') updatedPtw.status = 'CLOSED'; setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p)); updateDB('ptws', ptw.id, updatedPtw); toast.success("Permit updated."); };
+    const handleUpdatePlan = (plan: any) => { setPlanList(prev => prev.map(p => p.id === plan.id ? plan : p)); updateDB('plans', plan.id, plan); toast.success("Plan saved."); };
+    const handlePlanStatusChange = (id: string, status: any) => { setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p)); updateDB('plans', id, { status }); };
+    const handleUpdateRams = (rams: any) => { setRamsList(prev => prev.map(r => r.id === rams.id ? rams : r)); updateDB('rams', rams.id, rams); toast.success("RAMS saved."); };
+    const handleRamsStatusChange = (id: string, status: any) => { setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r)); updateDB('rams', id, { status }); };
+    const handleUpdateTbt = (tbt: any) => { setTbtList(prev => prev.map(t => t.id === tbt.id ? tbt : t)); updateDB('tbt_sessions', tbt.id, tbt); toast.success("TBT updated."); };
+    const handleAcknowledgeReport = (id: string) => { const report = reportList.find(r => r.id === id); if (report) { const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }]; setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: newAcks } : r)); updateDB('reports', id, { acknowledgements: newAcks }); } };
     const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
-
-    // --- FIXED: Correct mapping of sections for Plans ---
-    const handleCreatePlan = (d: any) => {
-        const newPlan: any = {
-            id: `plan_${Date.now()}`,
-            org_id: activeOrg.id,
-            project_id: d.project_id,
-            type: d.type,
-            title: d.title,
-            version: 'v1.0',
-            status: 'draft',
-            people: {
-                prepared_by: {
-                    name: activeUser?.name || 'Unknown',
-                    email: activeUser?.email || '',
-                    signed_at: new Date().toISOString()
-                }
-            },
-            dates: {
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            content: {
-                body_json: d.sections || [], 
-                attachments: []
-            },
-            meta: { tags: [], change_note: 'Initial creation' },
-            audit_trail: []
-        };
-        
-        setPlanList(prev => [newPlan, ...prev]);
-        try {
-            setDoc(doc(db, 'plans', newPlan.id), newPlan);
-            toast.success("Plan created successfully.");
-        } catch(e) { console.error(e); }
-    };
-
-    // --- FIXED: Correct mapping of AI Content for RAMS ---
-    const handleCreateRams = (d: any) => {
-        const newRams: any = {
-            id: `rams_${Date.now()}`,
-            org_id: activeOrg.id,
-            project_id: d.project_id,
-            activity: d.activity,
-            location: d.location,
-            status: 'draft',
-            version: 'v1.0',
-            prepared_by: {
-                name: activeUser?.name || 'Unknown',
-                email: activeUser?.email || '',
-                role: activeUser?.role || 'User',
-                signed_at: new Date().toISOString()
-            },
-            times: {
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                valid_from: new Date().toISOString(),
-                valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-            },
-            method_statement: d.aiContent ? {
-                overview: d.aiContent.overview || '',
-                competence: d.aiContent.competence || '',
-                sequence_of_operations: d.aiContent.sequence_of_operations || [],
-                emergency_arrangements: d.aiContent.emergency_arrangements || ''
-            } : { overview: '', competence: '', sequence_of_operations: [], emergency_arrangements: '' },
-            overall_risk_before: 0,
-            overall_risk_after: 0,
-            attachments: [],
-            linked_ptw_types: [],
-            audit_log: []
-        };
-
-        setRamsList(prev => [newRams, ...prev]);
-        try {
-            setDoc(doc(db, 'rams', newRams.id), newRams);
-            toast.success("RAMS created successfully.");
-        } catch(e) { console.error(e); }
-    };
-
+    const handleCreatePlan = (d: any) => { const newPlan: any = { id: `plan_${Date.now()}`, org_id: activeOrg.id, project_id: d.project_id, type: d.type, title: d.title, version: 'v1.0', status: 'draft', people: { prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '', signed_at: new Date().toISOString() } }, dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, content: { body_json: d.sections || [], attachments: [] }, meta: { tags: [], change_note: 'Initial creation' }, audit_trail: [] }; setPlanList(prev => [newPlan, ...prev]); try { setDoc(doc(db, 'plans', newPlan.id), newPlan); toast.success("Plan created successfully."); } catch(e) { console.error(e); } };
+    const handleCreateRams = (d: any) => { const newRams: any = { id: `rams_${Date.now()}`, org_id: activeOrg.id, project_id: d.project_id, activity: d.activity, location: d.location, status: 'draft', version: 'v1.0', prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '', role: activeUser?.role || 'User', signed_at: new Date().toISOString() }, times: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }, method_statement: d.aiContent ? { overview: d.aiContent.overview || '', competence: d.aiContent.competence || '', sequence_of_operations: d.aiContent.sequence_of_operations || [], emergency_arrangements: d.aiContent.emergency_arrangements || '' } : { overview: '', competence: '', sequence_of_operations: [], emergency_arrangements: '' }, overall_risk_before: 0, overall_risk_after: 0, attachments: [], linked_ptw_types: [], audit_log: [] }; setRamsList(prev => [newRams, ...prev]); try { setDoc(doc(db, 'rams', newRams.id), newRams); toast.success("RAMS created successfully."); } catch(e) { console.error(e); } };
     const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
 
     const actionItems = useMemo<ActionItem[]>(() => {
@@ -590,14 +377,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems,
+        actionItems, rolesList, // Added rolesList
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate
+        handleCreateChecklistTemplate, handleUpdateRole // Added handleUpdateRole
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
