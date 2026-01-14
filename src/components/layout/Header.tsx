@@ -86,11 +86,11 @@ export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organiz
        </div>
 
       <div className="flex items-center space-x-2 sm:space-x-3">
-         {/* THEME TOGGLE BUTTON */}
+         {/* --- THEME TOGGLE BUTTON --- */}
          <button 
             onClick={toggleTheme} 
             className="p-2 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white transition-colors"
-            title={theme === 'dark' ? 'Switch to White Mode' : 'Switch to Black Mode'}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
          >
             {theme === 'dark' ? <SunIcon className="w-5 h-5" /> : <MoonIcon className="w-5 h-5" />}
          </button>

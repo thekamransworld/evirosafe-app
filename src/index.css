@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* WHITE MODE VARIABLES (Clean, Professional) */
+  /* WHITE MODE VARIABLES */
   --bg-primary: #ffffff;
   --text-primary: #0f172a; /* Dark Slate */
   --text-secondary: #64748b; /* Slate 500 */
@@ -11,7 +11,7 @@
 }
 
 .dark:root {
-  /* BLACK MODE VARIABLES (Your Current Look) */
+  /* BLACK MODE VARIABLES */
   --bg-primary: #020617; /* Slate 950 */
   --text-primary: #f1f5f9; /* Slate 100 */
   --text-secondary: #94a3b8; /* Slate 400 */
@@ -19,7 +19,6 @@
 }
 
 body {
-  /* Default is White Mode. 'dark:' classes activate Black Mode */
   @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300;
   overflow-x: hidden;
   min-height: 100vh;
@@ -27,12 +26,8 @@ body {
 
 /* Glass Card - Adaptive */
 .glass-card {
-  /* White Mode: Clean white card with shadow */
   @apply bg-white border border-slate-200 shadow-lg;
-  
-  /* Black Mode: Glassy dark card */
   @apply dark:bg-slate-900/80 dark:border-white/10 dark:shadow-2xl;
-  
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-radius: 20px;
@@ -62,12 +57,8 @@ input[type="tel"],
 input[type="search"],
 textarea,
 select {
-  /* White Mode Input */
   @apply bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400;
-  
-  /* Black Mode Input */
   @apply dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500;
-  
   @apply rounded-xl shadow-sm transition-all duration-200;
 }
 

@@ -4,7 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  darkMode: 'class', // <--- THIS IS CRITICAL for the toggle to work
+  darkMode: 'class', // <--- THIS IS REQUIRED
   theme: {
     extend: {
       fontFamily: {
@@ -24,23 +24,10 @@ export default {
           900: '#134e4a',
           950: '#042f2e',
         },
-        // Dark Mode Colors (Your current look)
         'dark-surface': '#0f172a',
         'dark-background': '#030712',
         'dark-card': 'rgba(17, 24, 39, 0.7)',
         'dark-border': 'rgba(255, 255, 255, 0.08)',
-        
-        // Neon Accents
-        'neon-green': '#34d399',
-        'neon-blue': '#38bdf8',
-        'neon-purple': '#c084fc',
-        'neon-pink': '#f472b6',
-        'neon-orange': '#fb923c',
-        'neon-yellow': '#facc15',
-      },
-      boxShadow: {
-        'neon': '0 0 20px rgba(52, 211, 153, 0.4)',
-        'glass': '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
