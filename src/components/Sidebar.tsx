@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAppContext, useDataContext } from '../contexts';
 import { NotificationsPanel } from './NotificationsPanel';
 import { Bell } from 'lucide-react';
-import type { Resource } from '../types/rbac';
 
 interface SidebarProps {
   currentView: string;
@@ -30,6 +29,7 @@ const icons: Record<string, JSX.Element> = {
   tbt: <path d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />,
   training: <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />,
   people: <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+  roles: <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />, // Lock icon for Roles
   settings: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />,
   certification: <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
 };
@@ -96,25 +96,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const unreadCount = notifications.filter(n => n.user_id === activeUser?.id && !n.is_read).length;
 
   const menuItems = [
-    { label: 'Dashboard', view: 'dashboard', resource: 'dashboard' },
-    { label: 'AI Insights', view: 'ai-insights', resource: 'ai-insights' },
-    { label: 'HSE Statistics', view: 'hse-statistics', resource: 'hse-statistics' },
-    { label: 'Site Map', view: 'site-map', resource: 'site-map' },
-    { label: 'My Certificate', view: 'certification', resource: 'certification' },
-    { label: 'Reporting', view: 'reports', resource: 'reports' },
-    { label: 'Action Tracker', view: 'actions', resource: 'actions' },
-    { label: 'Inspections', view: 'inspections', resource: 'inspections' },
-    { label: 'Permit to Work', view: 'ptw', resource: 'ptw' },
-    { label: 'Checklists', view: 'checklists', resource: 'checklists' },
-    { label: 'Plans', view: 'plans', resource: 'plans' },
-    { label: 'RAMS', view: 'rams', resource: 'rams' },
-    { label: 'Signage', view: 'signage', resource: 'signage' },
-    { label: 'Toolbox Talks', view: 'tbt', resource: 'tbt' },
-    { label: 'Training', view: 'training', resource: 'training' },
-    { label: 'Housekeeping', view: 'housekeeping', resource: 'housekeeping' },
-    { label: 'People', view: 'people', resource: 'people' },
-    { label: 'Organizations', view: 'organizations', resource: 'organizations' },
-    { label: 'Settings', view: 'settings', resource: 'settings' },
+    { label: 'Dashboard', view: 'dashboard' },
+    { label: 'AI Insights', view: 'ai-insights' },
+    { label: 'HSE Statistics', view: 'hse-statistics' },
+    { label: 'Site Map', view: 'site-map' },
+    { label: 'My Certificate', view: 'certification' },
+    { label: 'Reporting', view: 'reports' },
+    { label: 'Action Tracker', view: 'actions' },
+    { label: 'Inspections', view: 'inspections' },
+    { label: 'Permit to Work', view: 'ptw' },
+    { label: 'Checklists', view: 'checklists' },
+    { label: 'Plans', view: 'plans' },
+    { label: 'RAMS', view: 'rams' },
+    { label: 'Signage', view: 'signage' },
+    { label: 'Toolbox Talks', view: 'tbt' },
+    { label: 'Training', view: 'training' },
+    { label: 'People', view: 'people' },
+    { label: 'Roles & Permissions', view: 'roles' }, // <--- ADDED THIS
+    { label: 'Organizations', view: 'organizations' },
+    { label: 'Settings', view: 'settings' },
   ];
 
   return (
@@ -142,24 +142,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
-        {menuItems.map((item) => (
-          // Only render if user has 'read' permission for the resource
-          can('read', item.resource as Resource) && (
-            <NavItem
-              key={item.view}
-              label={item.label}
-              view={item.view}
-              isOpen={isOpen}
-              currentView={currentView}
-              setCurrentView={setCurrentView}
-            />
-          )
-        ))}
+        {menuItems.map((item) => {
+            // Only show menu items if user has permission
+            // For 'roles', only ADMIN or ORG_ADMIN should see it
+            if (item.view === 'roles' && !can('read', 'roles')) return null;
+            
+            return (
+              <NavItem
+                key={item.view}
+                label={item.label}
+                view={item.view}
+                isOpen={isOpen}
+                currentView={currentView}
+                setCurrentView={setCurrentView}
+              />
+            );
+        })}
       </nav>
 
       {/* Notification & Toggle */}
       <div className="p-2 border-t border-slate-800/60 bg-slate-950/70 flex flex-col gap-2">
         
+        {/* Notification Button */}
         <button
           onClick={() => setShowNotifications(true)}
           className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors relative"
@@ -215,7 +219,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <p className="text-sm font-medium text-slate-100 truncate">
                 {currentUser?.email}
               </p>
-              <p className="text-xs text-slate-500 truncate">{activeUser?.role || 'User'}</p>
+              <p className="text-xs text-slate-500 truncate">
+                {activeUser?.role?.replace('_', ' ') || 'User'}
+              </p>
             </div>
           )}
         </div>
@@ -228,6 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </div>
 
+    {/* Notification Panel Overlay */}
     {showNotifications && (
         <NotificationsPanel onClose={() => setShowNotifications(false)} />
     )}
