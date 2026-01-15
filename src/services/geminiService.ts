@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use 'gemini-1.5-flash' (Newer, Faster, Stable) ---
+// Use 'gemini-1.5-flash'
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
