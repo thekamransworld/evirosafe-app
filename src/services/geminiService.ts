@@ -4,8 +4,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use 'gemini-pro' (Standard Model) ---
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+// --- FIX: Use 'gemini-1.5-flash' (Newer, Faster, Stable) ---
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
@@ -152,11 +152,26 @@ export const translateText = async (text: string, lang: string) => {
 };
 
 export const generateAiRiskForecast = async () => {
-    return {
+    if (!apiKey) return {
         risk_level: 'Medium',
-        summary: 'AI Analysis: Moderate risk due to high activity levels and potential heat stress.',
-        recommendations: ['Enforce hydration breaks', 'Check lifting gear certification', 'Monitor wind speeds']
+        summary: 'AI Analysis: Moderate risk due to high activity levels.',
+        recommendations: ['Enforce hydration breaks', 'Check lifting gear certification']
     };
+
+    try {
+        const result = await model.generateContent(`
+            Generate a predictive HSE risk forecast for a construction site.
+            Return JSON: { "risk_level": "High/Medium/Low", "summary": "string", "recommendations": ["string"] }
+        `);
+        const response = await result.response;
+        return JSON.parse(cleanJson(response.text()));
+    } catch (e) {
+        return {
+            risk_level: 'Medium',
+            summary: 'AI Analysis Unavailable.',
+            recommendations: ['Follow standard procedures']
+        };
+    }
 };
 
 export const getPredictiveInsights = generateAiRiskForecast;
