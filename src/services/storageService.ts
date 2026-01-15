@@ -1,24 +1,16 @@
-import { storage } from '../firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+// src/services/storageService.ts
 
 export const uploadFileToCloud = async (file: File, folder: string = 'general'): Promise<string> => {
-  try {
-    // 1. Create a reference
-    const filename = `${folder}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-    const storageRef = ref(storage, filename);
-    
-    // 2. Try to upload (This will fail if no bucket exists)
-    console.log(`Attempting upload for ${file.name}...`);
-    const snapshot = await uploadBytes(storageRef, file);
-    
-    // 3. Get URL if successful
-    return await getDownloadURL(snapshot.ref);
+  // This log proves the new code is running
+  console.log(`[Mock Storage Active] Simulating upload for ${file.name}...`);
 
-  } catch (error: any) {
-    // 4. CATCH THE ERROR so the app doesn't crash
-    console.warn("Storage Upload Failed (likely no bucket or CORS). Using placeholder.");
-    
-    // Return a fake image URL so the report can still be submitted
-    return `https://placehold.co/600x400/FF0000/FFFFFF?text=Storage+Not+Configured`;
-  }
+  // 1. Simulate a short network delay
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  // 2. Generate a fake URL so the app doesn't crash
+  const isVideo = file.type.startsWith('video');
+  const encodedName = encodeURIComponent(file.name);
+  const mockUrl = `https://placehold.co/600x400/2563eb/ffffff?text=${isVideo ? 'Video' : 'Image'}:+${encodedName}`;
+  
+  return mockUrl;
 };
