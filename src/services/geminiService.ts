@@ -1,7 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Gemini
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+// --- 🚨 HARDCODED KEY FIX ---
+// Paste your NEW key inside the quotes below.
+const HARDCODED_KEY = "AIzaSyDTcyGBUP6-c9exU2M-I10z1CgIMikYwXE"; 
+
+const apiKey = HARDCODED_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
 // --- HELPER: CLEAN JSON ---
@@ -11,29 +14,23 @@ const cleanJson = (text: string) => {
 
 // --- ROBUST GENERATION FUNCTION ---
 const generateContentSafe = async (prompt: string) => {
-  if (!apiKey) throw new Error("AI not configured. Please add VITE_GEMINI_API_KEY.");
-
-  // Updated Model List: Prioritizing the newest stable models
-  const modelsToTry = [
-    "gemini-1.5-flash",      // Current standard for speed/cost
-    "gemini-1.5-pro",        // Higher intelligence
-    "gemini-1.0-pro",        // Legacy stable
-    "gemini-pro"             // Oldest legacy
-  ];
+  // We use 'gemini-1.5-flash' as it is the standard free tier model
+  const modelsToTry = ["gemini-1.5-flash", "gemini-pro"];
 
   for (const modelName of modelsToTry) {
     try {
-      console.log(`[AI] Attempting to generate with model: ${modelName}...`);
+      console.log(`[AI] Using key: ${apiKey.substring(0, 8)}...`);
+      console.log(`[AI] Trying model: ${modelName}...`);
+      
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
       const response = await result.response;
       return response.text();
     } catch (error: any) {
       console.warn(`[AI] Model ${modelName} failed:`, error.message);
-      // Continue to next model
     }
   }
-  throw new Error("All AI models failed. Please check your API Key permissions in Google AI Studio.");
+  throw new Error("AI Failed. Please check the API Key in geminiService.ts");
 };
 
 // --- 1. GENERIC RESPONSE ---
@@ -41,7 +38,6 @@ export const generateResponse = async (prompt: string) => {
   try {
     return await generateContentSafe(prompt);
   } catch (error: any) {
-    console.error("AI Fatal Error:", error);
     return `Error: ${error.message}`;
   }
 };
@@ -53,14 +49,18 @@ export const generateSafetyReport = async (prompt: string) => {
       Act as a Senior HSE Manager. Analyze this incident description: "${prompt}".
       Return a JSON object with these fields:
       - description: A professional summary of the event.
-      - rootCause: The likely root cause (Human Error, Equipment Failure, Process, Environment).
+      - rootCause: The likely root cause.
       - riskLevel: High, Medium, or Low.
-      - recommendation: 3 bullet points of immediate corrective actions.
+      - recommendation: 3 bullet points of immediate actions.
     `);
     return JSON.parse(cleanJson(text));
   } catch (error) {
-    console.error("AI Parsing Error:", error);
-    return mockSafetyReport(prompt);
+    return {
+        description: prompt,
+        rootCause: "Analysis Failed",
+        riskLevel: "Medium",
+        recommendation: "Review manually."
+    };
   }
 };
 
@@ -68,18 +68,18 @@ export const generateSafetyReport = async (prompt: string) => {
 export const generateRamsContent = async (activity: string) => {
   try {
     const text = await generateContentSafe(`
-      Create a Method Statement for construction activity: "${activity}".
-      Return strictly valid JSON with this structure:
+      Create a Method Statement for: "${activity}".
+      Return JSON:
       {
-        "overview": "Brief summary of the work",
-        "competence": "Required training/certs",
+        "overview": "Summary of work",
+        "competence": "Required training",
         "emergency_arrangements": "Emergency procedures",
         "sequence_of_operations": [
           {
             "step_no": 1,
             "description": "Step description",
-            "hazards": [{"id": "h1", "description": "Hazard name"}],
-            "controls": [{"id": "c1", "description": "Control measure", "hierarchy": "engineering"}],
+            "hazards": [{"id": "h1", "description": "Hazard"}],
+            "controls": [{"id": "c1", "description": "Control", "hierarchy": "engineering"}],
             "risk_before": {"severity": 4, "likelihood": 4},
             "risk_after": {"severity": 2, "likelihood": 2}
           }
@@ -88,7 +88,7 @@ export const generateRamsContent = async (activity: string) => {
     `);
     return JSON.parse(cleanJson(text));
   } catch (error) {
-    return mockRams(activity);
+    throw new Error("RAMS Generation Failed");
   }
 };
 
@@ -107,7 +107,7 @@ export const generateTbtContent = async (topic: string) => {
     `);
     return JSON.parse(cleanJson(text));
   } catch (error) {
-    return mockTbt(topic);
+    throw new Error("TBT Generation Failed");
   }
 };
 
@@ -124,7 +124,7 @@ export const generateCourseContent = async (title: string) => {
     `);
     return JSON.parse(cleanJson(text));
   } catch (error) {
-    return mockCourse(title);
+    throw new Error("Course Generation Failed");
   }
 };
 
@@ -133,12 +133,11 @@ export const generateCertificationInsight = async (profile: any) => {
   try {
     const text = await generateContentSafe(`
       Analyze this HSE profile: ${JSON.stringify(profile)}.
-      Suggest 1 recommendation to reach the next level and 2 missing requirements.
       Return JSON: { "nextLevelRecommendation": "string", "missingItems": ["string"] }
     `);
     return JSON.parse(cleanJson(text));
   } catch (error) {
-    return mockCertInsight();
+    return { nextLevelRecommendation: "Continue training.", missingItems: [] };
   }
 };
 
@@ -157,7 +156,7 @@ export const translateText = async (text: string, lang: string) => {
 export const generateAiRiskForecast = async () => {
     try {
         const text = await generateContentSafe(`
-            Generate a predictive HSE risk forecast for a construction site.
+            Generate a predictive HSE risk forecast.
             Return JSON: { "risk_level": "High/Medium/Low", "summary": "string", "recommendations": ["string"] }
         `);
         return JSON.parse(cleanJson(text));
@@ -171,41 +170,3 @@ export const generateAiRiskForecast = async () => {
 };
 
 export const getPredictiveInsights = generateAiRiskForecast;
-
-// --- FALLBACK MOCKS ---
-const mockSafetyReport = (prompt: string) => ({
-  description: `Report: ${prompt}`,
-  rootCause: "Pending Investigation",
-  riskLevel: "Medium",
-  recommendation: "Review safety procedures and conduct TBT."
-});
-
-const mockRams = (activity: string) => ({
-  overview: `Method Statement for ${activity}`,
-  competence: "Standard HSE Training",
-  emergency_arrangements: "Muster Point A",
-  sequence_of_operations: [{
-    step_no: 1, description: "Prepare work area",
-    hazards: [{ id: "h1", description: "General Hazard" }],
-    controls: [{ id: "c1", description: "Standard Controls", hierarchy: "administrative" }],
-    risk_before: { severity: 3, likelihood: 3 },
-    risk_after: { severity: 2, likelihood: 1 }
-  }]
-});
-
-const mockTbt = (topic: string) => ({
-  summary: `Discussion on ${topic}`,
-  hazards: ["General Hazard"],
-  controls: ["Follow SOP"],
-  questions: ["Do you understand the risks?"]
-});
-
-const mockCourse = (title: string) => ({
-  syllabus: `# ${title}\n\nStandard syllabus content.`,
-  learning_objectives: ["Understand basics", "Safety compliance"]
-});
-
-const mockCertInsight = () => ({
-  nextLevelRecommendation: "Continue logging safe hours.",
-  missingItems: ["Advanced Training"]
-});
