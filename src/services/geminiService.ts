@@ -4,32 +4,58 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// Use 'gemini-1.5-flash'
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
+// --- ROBUST GENERATION FUNCTION ---
+// Tries multiple models in case one is deprecated or unavailable
+const generateContentSafe = async (prompt: string) => {
+  if (!apiKey) throw new Error("AI not configured. Please add VITE_GEMINI_API_KEY.");
+
+  // List of models to try in order of preference (Fastest -> Most Stable)
+  const modelsToTry = [
+    "gemini-1.5-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash-001",
+    "gemini-1.0-pro", 
+    "gemini-pro"
+  ];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (error: any) {
+      console.warn(`Model ${modelName} failed:`, error.message);
+      
+      // If it's a 404 (Not Found), try the next model
+      if (error.message.includes("404") || error.message.includes("not found")) {
+        continue;
+      }
+      // If it's a 403 (Permission) or 400 (Bad Request), stop and throw
+      throw error;
+    }
+  }
+  throw new Error("All AI models failed. Please enable 'Generative Language API' in Google Cloud Console.");
+};
+
 // --- 1. GENERIC RESPONSE ---
 export const generateResponse = async (prompt: string) => {
-  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY.";
   try {
-    const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (error) {
+    return await generateContentSafe(prompt);
+  } catch (error: any) {
     console.error("AI Error:", error);
-    return "Error generating response. Please check your API Key.";
+    return `Error: ${error.message}`;
   }
 };
 
 // --- 2. INCIDENT ANALYSIS ---
 export const generateSafetyReport = async (prompt: string) => {
-  if (!apiKey) return mockSafetyReport(prompt);
-
   try {
-    const result = await model.generateContent(`
+    const text = await generateContentSafe(`
       Act as a Senior HSE Manager. Analyze this incident description: "${prompt}".
       Return a JSON object with these fields:
       - description: A professional summary of the event.
@@ -37,8 +63,7 @@ export const generateSafetyReport = async (prompt: string) => {
       - riskLevel: High, Medium, or Low.
       - recommendation: 3 bullet points of immediate corrective actions.
     `);
-    const response = await result.response;
-    return JSON.parse(cleanJson(response.text()));
+    return JSON.parse(cleanJson(text));
   } catch (error) {
     console.error("AI Error:", error);
     return mockSafetyReport(prompt);
@@ -47,10 +72,8 @@ export const generateSafetyReport = async (prompt: string) => {
 
 // --- 3. RAMS GENERATION ---
 export const generateRamsContent = async (activity: string) => {
-  if (!apiKey) return mockRams(activity);
-
   try {
-    const result = await model.generateContent(`
+    const text = await generateContentSafe(`
       Create a Method Statement for construction activity: "${activity}".
       Return strictly valid JSON with this structure:
       {
@@ -69,8 +92,7 @@ export const generateRamsContent = async (activity: string) => {
         ]
       }
     `);
-    const response = await result.response;
-    return JSON.parse(cleanJson(response.text()));
+    return JSON.parse(cleanJson(text));
   } catch (error) {
     return mockRams(activity);
   }
@@ -78,10 +100,8 @@ export const generateRamsContent = async (activity: string) => {
 
 // --- 4. TOOLBOX TALK GENERATION ---
 export const generateTbtContent = async (topic: string) => {
-  if (!apiKey) return mockTbt(topic);
-
   try {
-    const result = await model.generateContent(`
+    const text = await generateContentSafe(`
       Create a Toolbox Talk for: "${topic}".
       Return JSON:
       {
@@ -91,8 +111,7 @@ export const generateTbtContent = async (topic: string) => {
         "questions": ["Question 1", "Question 2"]
       }
     `);
-    const response = await result.response;
-    return JSON.parse(cleanJson(response.text()));
+    return JSON.parse(cleanJson(text));
   } catch (error) {
     return mockTbt(topic);
   }
@@ -100,10 +119,8 @@ export const generateTbtContent = async (topic: string) => {
 
 // --- 5. COURSE GENERATION ---
 export const generateCourseContent = async (title: string) => {
-  if (!apiKey) return mockCourse(title);
-
   try {
-    const result = await model.generateContent(`
+    const text = await generateContentSafe(`
       Create a training syllabus for: "${title}".
       Return JSON:
       {
@@ -111,8 +128,7 @@ export const generateCourseContent = async (title: string) => {
         "learning_objectives": ["Obj 1", "Obj 2", "Obj 3"]
       }
     `);
-    const response = await result.response;
-    return JSON.parse(cleanJson(response.text()));
+    return JSON.parse(cleanJson(text));
   } catch (error) {
     return mockCourse(title);
   }
@@ -120,51 +136,37 @@ export const generateCourseContent = async (title: string) => {
 
 // --- 6. CERTIFICATION INSIGHT ---
 export const generateCertificationInsight = async (profile: any) => {
-  if (!apiKey) return mockCertInsight();
-
   try {
-    const result = await model.generateContent(`
+    const text = await generateContentSafe(`
       Analyze this HSE profile: ${JSON.stringify(profile)}.
       Suggest 1 recommendation to reach the next level and 2 missing requirements.
       Return JSON: { "nextLevelRecommendation": "string", "missingItems": ["string"] }
     `);
-    const response = await result.response;
-    return JSON.parse(cleanJson(response.text()));
+    return JSON.parse(cleanJson(text));
   } catch (error) {
     return mockCertInsight();
   }
 };
 
 export const generateReportSummary = async (json: string) => {
-    if (!apiKey) return "AI Summary unavailable (No API Key).";
     try {
-        const result = await model.generateContent(`Summarize this incident report in 2 sentences: ${json}`);
-        return result.response.text();
+        return await generateContentSafe(`Summarize this incident report in 2 sentences: ${json}`);
     } catch (e) { return "Error generating summary."; }
 };
 
 export const translateText = async (text: string, lang: string) => {
-    if (!apiKey) return `[Mock Translate]: ${text}`;
     try {
-        const result = await model.generateContent(`Translate this to ${lang}: "${text}"`);
-        return result.response.text();
+        return await generateContentSafe(`Translate this to ${lang}: "${text}"`);
     } catch (e) { return text; }
 };
 
 export const generateAiRiskForecast = async () => {
-    if (!apiKey) return {
-        risk_level: 'Medium',
-        summary: 'AI Analysis: Moderate risk due to high activity levels.',
-        recommendations: ['Enforce hydration breaks', 'Check lifting gear certification']
-    };
-
     try {
-        const result = await model.generateContent(`
+        const text = await generateContentSafe(`
             Generate a predictive HSE risk forecast for a construction site.
             Return JSON: { "risk_level": "High/Medium/Low", "summary": "string", "recommendations": ["string"] }
         `);
-        const response = await result.response;
-        return JSON.parse(cleanJson(response.text()));
+        return JSON.parse(cleanJson(text));
     } catch (e) {
         return {
             risk_level: 'Medium',
