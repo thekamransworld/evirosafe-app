@@ -13,8 +13,13 @@ const cleanJson = (text: string) => {
 const generateContentSafe = async (prompt: string) => {
   if (!apiKey) throw new Error("AI not configured. Please add VITE_GEMINI_API_KEY.");
 
-  // We try 'gemini-pro' first as it is the most stable for free keys
-  const modelsToTry = ["gemini-pro", "gemini-1.5-flash", "gemini-1.0-pro"];
+  // Updated Model List: Prioritizing the newest stable models
+  const modelsToTry = [
+    "gemini-1.5-flash",      // Current standard for speed/cost
+    "gemini-1.5-pro",        // Higher intelligence
+    "gemini-1.0-pro",        // Legacy stable
+    "gemini-pro"             // Oldest legacy
+  ];
 
   for (const modelName of modelsToTry) {
     try {
@@ -28,7 +33,7 @@ const generateContentSafe = async (prompt: string) => {
       // Continue to next model
     }
   }
-  throw new Error("All AI models failed. Please check your API Key and Google Cloud settings.");
+  throw new Error("All AI models failed. Please check your API Key permissions in Google AI Studio.");
 };
 
 // --- 1. GENERIC RESPONSE ---
