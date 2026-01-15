@@ -10,36 +10,25 @@ const cleanJson = (text: string) => {
 };
 
 // --- ROBUST GENERATION FUNCTION ---
-// Tries multiple models in case one is deprecated or unavailable
 const generateContentSafe = async (prompt: string) => {
   if (!apiKey) throw new Error("AI not configured. Please add VITE_GEMINI_API_KEY.");
 
-  // List of models to try in order of preference (Fastest -> Most Stable)
-  const modelsToTry = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash-001",
-    "gemini-1.0-pro", 
-    "gemini-pro"
-  ];
+  // We try 'gemini-pro' first as it is the most stable for free keys
+  const modelsToTry = ["gemini-pro", "gemini-1.5-flash", "gemini-1.0-pro"];
 
   for (const modelName of modelsToTry) {
     try {
+      console.log(`[AI] Attempting to generate with model: ${modelName}...`);
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
-      return result.response.text();
+      const response = await result.response;
+      return response.text();
     } catch (error: any) {
-      console.warn(`Model ${modelName} failed:`, error.message);
-      
-      // If it's a 404 (Not Found), try the next model
-      if (error.message.includes("404") || error.message.includes("not found")) {
-        continue;
-      }
-      // If it's a 403 (Permission) or 400 (Bad Request), stop and throw
-      throw error;
+      console.warn(`[AI] Model ${modelName} failed:`, error.message);
+      // Continue to next model
     }
   }
-  throw new Error("All AI models failed. Please enable 'Generative Language API' in Google Cloud Console.");
+  throw new Error("All AI models failed. Please check your API Key and Google Cloud settings.");
 };
 
 // --- 1. GENERIC RESPONSE ---
@@ -47,7 +36,7 @@ export const generateResponse = async (prompt: string) => {
   try {
     return await generateContentSafe(prompt);
   } catch (error: any) {
-    console.error("AI Error:", error);
+    console.error("AI Fatal Error:", error);
     return `Error: ${error.message}`;
   }
 };
@@ -65,7 +54,7 @@ export const generateSafetyReport = async (prompt: string) => {
     `);
     return JSON.parse(cleanJson(text));
   } catch (error) {
-    console.error("AI Error:", error);
+    console.error("AI Parsing Error:", error);
     return mockSafetyReport(prompt);
   }
 };
