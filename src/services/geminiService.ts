@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // --- 🚨 HARDCODED KEY FIX ---
 // Paste your NEW key inside the quotes below.
-const HARDCODED_KEY = "AIzaSyDFF_f_3K_cXn7FQPJ2Jvcb5aVNwlOHigw"; 
+const HARDCODED_KEY = "AIzaSyCGdDqNex9liSCFUe3V0eqfrdMnbTxAvwk"; 
 
 const apiKey = HARDCODED_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
