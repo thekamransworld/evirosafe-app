@@ -305,7 +305,7 @@ export interface InspectionFinding {
     root_causes: string[];
     status: 'open' | 'in_progress' | 'closed';
     created_at: string;
-    updated_at?: string; // Added to fix build error
+    updated_at?: string;
     created_by: string;
     verification_data?: {
         verified_by: string;
@@ -478,7 +478,7 @@ export interface TrainingRecord { id: string; org_id: string; user_id: string; c
 
 // --- PTW ---
 export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work' | 'Mechanical Work' | 'Chemical Handling';
-export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
+export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'APPROVED' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
 export type PtwCategory = 'standard' | 'high_risk' | 'operational' | 'emergency' | 'urgent';
 export type PtwWorkflowStage = PtwStatus;
 
