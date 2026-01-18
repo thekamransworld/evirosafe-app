@@ -40,10 +40,10 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
         risk_score: risk.score,
         risk_level: risk.level as any
       },
-      created_at: new Date().toISOString(), // FIX: Use ISO string
-      updated_at: new Date().toISOString(), // FIX: Use ISO string
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       created_by: 'current_user',
-      evidence_ids: [],
+      // evidence_ids: [], <--- REMOVED THIS LINE
       corrective_action_required: risk.score > 5,
       immediate_controls: [],
       root_causes: [],
