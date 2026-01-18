@@ -67,7 +67,7 @@ export interface Project {
 export type Resource = 
   | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights';
 
-export type View = string; // Relaxed type for routing
+export type View = string;
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
 export type Scope = 'org' | 'project' | 'own';
 
@@ -149,7 +149,7 @@ export interface RiskMatrix {
 // 3. INCIDENT REPORTING
 // ==========================================
 
-export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed';
+export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed' | 'under_investigation' | 'capa_required' | 'capa_in_progress' | 'pending_closure' | 'archived' | 'active';
 export type ReportClassification = 'To Be Determined' | 'Minor' | 'Moderate' | 'Major' | 'Fatal';
 export type ImpactedParty = 'Employee' | 'Contractor' | 'Visitor' | 'Public' | 'Environment';
 export type RootCause = 'Human Error' | 'Equipment Failure' | 'Process Deficiency' | 'Environment' | 'Other';
@@ -181,6 +181,32 @@ export interface ReportDistribution {
 export interface ReportAcknowledgement {
   user_id: string;
   acknowledged_at: string;
+}
+
+export interface CostImpact {
+  directCosts: { medical: number; repair: number; compensation: number; fines: number; };
+  indirectCosts: { downtime: number; lostProductivity: number; training: number; administrative: number; };
+  totalEstimated: number;
+  insuranceCoverage: number;
+}
+
+export interface RootCauseAnalysis {
+  finding_id?: string;
+  why1: string;
+  why2: string;
+  why3: string;
+  why4: string;
+  why5: string;
+  systemic_issues: string[];
+  analyzed_by?: string;
+  analyzed_at?: string;
+}
+
+export interface Witness {
+    name: string;
+    contact: string;
+    statement: string;
+    signature?: string;
 }
 
 // Specific Report Details
@@ -224,6 +250,15 @@ export interface Report {
     identification?: { was_fire: boolean; was_injury: boolean; was_environment: boolean; };
     classification_codes?: string[];
     created_at?: string;
+    
+    // New Fields for Enhanced Reporting
+    costs?: CostImpact;
+    root_cause_analysis?: RootCauseAnalysis;
+    witnesses?: Witness[];
+    lessons_learned?: string;
+    prevention_strategy?: string;
+    compliance?: { oshaReportable?: boolean; rinaReportable?: boolean; insuranceNotified?: boolean; };
+    investigation_level?: 'immediate' | 'formal' | 'quick' | 'none';
 }
 
 // ==========================================
@@ -248,7 +283,8 @@ export type ObservationCategory =
   | 'work_environment'
   | 'documentation'
   | 'emergency_preparedness'
-  | 'management_systems';
+  | 'management_systems'
+  | 'people' | 'equipment' | 'materials' | 'environment' | 'emergency'; // Legacy support
 
 export type ObservationType = 
   | 'unsafe_act'
@@ -276,6 +312,7 @@ export interface ClosingMeetingData {
   next_inspection_date?: string;
   supervisor_acknowledged: boolean;
   recommendations: string;
+  attendees?: string[];
 }
 
 export interface ImmediateControl {
@@ -308,6 +345,7 @@ export interface InspectionFinding {
       notes: string;
       evidence_urls: string[];
     };
+    root_cause_analysis?: RootCauseAnalysis;
 }
 
 export interface Inspection {
@@ -347,6 +385,16 @@ export interface ChecklistItem {
   riskLevel?: 'Low' | 'Medium' | 'High' | 'Critical';
   requiredEvidence?: string[]; 
   referenceStandards?: string[];
+  response?: {
+      value: 'pass' | 'fail' | 'na';
+      comments?: string;
+      evidence_ids?: string[];
+      timestamp?: Date;
+      responder?: string;
+  };
+  category?: string;
+  requirement?: string;
+  criteria?: string;
 }
 
 export interface ChecklistTemplate { 
@@ -419,7 +467,7 @@ export interface Rams {
 // 7. PERMIT TO WORK (PTW)
 // ==========================================
 
-export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work';
+export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work' | 'Mechanical Work' | 'Chemical Handling';
 export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
 export type PtwCategory = 'standard' | 'high_risk' | 'operational' | 'emergency' | 'urgent';
 export type PtwWorkflowStage = PtwStatus;

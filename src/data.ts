@@ -1,8 +1,4 @@
-import type { 
-  Organization, User, Project, Report, Inspection, ChecklistTemplate, 
-  ChecklistRun, Plan, Rams, Sign, TbtSession, TrainingCourse, 
-  TrainingRecord, TrainingSession, Notification, Ptw, CertificationProfile 
-} from './types';
+import type { Organization, User, Project, Report, Inspection, ChecklistTemplate, ChecklistRun, Plan, Rams, Sign, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, Notification, Ptw, CertificationProfile } from './types';
 import { logoSrc } from './config';
 
 // --- ORGANIZATIONS ---
@@ -181,81 +177,9 @@ export const rams: Rams[] = [
     }
 ];
 
-// --- INSPECTIONS (UPDATED FOR PHASED WORKFLOW) ---
-export const inspections: Inspection[] = [
-    {
-        id: 'insp_1',
-        org_id: 'org_1',
-        project_id: 'proj_1',
-        title: 'Weekly Site Safety Audit',
-        type: 'Safety',
-        status: 'Closed',
-        current_phase: 'closed', // NEW FIELD
-        person_responsible_id: 'user_alex',
-        checklist_template_id: 'cl_1',
-        schedule_at: '2024-03-10T09:00',
-        team_member_ids: ['user_kamran'],
-        observers: [],
-        findings: [
-            {
-                id: 'f1',
-                description: 'Scaffolding tag missing on Tower A',
-                risk_level: 'High',
-                category: 'Unsafe Condition',
-                observation_category: 'equipment', // NEW FIELD
-                observation_type: 'unsafe_condition', // NEW FIELD
-                immediate_actions: 'Tag replaced immediately',
-                evidence_urls: [],
-                corrective_action_required: true,
-                status: 'closed'
-            }
-        ],
-        opening_meeting: {
-            conducted_at: '2024-03-10T09:00',
-            attendees: ['user_kamran', 'user_alex'],
-            supervisor_present: 'John Doe',
-            hazards_discussed: 'Working at height, dropped objects',
-            permits_verified: true,
-            emergency_procedures_confirmed: true
-        },
-        closing_meeting: {
-            conducted_at: '2024-03-10T11:00',
-            attendees: ['user_kamran', 'user_alex'],
-            key_findings_summary: 'Generally good compliance, one scaffold tag missing.',
-            immediate_actions_agreed: 'Tag replaced.',
-            supervisor_acknowledged: true,
-            follow_up_required: false
-        },
-        audit_trail: []
-    },
-    {
-        id: 'insp_2',
-        org_id: 'org_1',
-        project_id: 'proj_2',
-        title: 'Electrical Equipment Check',
-        type: 'Equipment',
-        status: 'In Progress',
-        current_phase: 'execution', // NEW FIELD
-        person_responsible_id: 'user_kamran',
-        checklist_template_id: 'cl_11',
-        schedule_at: '2024-03-15T14:00',
-        team_member_ids: [],
-        observers: [],
-        findings: [],
-        opening_meeting: {
-            conducted_at: '2024-03-15T14:00',
-            attendees: ['user_kamran'],
-            supervisor_present: 'Mike Smith',
-            hazards_discussed: 'Live electricity, LOTO',
-            permits_verified: true,
-            emergency_procedures_confirmed: true
-        },
-        audit_trail: []
-    }
-];
-
 // --- EMPTY PLACEHOLDERS (To prevent crashes) ---
 export const reports: Report[] = [];
+export const inspections: Inspection[] = [];
 export const checklistRuns: ChecklistRun[] = [];
 export const signs: Sign[] = [];
 export const tbtSessions: TbtSession[] = [];
