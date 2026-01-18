@@ -8,28 +8,22 @@ import {
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
   MapPin, User as UserIcon, CheckCircle,
-  Shield
+  Shield, ArrowRight
 } from 'lucide-react';
 
 // === GEN 4 STYLES ===
 const glassStyles = {
-  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
+  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative cursor-pointer",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
-  filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
 };
 
 const getStatusConfig = (status: PtwDoc['status']) => {
-    switch (status) {
-      case 'ACTIVE': return { label: 'ACTIVE', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle };
-      case 'APPROVAL': return { label: 'PENDING APPROVAL', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Clock };
-      case 'PRE_SCREEN':
-      case 'SITE_INSPECTION':
-      case 'SUBMITTED': return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
-      case 'HOLD': return { label: 'ON HOLD', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
-      case 'COMPLETED':
-      case 'CLOSED': return { label: 'CLOSED', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: CheckCircle };
-      default: return { label: 'DRAFT', color: 'text-slate-500', bg: 'bg-slate-500/5', border: 'border-slate-500/10', icon: FileText };
-    }
+    if (['ACTIVE', 'SITE_HANDOVER'].includes(status)) return { label: status, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle };
+    if (['APPROVAL', 'PENDING_APPROVAL', 'ISSUER_SIGNED'].includes(status)) return { label: 'APPROVAL', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Clock };
+    if (['PRE_SCREEN', 'SITE_INSPECTION', 'SUBMITTED', 'ISSUER_REVIEW', 'IV_REVIEW'].includes(status)) return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
+    if (['HOLD', 'SUSPENDED'].includes(status)) return { label: 'ON HOLD', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
+    if (['COMPLETED', 'CLOSED', 'ARCHIVED'].includes(status)) return { label: 'CLOSED', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: CheckCircle };
+    return { label: 'DRAFT', color: 'text-slate-500', bg: 'bg-slate-500/5', border: 'border-slate-500/10', icon: FileText };
 };
 
 interface PtwProps {
@@ -41,8 +35,8 @@ interface PtwProps {
   onSelectPtw: (ptw: PtwDoc) => void;
 }
 
-const StatCard: React.FC<{ label: string, value: number, color: string, icon: React.ReactNode }> = ({ label, value, color, icon }) => (
-    <div className={`${glassStyles.card} p-4 flex items-center justify-between`}>
+const StatCard: React.FC<{ label: string; value: number; color: string; icon: React.ReactNode }> = ({ label, value, color, icon }) => (
+    <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between">
         <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
             <p className={`text-2xl font-black ${color} mt-1`}>{value}</p>
@@ -65,7 +59,7 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
             p.payload.permit_no?.toLowerCase().includes(search.toLowerCase());
         
         if (filter === 'All') return matchesSearch;
-        if (filter === 'Active') return matchesSearch && p.status === 'ACTIVE';
+        if (filter === 'Active') return matchesSearch && (p.status === 'ACTIVE' || p.status === 'SITE_HANDOVER');
         if (filter === 'Draft') return matchesSearch && p.status === 'DRAFT';
         if (filter === 'Closed') return matchesSearch && (p.status === 'CLOSED' || p.status === 'COMPLETED');
         return matchesSearch;
@@ -75,8 +69,8 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
   const stats = useMemo(() => ({
       total: ptws.length,
       active: ptws.filter(p => p.status === 'ACTIVE').length,
-      pending: ptws.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
-      highRisk: ptws.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
+      pending: ptws.filter(p => ['APPROVAL', 'SUBMITTED', 'ISSUER_REVIEW'].includes(p.status)).length,
+      highRisk: ptws.filter(p => ['Hot Work', 'Confined Space Entry', 'Lifting'].includes(p.type)).length
   }), [ptws]);
 
   const getProjectName = (id: string) => projects.find(p => p.id === id)?.name || 'Unknown Project';
@@ -162,7 +156,7 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
                                 </span>
                                 <h3 className="font-bold text-slate-100 text-lg line-clamp-1">{ptw.title}</h3>
                             </div>
-                            <div className={`${glassStyles.badge} ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
+                            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1 ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
                                 <StatusIcon className="w-3 h-3" />
                                 {statusConfig.label}
                             </div>
