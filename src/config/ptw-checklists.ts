@@ -1,4 +1,4 @@
-import type { PtwType } from '../types/ptw';
+import type { PtwType } from '../types';
 
 export const ptwChecklistData: Record<PtwType, { id: string; text: string }[]> = {
   'Utility Work': [

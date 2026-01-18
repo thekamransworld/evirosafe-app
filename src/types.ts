@@ -1,3 +1,9 @@
+// src/types.ts
+
+// ==========================================
+// 1. CORE SYSTEM TYPES
+// ==========================================
+
 export interface Organization {
   id: string;
   name: string;

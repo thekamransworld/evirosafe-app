@@ -1,6 +1,4 @@
-// src/config/ptw-types.ts
-
-import type { PtwType } from '../types/ptw';
+import type { PtwType } from '../types';
 
 export const ptwTypeDetails: Record<PtwType, {
   icon: string;
@@ -145,32 +143,4 @@ export const ptwTypeDetails: Record<PtwType, {
     requires_loto: true,
     global_standards: ['ISO 45001', 'OSHA 1910.1200', 'GHS Standards']
   }
-};
-
-// --- Default Values (Moved here from ptw-checklists.ts) ---
-
-export const emptySignoff = {
-  name: '',
-  designation: '',
-  email: '',
-  mobile: '',
-  signature: '',
-  remarks: '',
-  signed_at: ''
-};
-
-export const emptySignature = { signature: '' };
-
-export const emptyExtension = { 
-  is_requested: false, 
-  reason: '', 
-  days: { from: '', to: '' }, 
-  hours: { from: '', to: '' } 
-};
-
-export const emptyClosure = {
-  note: '',
-  permit_requester: emptySignoff,
-  client_proponent: emptySignoff,
-  client_hs: emptySignoff
 };
