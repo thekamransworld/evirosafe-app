@@ -35,7 +35,8 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
       if (field === 'text' || field === 'description') {
           newItems[index] = { ...newItems[index], [field]: { en: value } };
       } else {
-          newItems[index] = { ...newItems[index], [field]: value };
+          // FIX: Cast string to specific risk level type
+          newItems[index] = { ...newItems[index], [field]: value as 'Low' | 'Medium' | 'High' | 'Critical' };
       }
       return newItems;
     });
@@ -53,13 +54,12 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
       title: { en: title },
       items: validItems,
       popularity: 0,
-      estimatedTime: validItems.length * 2, // approx 2 min per item
+      estimatedTime: validItems.length * 2,
       aiGenerated: false
     };
 
     onSubmit(newTemplate);
     onClose();
-    // Reset form
     setTitle('');
     setCategory('General');
     setItems([{ id: '1', text: { en: '' }, description: { en: '' }, riskLevel: 'Low' }]);
@@ -71,13 +71,11 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
     <div className="fixed inset-0 bg-black/60 z-50 flex justify-center items-center p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
         
-        {/* Header */}
         <div className="p-6 border-b dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 rounded-t-2xl">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Create Custom Checklist</h2>
           <button onClick={onClose}><X className="w-6 h-6 text-gray-500" /></button>
         </div>
 
-        {/* Body */}
         <div className="p-6 overflow-y-auto space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -136,10 +134,10 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
                         onChange={e => handleItemChange(idx, 'riskLevel', e.target.value)}
                         className="p-2 text-xs border rounded w-24 dark:bg-slate-800 dark:border-slate-600 dark:text-white"
                       >
-                        <option>Low</option>
-                        <option>Medium</option>
-                        <option>High</option>
-                        <option>Critical</option>
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
                       </select>
                     </div>
                   </div>
@@ -152,7 +150,6 @@ export const ChecklistCreationModal: React.FC<ChecklistCreationModalProps> = ({ 
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t dark:border-slate-800 bg-gray-50 dark:bg-slate-900/50 flex justify-end gap-3 rounded-b-2xl">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSubmit}>Create Checklist</Button>

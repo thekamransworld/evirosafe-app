@@ -5,178 +5,138 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useModalContext, useAppContext } from '../contexts';
 import { getRiskLevel } from '../utils/riskUtils';
-import { 
-  Plus, MapPin, Calendar, Filter, 
-  AlertTriangle, CheckCircle, Clock, Search,
-  FileText, TrendingUp
-} from 'lucide-react';
 
 const ReportCard: React.FC<{report: Report, onSelect: (report: Report) => void}> = ({ report, onSelect }) => {
     const risk = getRiskLevel(report.risk_pre_control);
     
-    const getStatusColor = (status: ReportStatus) => {
-        switch(status) {
-            case 'draft': return 'gray';
-            case 'submitted': return 'blue';
-            case 'under_investigation': return 'purple';
-            case 'capa_required': return 'amber';
-            case 'capa_in_progress': return 'yellow';
-            case 'pending_closure': return 'indigo';
-            case 'closed': return 'green';
-            case 'archived': return 'gray';
-            default: return 'gray';
-        }
-    };
-
     return (
-        <Card onClick={() => onSelect(report)} className="hover:shadow-lg hover:border-primary-300 transition-all cursor-pointer group relative overflow-hidden">
-            {/* Status Strip */}
-            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${risk.color === 'red' ? 'bg-red-500' : risk.color === 'yellow' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-            
-            <div className="pl-4">
-                <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                        <span className="text-2xl">{getReportIcon(report.type)}</span>
-                        <div>
-                            <h3 className="font-bold text-sm text-text-primary dark:text-white truncate max-w-[150px]">{report.type}</h3>
-                            <p className="text-[10px] text-gray-500 font-mono">{report.id.slice(-6)}</p>
-                        </div>
-                    </div>
-                    <Badge color={getStatusColor(report.status)} size="sm">
-                        {report.status.replace(/_/g, ' ')}
-                    </Badge>
+        <Card onClick={() => onSelect(report)} className="hover:shadow-md hover:border-primary-300 transition-all cursor-pointer">
+            <div className="flex justify-between items-start">
+                <h3 className="font-bold text-md text-text-primary pr-2 truncate">{report.type}</h3>
+                <Badge color={risk.color}>{risk.level} Risk</Badge>
+            </div>
+            <p className="text-sm text-text-secondary mt-2 line-clamp-2">{report.description || (report.details as any).key_observations}</p>
+            <div className="text-xs text-gray-500 mt-4 space-y-1">
+                <div className="flex items-center">
+                    <MapPinIcon className="w-4 h-4 mr-2" />
+                    <span>{report.location.text}</span>
                 </div>
-
-                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-4 min-h-[40px]">
-                    {report.description || "No description provided."}
-                </p>
-
-                <div className="flex items-center justify-between pt-3 border-t dark:border-white/10">
-                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        <span>{new Date(report.occurred_at).toLocaleDateString()}</span>
-                    </div>
-                    
-                    {report.costs?.total_estimated ? (
-                        <div className="flex items-center text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                            <TrendingUp className="w-3 h-3 mr-1" />
-                            ${report.costs.total_estimated.toLocaleString()}
-                        </div>
-                    ) : (
-                        <div className="flex items-center text-xs text-gray-400">
-                            <MapPin className="w-3 h-3 mr-1" />
-                            <span className="truncate max-w-[80px]">{report.location.text}</span>
-                        </div>
-                    )}
+                <div className="flex items-center">
+                    <CalendarIcon className="w-4 h-4 mr-2" />
+                    <span>{new Date(report.occurred_at).toLocaleDateString()}</span>
                 </div>
+                {report.costs?.totalEstimated && (
+                    <div className="flex items-center text-green-600">
+                        <span className="font-bold mr-1">$</span>
+                        <span>{report.costs.totalEstimated.toLocaleString()} Est. Cost</span>
+                    </div>
+                )}
             </div>
         </Card>
     )
 }
 
-const FilterButton: React.FC<{label: string, value: string, currentFilter: string, setFilter: (val: string) => void, count?: number}> = ({ label, value, currentFilter, setFilter, count }) => (
+const FilterButton: React.FC<{label: string, value: string, currentFilter: string, setFilter: (val: string) => void}> = ({ label, value, currentFilter, setFilter }) => (
     <button
         onClick={() => setFilter(value)}
-        className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-all flex items-center gap-2 ${
-            currentFilter === value 
-            ? 'bg-primary-600 text-white shadow-md' 
-            : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-white/10'
+        className={`px-3 py-1 text-sm font-medium rounded-full whitespace-nowrap ${
+            currentFilter === value ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-white/10 dark:text-white dark:hover:bg-white/20'
         }`}
     >
         {label}
-        {count !== undefined && <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${currentFilter === value ? 'bg-white/20 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>{count}</span>}
     </button>
 )
 
-const getReportIcon = (type: string) => {
-    if (type.includes('Fire')) return '🔥';
-    if (type.includes('Injury') || type.includes('Accident')) return '🚑';
-    if (type.includes('Environmental')) return '🛢️';
-    if (type.includes('Vehicle')) return '🚜';
-    if (type.includes('Near Miss')) return '⚠️';
-    return '📋';
-};
+const REPORT_CATEGORIES: ReportType[] = [
+    'Incident', 'Accident', 'Near Miss', 'Unsafe Act', 'Unsafe Condition',
+    'First Aid Case (FAC)', 'Medical Treatment Case (MTC)', 'Lost Time Injury (LTI)',
+    'Restricted Work Case (RWC)', 'Property / Asset Damage', 'Environmental Incident',
+    'Fire Event', 'Leadership Event', 'Positive Observation'
+];
 
 export const Reports: React.FC = () => {
   const { reportList } = useDataContext();
   const { setSelectedReport, setIsReportCreationModalOpen } = useModalContext();
   const { can } = useAppContext();
 
+  const [typeFilter, setTypeFilter] = useState('All');
+  const [riskFilter, setRiskFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'All'>('All');
-  const [search, setSearch] = useState('');
 
   const filteredReports = useMemo(() => {
     return reportList.filter(report => {
+        const typeMatch = typeFilter === 'All' || report.type === typeFilter;
+        const riskMatch = riskFilter === 'All' || getRiskLevel(report.risk_pre_control).level === riskFilter;
         const statusMatch = statusFilter === 'All' || report.status === statusFilter;
-        const searchMatch = !search || 
-            report.description.toLowerCase().includes(search.toLowerCase()) ||
-            report.type.toLowerCase().includes(search.toLowerCase()) ||
-            report.location.text.toLowerCase().includes(search.toLowerCase());
-        return statusMatch && searchMatch;
+        return typeMatch && riskMatch && statusMatch;
     });
-  }, [reportList, statusFilter, search]);
-
-  const counts = useMemo(() => {
-      return {
-          all: reportList.length,
-          submitted: reportList.filter(r => r.status === 'submitted').length,
-          investigating: reportList.filter(r => r.status === 'under_investigation').length,
-          capa: reportList.filter(r => r.status === 'capa_required' || r.status === 'capa_in_progress').length,
-          closed: reportList.filter(r => r.status === 'closed').length
-      }
-  }, [reportList]);
+  }, [reportList, typeFilter, riskFilter, statusFilter]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-            <h1 className="text-3xl font-bold text-text-primary dark:text-white">Incident Reporting</h1>
-            <p className="text-text-secondary dark:text-gray-400">Track incidents, investigations, and corrective actions.</p>
-        </div>
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-text-primary">Incident Reporting</h1>
         {can('create', 'reports') && (
-            <Button onClick={() => setIsReportCreationModalOpen(true)} className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-lg shadow-red-900/20">
-              <Plus className="w-5 h-5 mr-2" />
+            <Button onClick={() => setIsReportCreationModalOpen(true)}>
+              <PlusIcon className="w-5 h-5 mr-2" />
               New Report
             </Button>
         )}
       </div>
 
-      <div className="flex flex-col gap-4">
-        {/* Search & Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-gray-900/50 p-2 rounded-xl border border-gray-200 dark:border-gray-800">
-            <div className="relative w-full md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input 
-                    type="text" 
-                    placeholder="Search reports..." 
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent text-sm focus:ring-2 focus:ring-primary-500 outline-none dark:text-white"
-                />
+      <Card className="mb-6">
+        <div className="space-y-4">
+            <div>
+                <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Report Type</label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                    <FilterButton label="All" value="All" currentFilter={typeFilter} setFilter={setTypeFilter} />
+                    {REPORT_CATEGORIES.map(t => <FilterButton key={t} label={t} value={t} currentFilter={typeFilter} setFilter={setTypeFilter} />)}
+                </div>
             </div>
-            <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 hidden md:block"></div>
-            <div className="flex gap-2 overflow-x-auto w-full pb-2 md:pb-0 custom-scrollbar">
-                <FilterButton label="All" value="All" currentFilter={statusFilter} setFilter={setStatusFilter as any} count={counts.all} />
-                <FilterButton label="New" value="submitted" currentFilter={statusFilter} setFilter={setStatusFilter as any} count={counts.submitted} />
-                <FilterButton label="Investigating" value="under_investigation" currentFilter={statusFilter} setFilter={setStatusFilter as any} count={counts.investigating} />
-                <FilterButton label="CAPA" value="capa_required" currentFilter={statusFilter} setFilter={setStatusFilter as any} count={counts.capa} />
-                <FilterButton label="Closed" value="closed" currentFilter={statusFilter} setFilter={setStatusFilter as any} count={counts.closed} />
+             <div>
+                <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Risk Level</label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                    <FilterButton label="All" value="All" currentFilter={riskFilter} setFilter={setRiskFilter} />
+                    {['Low', 'Medium', 'High', 'Critical'].map(c => <FilterButton key={c} label={c} value={c} currentFilter={riskFilter} setFilter={setRiskFilter} />)}
+                </div>
+            </div>
+            <div>
+                <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Status</label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                    <FilterButton label="All" value="All" currentFilter={statusFilter} setFilter={setStatusFilter as (val: string) => void} />
+                    {['under_review', 'submitted', 'closed', 'draft'].map(s => <FilterButton key={s} label={s.replace('_', ' ')} value={s} currentFilter={statusFilter} setFilter={setStatusFilter as (val: string) => void} />)}
+                </div>
             </div>
         </div>
-      </div>
+      </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReports.map(report => (
             <ReportCard key={report.id} report={report} onSelect={setSelectedReport} />
         ))}
         {filteredReports.length === 0 && (
-            <div className="col-span-full py-20 text-center border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-gray-900/30">
-                <FileText className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white">No reports found</h3>
-                <p className="text-gray-500 dark:text-gray-400">Try adjusting your filters or create a new report.</p>
+            <div className="col-span-full text-center py-12 text-gray-500">
+                <p>No reports match the current filters.</p>
             </div>
         )}
       </div>
     </div>
   );
 };
+
+const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+const MapPinIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+    </svg>
+);
+const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M-4.5 12h27" />
+    </svg>
+);
