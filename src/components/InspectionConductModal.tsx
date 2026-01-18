@@ -8,12 +8,7 @@ import {
 } from './inspection/InspectionComponents';
 import { 
     CloseIcon, CameraIcon, MapPinIcon, FindingDisplay, FindingForm 
-} from './InspectionConductModalHelpers'; // We will define these helpers below to keep file clean
-
-// --- HELPER ICONS & COMPONENTS (Inline for simplicity if not separated) ---
-const CloseIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
-const CameraIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.776 48.776 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>;
-const MapPinIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>;
+} from './InspectionConductModalHelpers';
 
 interface InspectionConductModalProps {
   isOpen: boolean;
@@ -109,19 +104,12 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = ({
                     
                     {/* Finding Editor */}
                     {editingFinding && (
-                        <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                            <h4 className="font-bold mb-2 text-gray-900 dark:text-white">Edit Finding</h4>
-                            <textarea 
-                                className="w-full p-2 border rounded mb-2 dark:bg-gray-900 dark:text-white" 
-                                placeholder="Description..." 
-                                value={editingFinding.description || ''}
-                                onChange={e => setEditingFinding({...editingFinding, description: e.target.value})}
-                            />
-                            <div className="flex justify-end gap-2">
-                                <Button variant="secondary" onClick={() => setEditingFinding(null)}>Cancel</Button>
-                                <Button onClick={() => handleSaveFinding({ ...editingFinding, id: editingFinding.id || `f_${Date.now()}`, risk_level: 'Medium', status: 'open' } as InspectionFinding)}>Save</Button>
-                            </div>
-                        </div>
+                        <FindingForm
+                            finding={editingFinding}
+                            onSave={handleSaveFinding}
+                            onCancel={() => setEditingFinding(null)}
+                            users={users}
+                        />
                     )}
 
                     {/* Checklist Items */}
