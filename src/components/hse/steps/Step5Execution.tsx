@@ -3,7 +3,6 @@ import {
   CheckCircle, XCircle, MinusCircle, 
   MessageSquare, Camera, ChevronDown, ChevronUp 
 } from 'lucide-react';
-// FIX: Updated import path
 import { HSEInspection, ChecklistItem } from '../../../types';
 
 interface Step5Props {
@@ -25,7 +24,6 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
         return {
           ...item,
           response: {
-            ...item.response,
             value: value,
             timestamp: new Date(),
             responder: 'Current User',
@@ -58,6 +56,19 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
 
   const progress = Math.round((items.filter(i => i.response?.value).length / items.length) * 100) || 0;
 
+  // Helper to get text safely
+  const getText = (item: ChecklistItem) => {
+      if (item.requirement) return item.requirement;
+      if (item.text && typeof item.text === 'object') return item.text['en'] || Object.values(item.text)[0];
+      return 'Unknown Requirement';
+  };
+
+  const getCriteria = (item: ChecklistItem) => {
+      if (item.criteria) return item.criteria;
+      if (item.description && typeof item.description === 'object') return item.description['en'] || Object.values(item.description)[0];
+      return '';
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 sticky top-0 z-10 shadow-sm">
@@ -88,8 +99,8 @@ export const Step5Execution: React.FC<Step5Props> = ({ formData, setFormData }) 
             }`}>
               <div className="p-4 flex items-start gap-4">
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900 dark:text-white">{item.requirement}</p>
-                  <p className="text-sm text-gray-500 mt-1">{item.criteria}</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{getText(item)}</p>
+                  <p className="text-sm text-gray-500 mt-1">{getCriteria(item)}</p>
                 </div>
                 
                 <div className="flex gap-2 shrink-0">

@@ -1,3 +1,5 @@
+// src/config/ptw-types.ts
+
 import type { PtwType } from '../types';
 
 export const ptwTypeDetails: Record<PtwType, {

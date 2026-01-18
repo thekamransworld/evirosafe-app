@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Plus, AlertTriangle, Trash2, AlertCircle } from 'lucide-react';
-// FIX: Updated import path
 import { HSEInspection, HSEFinding } from '../../../types';
 import { Button } from '../../ui/Button';
 
@@ -41,11 +40,18 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
         risk_score: risk.score,
         risk_level: risk.level as any
       },
-      created_at: new Date(),
-      updated_at: new Date(),
+      created_at: new Date().toISOString(), // FIX: Use ISO string
+      updated_at: new Date().toISOString(), // FIX: Use ISO string
       created_by: 'current_user',
       evidence_ids: [],
-      corrective_action_required: risk.score > 5
+      corrective_action_required: risk.score > 5,
+      immediate_controls: [],
+      root_causes: [],
+      evidence_urls: [],
+      category: 'General',
+      observation_category: 'people_behaviors',
+      observation_type: 'unsafe_condition',
+      risk_level: risk.level === 'extreme' ? 'Critical' : risk.level === 'high' ? 'High' : risk.level === 'medium' ? 'Medium' : 'Low'
     };
 
     setFormData({

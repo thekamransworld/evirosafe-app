@@ -130,7 +130,18 @@ export interface ActivityItem {
 }
 
 // --- REPORTING ---
-export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed';
+// Updated to include all workflow phases
+export type ReportStatus = 
+  | 'draft' 
+  | 'submitted' 
+  | 'under_review' 
+  | 'under_investigation' 
+  | 'capa_required' 
+  | 'capa_in_progress' 
+  | 'pending_closure' 
+  | 'closed' 
+  | 'archived';
+
 export type ReportClassification = 'To Be Determined' | 'Minor' | 'Moderate' | 'Major' | 'Fatal';
 export type ImpactedParty = 'Employee' | 'Contractor' | 'Visitor' | 'Public' | 'Environment';
 export type RootCause = 'Human Error' | 'Equipment Failure' | 'Process Deficiency' | 'Environment' | 'Other';
@@ -239,6 +250,7 @@ export interface Report {
     witnesses?: Witness[];
     lessons_learned?: string;
     prevention_strategy?: string;
+    root_cause_analysis?: any; // Added to fix build error
 }
 
 // --- INSPECTIONS ---
@@ -327,6 +339,27 @@ export interface ClosingMeetingData {
   recommendations: string;
 }
 
+// Updated ChecklistItem to support both old and new structures
+export interface ChecklistResponse {
+  value: 'pass' | 'fail' | 'na';
+  comments?: string;
+  evidence_ids?: string[];
+  timestamp: Date;
+  responder: string;
+}
+
+export interface ChecklistItem { 
+    id: string; 
+    text: Record<string, string>; 
+    description: Record<string, string>; 
+    riskLevel?: string;
+    // New fields for enhanced inspection
+    requirement?: string;
+    criteria?: string;
+    category?: string;
+    response?: ChecklistResponse;
+}
+
 export interface Inspection {
     id: string;
     org_id: string;
@@ -349,7 +382,7 @@ export interface Inspection {
     scheduled_follow_up?: string;
     location_area?: string;
     created_at?: string;
-    checklist_items?: any[];
+    checklist_items?: ChecklistItem[];
     schedule?: { scheduled_date: Date; scheduled_time: string };
     inspection_team?: { team_lead?: any; inspectors?: any[] };
     evidence?: Evidence[];
@@ -380,7 +413,6 @@ export interface Evidence {
 }
 
 // --- CHECKLISTS ---
-export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
 export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
 export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
