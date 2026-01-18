@@ -45,10 +45,10 @@ const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChan
 );
 
 const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
-    const { can } = useAppContext();
-    
-    // Use the new engine to check if user can approve THIS specific PTW
-    const canApprove = can('approve', 'ptw', ptw);
+    const { activeUser, can } = useAppContext();
+    const canApprove = can('approve', 'ptw');
+    const isCreator = ptw.payload.creator_id === activeUser?.id;
+    const selfApprovalBlocked = false; 
 
     return (
         <div className="flex items-center space-x-2">
@@ -58,7 +58,7 @@ const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () =>
             {ptw.status === 'SUBMITTED' && canApprove && (
                 <>
                     <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
-                    <Button onClick={() => onAction('approve_proponent')}>Approve (Proponent)</Button>
+                    <Button onClick={() => onAction('approve_proponent')} disabled={selfApprovalBlocked}>Approve (Proponent)</Button>
                 </>
             )}
             

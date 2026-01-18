@@ -1,21 +1,31 @@
-import type { Ptw, PtwWorkflowStage, PtwWorkflowLog } from '../types/ptw';
+import type { Ptw, PtwWorkflowStage, PtwWorkflowLog } from '../types';
 
 export class PtwWorkflowEngine {
   // Define valid transitions
   private static transitions: Record<PtwWorkflowStage, PtwWorkflowStage[]> = {
-    DRAFT: ['REQUESTED'],
-    REQUESTED: ['ISSUER_REVIEW', 'DRAFT'], // Issuer accepts or returns to draft
+    DRAFT: ['REQUESTED', 'SUBMITTED'],
+    SUBMITTED: ['PRE_SCREEN', 'DRAFT'],
+    PRE_SCREEN: ['SITE_INSPECTION', 'REJECTED'],
+    SITE_INSPECTION: ['APPROVAL', 'REJECTED'],
+    REQUESTED: ['ISSUER_REVIEW', 'DRAFT'],
     ISSUER_REVIEW: ['ISSUER_SIGNED', 'DRAFT'],
-    ISSUER_SIGNED: ['IV_REVIEW', 'PENDING_APPROVAL'], // IV optional
+    ISSUER_SIGNED: ['IV_REVIEW', 'PENDING_APPROVAL'],
     IV_REVIEW: ['PENDING_APPROVAL', 'DRAFT'],
-    PENDING_APPROVAL: ['APPROVED', 'DRAFT'],
-    APPROVED: ['ACTIVE', 'CANCELLED'], // Issued -> Active
-    ACTIVE: ['SUSPENDED', 'COMPLETION_PENDING', 'HOLD'],
+    PENDING_APPROVAL: ['APPROVAL'],
+    APPROVAL: ['APPROVER_SIGNED', 'DRAFT', 'ACTIVE'],
+    APPROVER_SIGNED: ['AUTHORIZATION'],
+    AUTHORIZATION: ['HANDOVER_PENDING'],
+    HANDOVER_PENDING: ['SITE_HANDOVER'],
+    SITE_HANDOVER: ['ACTIVE'],
+    ACTIVE: ['SUSPENDED', 'COMPLETION_PENDING', 'HOLD', 'COMPLETED'],
     HOLD: ['ACTIVE', 'CANCELLED'],
     SUSPENDED: ['ACTIVE', 'CANCELLED'],
-    COMPLETION_PENDING: ['CLOSED', 'ACTIVE'], // Active if rejected
+    COMPLETION_PENDING: ['JOINT_INSPECTION'],
+    COMPLETED: ['CLOSED'],
+    JOINT_INSPECTION: ['CLOSED', 'ACTIVE'],
     CLOSED: ['ARCHIVED'],
     CANCELLED: ['ARCHIVED'],
+    REJECTED: ['ARCHIVED'],
     ARCHIVED: []
   };
 
@@ -50,37 +60,55 @@ export class PtwWorkflowEngine {
   static validateRolePermission(
     currentStage: PtwWorkflowStage,
     userRole: string,
-    userId: string,
-    ptw: Ptw
+    _userId: string,
+    _ptw: Ptw
   ): { allowed: boolean; message: string } {
     const isAdmin = userRole === 'ADMIN';
     const isHSE = userRole === 'HSE_MANAGER';
     const isIssuer = userRole === 'SUPERVISOR' || userRole === 'HSE_MANAGER';
     const isApprover = userRole === 'HSE_MANAGER' || userRole === 'ORG_ADMIN';
-    const isReceiver = true; // Usually the creator
+    const isReceiver = true;
 
     if (isAdmin) return { allowed: true, message: 'Admin Override' };
 
     switch (currentStage) {
       case 'DRAFT':
-        return { allowed: true, message: '' }; // Anyone can edit draft
+        return { allowed: true, message: '' };
       
       case 'REQUESTED':
+      case 'SUBMITTED':
         return { allowed: isIssuer || isHSE, message: 'Only issuer can review requested permits' };
       
       case 'ISSUER_REVIEW':
+      case 'PRE_SCREEN':
         return { allowed: isIssuer, message: 'Only issuer can sign off on review' };
       
-      case 'PENDING_APPROVAL':
-        return { allowed: isApprover, message: 'Only approver can authorize' };
+      case 'ISSUER_SIGNED':
+      case 'SITE_INSPECTION':
+        return { allowed: true, message: '' };
       
-      case 'APPROVED':
-        return { allowed: isIssuer, message: 'Only issuer can activate/issue permit' };
+      case 'PENDING_APPROVAL':
+      case 'APPROVAL':
+        return { allowed: isApprover, message: 'Only approver can review and sign' };
+      
+      case 'AUTHORIZATION':
+        return { allowed: isIssuer, message: 'Only issuer can authorize permit' };
+      
+      case 'HANDOVER_PENDING':
+      case 'SITE_HANDOVER':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can accept handover' };
       
       case 'ACTIVE':
-        return { allowed: isReceiver || isIssuer, message: 'Only receiver or issuer can update active work' };
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can update work status' };
       
       case 'COMPLETION_PENDING':
+      case 'COMPLETED':
+        return { allowed: isReceiver || isIssuer, message: 'Only receiver can mark work complete' };
+      
+      case 'JOINT_INSPECTION':
+        return { allowed: isIssuer || isHSE, message: 'Joint inspection requires issuer' };
+      
+      case 'CLOSED':
         return { allowed: isIssuer, message: 'Only issuer can close permit' };
       
       default:

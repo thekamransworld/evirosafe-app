@@ -130,7 +130,6 @@ export interface ActivityItem {
 }
 
 // --- REPORTING ---
-// Updated to include all workflow phases
 export type ReportStatus = 
   | 'draft' 
   | 'submitted' 
@@ -250,7 +249,7 @@ export interface Report {
     witnesses?: Witness[];
     lessons_learned?: string;
     prevention_strategy?: string;
-    root_cause_analysis?: any; // Added to fix build error
+    root_cause_analysis?: any;
 }
 
 // --- INSPECTIONS ---
@@ -306,6 +305,7 @@ export interface InspectionFinding {
     root_causes: string[];
     status: 'open' | 'in_progress' | 'closed';
     created_at: string;
+    updated_at?: string; // Added to fix build error
     created_by: string;
     verification_data?: {
         verified_by: string;
@@ -339,7 +339,6 @@ export interface ClosingMeetingData {
   recommendations: string;
 }
 
-// Updated ChecklistItem to support both old and new structures
 export interface ChecklistResponse {
   value: 'pass' | 'fail' | 'na';
   comments?: string;
@@ -353,7 +352,6 @@ export interface ChecklistItem {
     text: Record<string, string>; 
     description: Record<string, string>; 
     riskLevel?: string;
-    // New fields for enhanced inspection
     requirement?: string;
     criteria?: string;
     category?: string;
