@@ -1,118 +1,189 @@
-// src/types/ptw.ts
+import type { User } from '../types';
+
+// --- 1. CORE DEFINITIONS ---
 
 export type PtwType = 
-  | 'Utility Work'
-  | 'Work at Height'
   | 'General Work'
-  | 'Confined Space Entry'
-  | 'Night Work'
-  | 'Electrical Work'
-  | 'Excavation'
   | 'Hot Work'
-  | 'Road Closure'
+  | 'Confined Space Entry'
+  | 'Electrical Work'
+  | 'Work at Height'
+  | 'Excavation'
   | 'Lifting'
-  | 'Mechanical Work'
-  | 'Chemical Handling';
+  | 'Road Closure'
+  | 'Utility Work'
+  | 'Night Work';
 
 export type PtwStatus = 
-  | 'DRAFT'
-  | 'SUBMITTED'
-  | 'PRE_SCREEN'
-  | 'SITE_INSPECTION'
-  | 'APPROVAL'
-  | 'ACTIVE'
-  | 'HOLD'
-  | 'CLOSED'
-  | 'COMPLETED'
-  | 'REJECTED'
-  | 'CANCELLED';
+  | 'DRAFT'              // Being written
+  | 'REQUESTED'          // Submitted by Receiver
+  | 'ISSUER_REVIEW'      // Issuer checking details
+  | 'ISSUER_SIGNED'      // Issuer signed, waiting for others
+  | 'IV_REVIEW'          // Independent Verifier (if needed)
+  | 'PENDING_APPROVAL'   // Waiting for final authority
+  | 'APPROVED'           // Approved, ready for issue
+  | 'ACTIVE'             // Issued & Work Started
+  | 'SUSPENDED'          // Temporarily stopped (e.g., shift change)
+  | 'COMPLETION_PENDING' // Work done, waiting for closure
+  | 'CLOSED'             // Formally closed
+  | 'CANCELLED'          // Voided
+  | 'ARCHIVED';          // Historical
 
-export type PtwCategory = 'standard' | 'operational' | 'emergency' | 'urgent';
+export type PtwCategory = 'standard' | 'high_risk' | 'operational' | 'emergency' | 'urgent';
+export type PtwWorkflowStage = PtwStatus;
 
-// ========== BASE PTW INTERFACES ==========
+// --- 2. SUB-INTERFACES ---
+
+export interface PtwWorkflowLog {
+  stage: PtwWorkflowStage;
+  action: string;
+  user_id: string;
+  timestamp: string;
+  comments?: string;
+  signoff_type?: 'digital' | 'wet_ink';
+}
+
 export interface PtwPpe {
   hard_hat: boolean;
-  safety_harness: boolean;
   safety_shoes: boolean;
   goggles: boolean;
+  safety_harness: boolean;
   coverall: boolean;
   respirator: boolean;
   safety_gloves: boolean;
   vest: boolean;
-  hearing_protection?: boolean;
-  face_shield?: boolean;
-  chemical_suit?: boolean;
-  apron?: boolean;
-  rubber_boots?: boolean;
+  other?: string;
 }
 
 export interface PtwSafetyRequirement {
   id: string;
   text: string;
   response: 'Yes' | 'No' | 'N/A';
+  is_critical?: boolean;
+  comment?: string;
+  evidence_urls?: string[];
+}
+
+export interface PtwSignature {
+  signature: string; // URL or Base64
+  signed_at: string;
 }
 
 export interface PtwSignoff {
   name: string;
-  designation?: string;
-  email?: string;
-  mobile?: string;
+  designation: string;
+  email: string;
+  mobile: string;
+  remarks: string;
   signature: string;
-  remarks?: string;
-  signed_at?: string;
+  signed_at: string;
 }
 
 export interface PtwStoppage {
+  time: string;
   reason: string;
   stopped_by: string;
   informed_to: string;
-  time: string;
-  restarted_time?: string;
-  signature?: string;
+  restarted_time: string;
+  signature: string;
 }
 
 export interface PtwExtension {
   is_requested: boolean;
-  reason?: string;
-  days: {
-    from: string;
-    to: string;
-  };
-  hours: {
-    from: string;
-    to: string;
-  };
-  approved?: boolean;
-  approved_by?: string;
-  approved_at?: string;
+  reason: string;
+  days: { from: string; to: string };
+  hours: { from: string; to: string };
+  requester: PtwSignature;
+  client_proponent: PtwSignature;
+  client_hs: PtwSignature;
 }
 
 export interface PtwClosure {
-  note?: string;
-  permit_requester: PtwSignoff;
-  client_proponent: PtwSignoff;
-  client_hs: PtwSignoff;
+  note: string;
+  permit_requester: PtwSignature;
+  client_proponent: PtwSignature;
+  client_hs: PtwSignature;
 }
 
-export interface PtwJointInspection {
-  remarks: string;
-  requester: { signature: string };
-  client_proponent: { signature: string };
-  client_hs: { signature: string };
+// --- 3. PAYLOAD DEFINITIONS (The "Body" of the permit) ---
+
+// Common fields for ALL permits
+export interface CanonicalPtwPayload {
+  creator_id: string;
+  permit_no: string;
+  category: PtwCategory;
+  
+  // Personnel
+  requester: {
+    name: string;
+    email: string;
+    mobile: string;
+    designation: string;
+    contractor: string;
+    signature: string;
+    hse_certified?: boolean;
+  };
+  contractor_safety_personnel?: {
+    name: string;
+    email: string;
+    mobile: string;
+    designation: string;
+    signature: string;
+  };
+
+  // Work Details
+  work: {
+    location: string;
+    description: string;
+    coverage: {
+      start_date: string;
+      end_date: string;
+      start_time: string;
+      end_time: string;
+    };
+    associated_permits?: string[];
+    number_of_workers?: number;
+    risk_assessment_ref?: string;
+    emergency_contact?: string;
+  };
+
+  // Safety
+  safety_requirements: PtwSafetyRequirement[];
+  ppe: PtwPpe;
+  
+  // Workflow Data
+  signoffs?: {
+    client_proponent: PtwSignoff;
+    other_stakeholders: PtwSignoff[];
+    client_hs: PtwSignoff;
+  };
+  
+  joint_inspection?: {
+    remarks: string;
+    requester: PtwSignature;
+    client_proponent: PtwSignature;
+    client_hs: PtwSignature;
+  };
+
+  holding_or_stoppage?: PtwStoppage[];
+  extension?: PtwExtension;
+  closure?: PtwClosure;
+  
+  attachments?: { name: string; url: string }[];
+  audit?: any[]; // Legacy audit trail
+  
+  global_compliance?: {
+    standards: string[];
+  };
 }
 
-// ========== TYPE-SPECIFIC PAYLOADS ==========
-export interface PtwUtilityWorkPayload {
-  community_announcement_required: boolean;
-  underground_drawings_available: boolean;
-  backup_plan_available: boolean;
-  road_diversion_plan_available: boolean;
-  service_shutdown_required: boolean;
-  utility_type: 'water' | 'sewer' | 'electricity' | 'gas' | 'telecom';
-  as_built_drawings_available: boolean;
+// Specific Payloads
+export interface PtwHotWorkPayload extends CanonicalPtwPayload {
+  fire_watcher: { name: string; mobile: string };
+  post_watch_minutes: number;
 }
 
-export interface PtwWorkAtHeightPayload {
+export interface PtwWorkAtHeightPayload extends CanonicalPtwPayload {
   access_equipment: {
     step_ladder: boolean;
     independent_scaffolding: boolean;
@@ -125,101 +196,38 @@ export interface PtwWorkAtHeightPayload {
     roof_ladder: boolean;
     other: string;
   };
-  fall_protection: {
-      anchor_points_certified: boolean;
-      rescue_plan_available: boolean;
-      weather_monitoring: boolean;
-  };
 }
 
-export interface PtwGeneralWorkPayload {
-  msds_coshh_available: boolean;
-  toolbox_talk_conducted: boolean;
-  drinking_water_available: boolean;
-  rest_area_available: boolean;
-  first_aid_available: boolean;
-  heat_stress_precautions: {
-    work_rest_cycle: boolean;
-    shades_ventilation: boolean;
-    light_clothing: boolean;
-  };
+export interface GasTestLogEntry {
+  time: string;
+  o2: number;
+  lel: number;
+  co: number;
+  h2s: number;
+  tester_name: string;
 }
 
-export interface PtwConfinedSpacePayload {
-  gas_tests: any[];
-  entry_log: any[];
-  rescue_plan: {
-    team_available: boolean;
-    equipment_available: boolean;
-    practiced_recently: boolean;
-  };
+export interface PersonnelEntryLogEntry {
+  name: string;
+  time_in: string;
+  time_out: string;
 }
 
-export interface PtwNightWorkPayload {
-  hi_visibility_jackets_available: boolean;
-  flashing_beacon_lights: boolean;
-  communication_tools_available: boolean;
-  continuous_supervision: boolean;
-  work_rotation_planned: boolean;
-  emergency_arrangements: boolean;
-  lighting_level_lux: number;
-  rest_area_provided: boolean;
+export interface PtwConfinedSpacePayload extends CanonicalPtwPayload {
+  gas_tests: GasTestLogEntry[];
+  entry_log: PersonnelEntryLogEntry[];
 }
 
-export interface PtwElectricalWorkPayload {
-  personnel_qualified: boolean;
-  fiberglass_ladder_required: boolean;
-  no_jewelry_metal: boolean;
-  area_free_from_hazards: boolean;
-  equipment_properly_grounded: boolean;
-  deenergization_infeasible: boolean;
-  voltage_level: 'low' | 'medium' | 'high';
-  loto_procedure: string;
-  insulated_tools_class: string;
-}
-
-export interface PtwExcavationPayload {
+export interface PtwExcavationPayload extends CanonicalPtwPayload {
   soil_type: 'A' | 'B' | 'C';
   cave_in_protection: string[];
-  utilities_marked: boolean;
-  daily_inspection_required: boolean;
-  safety_shoring: {
-      type: string;
-      installed_by: string;
-      inspection_date: string;
-  };
 }
 
-export interface PtwHotWorkPayload {
-  fire_watcher: {
-    name: string;
-    mobile: string;
-    certified: boolean;
-  };
-  post_watch_minutes: number;
-  fire_precautions: {
-    extinguishers_available: boolean;
-    water_supply_available: boolean;
-    combustibles_removed: boolean;
-    fire_blanket_available: boolean;
-  };
+export interface PtwRoadClosurePayload extends CanonicalPtwPayload {
+  closure_type: 'full' | 'partial' | 'rolling';
 }
 
-export interface PtwRoadClosurePayload {
-  closure_type: 'partial' | 'complete';
-  traffic_management: {
-    alternative_route_planned?: boolean;
-    signage_reflective?: boolean;
-    sunflower_lights_available?: boolean;
-    banksman_appointed?: boolean;
-    speed_limit_signs_erected?: boolean;
-    plan_available: boolean;
-    signage_available: boolean;
-    flaggers_certified: boolean;
-  };
-}
-
-export interface PtwLiftingPayload {
+export interface PtwLiftingPayload extends CanonicalPtwPayload {
   load_calculation: {
     hook_rigging_weight?: number;
     load_weight: number;
@@ -229,71 +237,30 @@ export interface PtwLiftingPayload {
     crane_capacity_at_radius?: number;
     crane_capacity: number;
     utilization_percent: number;
-    lift_plan_ref: string;
-    crane_certification_no: string;
-    operator_certification_no: string;
+    lift_plan_ref?: string;
+    crane_certification_no?: string;
+    operator_certification_no?: string;
   };
 }
 
-// ========== CANONICAL PTW PAYLOAD ==========
-export interface CanonicalPtwPayload {
-  creator_id: string;
-  permit_no: string;
-  category: PtwCategory;
-  requester: {
-    name: string;
-    email: string;
-    mobile: string;
-    designation: string;
-    contractor: string;
-    signature: string;
-    hse_certified?: boolean;
-  };
-  contractor_safety_personnel: {
-    name: string;
-    email: string;
-    mobile: string;
-    designation: string;
-    signature: string;
-  };
-  work: {
-    location: string;
-    description: string;
-    coverage: {
-      start_date: string;
-      end_date: string;
-      start_time: string;
-      end_time: string;
-    };
-    associated_permits: string[];
-    number_of_workers?: number;
-    work_method_statement?: string;
-    emergency_contact?: string;
-    risk_assessment_ref?: string;
-    environmental_concerns?: string;
-  };
-  safety_requirements: PtwSafetyRequirement[];
-  ppe: PtwPpe;
-  signoffs: {
-    client_proponent: PtwSignoff;
-    other_stakeholders: PtwSignoff[];
-    client_hs: PtwSignoff;
-  };
-  joint_inspection: PtwJointInspection;
-  holding_or_stoppage: PtwStoppage[];
-  extension: PtwExtension;
-  closure: PtwClosure;
-  attachments: any[];
-  audit: any[];
-  global_compliance?: {
-    standards: string[];
-    requirements_met: Record<string, boolean>;
-    created_at: string;
-    last_audit: string | null;
-  };
-}
+// Placeholder interfaces for other types to ensure union works
+export interface PtwNightWorkPayload extends CanonicalPtwPayload {}
+export interface PtwElectricalWorkPayload extends CanonicalPtwPayload {}
+export interface PtwUtilityWorkPayload extends CanonicalPtwPayload {}
+export interface PtwGeneralWorkPayload extends CanonicalPtwPayload {}
 
-// ========== MAIN PTW DOCUMENT ==========
+// Union Type
+export type PtwPayload = 
+  | CanonicalPtwPayload
+  | PtwHotWorkPayload
+  | PtwWorkAtHeightPayload
+  | PtwConfinedSpacePayload
+  | PtwExcavationPayload
+  | PtwRoadClosurePayload
+  | PtwLiftingPayload;
+
+// --- 4. MAIN DOCUMENT ---
+
 export interface Ptw {
   id: string;
   org_id: string;
@@ -301,20 +268,10 @@ export interface Ptw {
   type: PtwType;
   status: PtwStatus;
   title: string;
-  payload: CanonicalPtwPayload & (
-    | PtwUtilityWorkPayload
-    | PtwWorkAtHeightPayload
-    | PtwGeneralWorkPayload
-    | PtwConfinedSpacePayload
-    | PtwNightWorkPayload
-    | PtwElectricalWorkPayload
-    | PtwExcavationPayload
-    | PtwHotWorkPayload
-    | PtwRoadClosurePayload
-    | PtwLiftingPayload
-  );
-  created_at: string;
+  payload: PtwPayload;
+  approvals: any[]; // Legacy
+  audit_log: any[]; // Legacy
+  compliance_level?: 'FULL' | 'PARTIAL' | 'NONE';
   updated_at: string;
-  version: string;
-  compliance_level: 'FULL' | 'PARTIAL' | 'NONE';
+  workflow_log?: PtwWorkflowLog[];
 }

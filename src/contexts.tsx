@@ -20,8 +20,6 @@ import { useToast } from './components/ui/Toast';
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
-import { sendRiskAlert } from './services/emailService'; // Import Email Service
-import { getRiskLevel } from './utils/riskUtils'; // Import Risk Utils
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -59,14 +57,17 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // FIX: Load saved view from localStorage to persist navigation on refresh
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
 
+  // Save view whenever it changes
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
   }, [currentView]);
   
+  // Initialize with static data to prevent empty states before Firebase loads
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || initialOrganizations[0]);
   
@@ -87,24 +88,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
+  // --- CRITICAL FIX: Fallback to initialUsers if usersList (from Firebase) hasn't loaded yet ---
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
+    
+    // 1. Try to find in current state (Firebase data)
     const foundInState = usersList.find(u => u.id === activeUserId);
     if (foundInState) return foundInState;
+
+    // 2. Fallback to static data (prevents "missing buttons" on refresh)
     const foundInStatic = initialUsers.find(u => u.id === activeUserId);
     if (foundInStatic) return foundInStatic;
+
     return null;
   }, [activeUserId, usersList]);
 
   const login = (userId: string) => {
+    // Check both lists to ensure valid login even if offline
     const user = usersList.find(u => u.id === userId) || initialUsers.find(u => u.id === userId);
+    
     if (user) {
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
+        
+        // Only set view if not already set (respects the localStorage load)
         if (!localStorage.getItem('currentView')) {
             const defaultView = user.preferences?.default_view || 'dashboard';
             setCurrentView(defaultView);
         }
+        
+        // Ensure Org is set
         const userOrg = organizations.find(o => o.id === user.org_id) || initialOrganizations.find(o => o.id === user.org_id);
         if(userOrg) setActiveOrg(userOrg);
     }
@@ -132,8 +145,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const can = (action: Action, resource: Resource): boolean => {
     if (!activeUser) return false;
+    
+    // Find role definition
     const userRole = roles.find(r => r.key === activeUser.role);
-    if (!userRole) return false;
+    if (!userRole) return false; // Fail safe
+
+    // Check specific resource permission
     const permission = userRole.permissions.find(p => p.resource === resource);
     return permission ? permission.actions.includes(action) : false;
   };
@@ -185,7 +202,6 @@ interface DataContextType {
   
   handleCreateProject: (data: any) => void;
   handleCreateReport: (data: any) => void;
-  handleUpdateReport: (id: string, data: Partial<Report>) => void; // NEW
   handleStatusChange: (id: string, status: any) => void;
   handleCapaActionChange: (id: string, index: number, status: any) => void;
   handleAcknowledgeReport: (id: string) => void;
@@ -212,14 +228,15 @@ interface DataContextType {
 const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { activeOrg, activeUser, setUsersList, usersList } = useAppContext();
+    const { activeOrg, activeUser, setUsersList } = useAppContext();
     const { currentUser } = useAuth();
     const toast = useToast();
     
     const [isLoading, setIsLoading] = useState(true);
     
+    // Initialize with static data to ensure UI paints immediately
     const [projects, setProjects] = useState<Project[]>(initialProjects || []);
-    const [reportList, setReportList] = useState<Report[]>([]);
+    const [reportList, setReportList] = useState<Report[]>([]); // Reports typically fetched fresh
     const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
     const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
     const [planList, setPlanList] = useState<PlanType[]>(initialPlans || []);
@@ -235,6 +252,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
     useEffect(() => {
+      // If no user, stop loading immediately
       if (!currentUser) {
           setIsLoading(false);
           return;
@@ -242,12 +260,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const fetchData = async () => {
         try {
+          // Helper to fetch and MERGE with existing data if needed
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             const snap = await getDocs(collection(db, name));
             const data = snap.docs.map(d => d.data());
             if (data.length > 0) {
                  setter(data);
             } else {
+                 // If Firebase is empty, keep initial data
                  setter(initialData); 
             }
           };
@@ -285,6 +305,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await updateDoc(doc(db, collectionName, id), data);
         } catch (e) {
             console.error(`Error updating ${collectionName}:`, e);
+            toast.error("Failed to save changes to database.");
         }
     };
 
@@ -294,45 +315,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: `rep_${Date.now()}`,
             org_id: activeOrg.id,
             reporter_id: activeUser?.id || 'unknown',
-            status: reportData.status || 'submitted',
+            status: 'submitted',
             audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
             capa: [],
             acknowledgements: []
         };
-        
         setReportList(prev => [newReport, ...prev]);
-        
-        try { 
-            await setDoc(doc(db, 'reports', newReport.id), newReport); 
-            toast.success("Report saved."); 
-
-            // --- AUTOMATED RISK NOTIFICATION ---
-            const risk = getRiskLevel(newReport.risk_pre_control);
-            if (risk.level === 'Critical' || risk.level === 'High') {
-                // Find admins and managers
-                const recipients = usersList
-                    .filter(u => u.role === 'ADMIN' || u.role === 'HSE_MANAGER' || u.role === 'ORG_ADMIN')
-                    .map(u => u.email);
-                
-                if (recipients.length > 0) {
-                    sendRiskAlert(recipients, newReport.type, risk.level, newReport.description, newReport.id);
-                    toast.info(`Risk Alert sent to ${recipients.length} managers.`);
-                }
-            }
-
-        } catch (e) { console.error(e); }
-    };
-
-    // --- NEW: Generic Update Report Function ---
-    const handleUpdateReport = async (id: string, data: Partial<Report>) => {
-        setReportList(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
-        try {
-            await updateDoc(doc(db, 'reports', id), data);
-            toast.success("Report updated.");
-        } catch (e) {
-            console.error(e);
-            toast.error("Failed to update report.");
-        }
+        try { await setDoc(doc(db, 'reports', newReport.id), newReport); toast.success("Report saved."); } catch (e) { console.error(e); }
     };
 
     const handleCreateInspection = async (data: any) => {
@@ -372,7 +361,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 status: 'active',
                 created_at: new Date().toISOString()
             };
+            
+            // Use addDoc to let Firestore auto-generate ID
             const docRef = await addDoc(collection(db, 'projects'), projectData);
+            
             const newProj = { id: docRef.id, ...projectData };
             setProjects(prev => [newProj, ...prev]);
             toast.success("Project created.");
@@ -432,7 +424,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         toast.success("Inspection updated.");
     };
 
-    const handleUpdatePtw = (ptw: any, action?: any) => {
+    const handleUpdatePtw = async (ptw: any, action?: any) => {
+        // If it's a full PTW object update (from Detail View)
+        if (!action && typeof ptw === 'object') {
+             setPtwList(prev => prev.map(p => p.id === ptw.id ? ptw : p));
+             await updateDB('ptws', ptw.id, ptw);
+             toast.success("Permit updated successfully.");
+             return;
+        }
+
+        // Legacy handling (if any old components still use action string)
         let updatedPtw = { ...ptw };
         if (action === 'submit') updatedPtw.status = 'SUBMITTED';
         if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL';
@@ -443,7 +444,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (action === 'close') updatedPtw.status = 'CLOSED';
 
         setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p));
-        updateDB('ptws', ptw.id, updatedPtw);
+        await updateDB('ptws', ptw.id, updatedPtw);
         toast.success("Permit updated.");
     };
 
@@ -488,6 +489,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
 
+    // --- FIXED: Correct mapping of sections for Plans ---
     const handleCreatePlan = (d: any) => {
         const newPlan: any = {
             id: `plan_${Date.now()}`,
@@ -524,6 +526,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch(e) { console.error(e); }
     };
 
+    // --- FIXED: Correct mapping of AI Content for RAMS ---
     const handleCreateRams = (d: any) => {
         const newRams: any = {
             id: `rams_${Date.now()}`,
@@ -594,7 +597,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
         actionItems,
         setInspectionList, setChecklistRunList, setPtwList,
-        handleCreateProject, handleCreateReport, handleUpdateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
+        handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,

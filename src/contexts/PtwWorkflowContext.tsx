@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import type { Ptw, PtwWorkflowStage } from '../types';
+import React, { createContext, useContext, ReactNode } from 'react';
+import type { Ptw, PtwWorkflowStage } from '../types/ptw';
 import { PtwWorkflowEngine } from '../utils/workflowEngine';
 
 interface PtwWorkflowContextType {
@@ -24,23 +24,16 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
     const nextStages = PtwWorkflowEngine.getNextStages(ptw.status);
     if (nextStages.length === 0) return null;
 
-    // Get the next logical stage (usually first in array)
+    // For simplicity in this helper, we default to the first available next stage.
+    // In a real UI, you'd pass the specific target stage.
     const nextStage = nextStages[0];
     
-    // Create updated PTW
     const updatedPtw: Ptw = {
       ...ptw,
       status: nextStage,
       workflow_log: [
         ...(ptw.workflow_log || []),
-        {
-          stage: nextStage,
-          action: `Moved to ${nextStage}`,
-          user_id: userId,
-          timestamp: new Date().toISOString(),
-          comments,
-          signoff_type: 'digital' // FIX: Added this property
-        }
+        PtwWorkflowEngine.createLogEntry(nextStage, `Moved to ${nextStage}`, userId, comments)
       ],
       updated_at: new Date().toISOString()
     };
@@ -63,31 +56,15 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
   };
 
   const getStageResponsibilities = (stage: PtwWorkflowStage): string[] => {
-    const responsibilities: Record<PtwWorkflowStage, string[]> = {
+    const responsibilities: Record<string, string[]> = {
       DRAFT: ['Requester: Complete application details'],
       REQUESTED: ['Issuer: Review application', 'HSE: Verify risk assessment'],
       ISSUER_REVIEW: ['Issuer: Verify site conditions', 'Issuer: Confirm isolations'],
-      ISSUER_SIGNED: ['IV Provider: Independent verification (if critical)'],
-      IV_REVIEW: ['IV Provider: Conduct safety review', 'IV Provider: Verify controls'],
       PENDING_APPROVAL: ['Approver: Review and authorize'],
-      APPROVAL: ['Approver: Final safety check', 'Approver: Budget/scope verification'],
-      APPROVER_SIGNED: ['Issuer: Prepare for handover'],
-      AUTHORIZATION: ['Issuer: Generate permit documents'],
-      HANDOVER_PENDING: ['Issuer: Conduct pre-job briefing'],
-      SITE_HANDOVER: ['Receiver: Accept responsibility', 'Receiver: Verify site conditions'],
+      APPROVED: ['Issuer: Prepare for handover'],
       ACTIVE: ['Receiver: Supervise work', 'Safety Watch: Monitor conditions'],
-      SUSPENDED: ['Receiver: Secure work area', 'Issuer: Review suspension reason'],
-      COMPLETION_PENDING: ['Receiver: Clean work area', 'Receiver: Remove tools'],
-      JOINT_INSPECTION: ['Issuer & Receiver: Inspect work area', 'Issuer: Verify isolations removed'],
-      CLOSED: ['Issuer: Archive documents', 'System: Update asset records'],
-      CANCELLED: ['Issuer: Document cancellation reason'],
-      ARCHIVED: ['System: Retention period compliance'],
-      SUBMITTED: ['Reviewer: Check details'],
-      PRE_SCREEN: ['HSE: Initial check'],
-      SITE_INSPECTION: ['Inspector: Verify site'],
-      HOLD: ['Issuer: Pause work'],
-      COMPLETED: ['Receiver: Finish work'],
-      REJECTED: ['Issuer: Reject permit']
+      COMPLETION_PENDING: ['Issuer: Verify site restoration'],
+      CLOSED: ['Issuer: Archive documents']
     };
 
     return responsibilities[stage] || [];

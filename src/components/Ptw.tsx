@@ -3,17 +3,20 @@ import type { Project, User } from '../types';
 import type { Ptw as PtwDoc } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
   MapPin, User as UserIcon, CheckCircle,
-  Shield // <--- FIXED: Added missing import
+  Shield
 } from 'lucide-react';
+
+// Import the NEW Detail View
+import { PermitDetailView } from './permit/PermitDetailView';
 
 // === GEN 4 STYLES ===
 const glassStyles = {
-  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
+  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative cursor-pointer",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
   filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
 };
@@ -21,11 +24,12 @@ const glassStyles = {
 const getStatusConfig = (status: PtwDoc['status']) => {
     switch (status) {
       case 'ACTIVE': return { label: 'ACTIVE', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle };
-      case 'APPROVAL': return { label: 'PENDING APPROVAL', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Clock };
-      case 'PRE_SCREEN':
-      case 'SITE_INSPECTION':
-      case 'SUBMITTED': return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
-      case 'HOLD': return { label: 'ON HOLD', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
+      case 'APPROVED': return { label: 'APPROVED', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: CheckCircle };
+      case 'REQUESTED':
+      case 'ISSUER_REVIEW':
+      case 'PENDING_APPROVAL': return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
+      case 'HOLD': 
+      case 'SUSPENDED': return { label: 'SUSPENDED', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
       case 'COMPLETED':
       case 'CLOSED': return { label: 'CLOSED', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: CheckCircle };
       default: return { label: 'DRAFT', color: 'text-slate-500', bg: 'bg-slate-500/5', border: 'border-slate-500/10', icon: FileText };
@@ -42,7 +46,7 @@ interface PtwProps {
 }
 
 const StatCard: React.FC<{ label: string, value: number, color: string, icon: React.ReactNode }> = ({ label, value, color, icon }) => (
-    <div className={`${glassStyles.card} p-4 flex items-center justify-between`}>
+    <div className={`${glassStyles.card} p-4 flex items-center justify-between cursor-default`}>
         <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
             <p className={`text-2xl font-black ${color} mt-1`}>{value}</p>
@@ -55,8 +59,12 @@ const StatCard: React.FC<{ label: string, value: number, color: string, icon: Re
 
 export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, onAddExistingPtw, onSelectPtw }) => {
   const { can } = useAppContext();
+  const { handleUpdatePtw } = useDataContext(); // Need this to update permits
   const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Closed'>('All');
   const [search, setSearch] = useState('');
+  
+  // Local state for the detail modal
+  const [selectedPermitForDetail, setSelectedPermitForDetail] = useState<PtwDoc | null>(null);
 
   const filteredPtws = useMemo(() => {
     return ptws.filter(p => {
@@ -75,7 +83,7 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
   const stats = useMemo(() => ({
       total: ptws.length,
       active: ptws.filter(p => p.status === 'ACTIVE').length,
-      pending: ptws.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
+      pending: ptws.filter(p => p.status === 'REQUESTED' || p.status === 'PENDING_APPROVAL').length,
       highRisk: ptws.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
   }), [ptws]);
 
@@ -146,12 +154,11 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPtws.map((ptw) => {
             const statusConfig = getStatusConfig(ptw.status);
-            // SAFE CHECK: Ensure type exists in config
             const typeDetails = ptwTypeDetails[ptw.type] || { icon: '?', hex: '#64748b' };
             const StatusIcon = statusConfig.icon;
             
             return (
-                <div key={ptw.id} onClick={() => onSelectPtw(ptw)} className={glassStyles.card}>
+                <div key={ptw.id} onClick={() => setSelectedPermitForDetail(ptw)} className={glassStyles.card}>
                     {/* Color Strip */}
                     <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: typeDetails.hex }} />
                     
@@ -212,6 +219,18 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
             </div>
         )}
       </div>
+
+      {/* NEW DETAIL MODAL */}
+      {selectedPermitForDetail && (
+        <PermitDetailView 
+            permit={selectedPermitForDetail}
+            onClose={() => setSelectedPermitForDetail(null)}
+            onUpdate={(updatedPtw) => {
+                handleUpdatePtw(updatedPtw);
+                setSelectedPermitForDetail(updatedPtw);
+            }}
+        />
+      )}
     </div>
   );
 };
