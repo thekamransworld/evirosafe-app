@@ -9,20 +9,21 @@ import {
   rams as initialRams
 } from './data';
 import { translations, supportedLanguages, roles } from './config';
-import { ROLE_DEFINITIONS } from './config/permissions';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
 } from './types';
-import type { RoleDefinition } from './types/rbac';
-import { checkPermission, getPermissionScope } from './utils/rbacEngine'; // Import new helper
 import { useToast } from './components/ui/Toast';
 
+// --- FIREBASE IMPORTS ---
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
+import { sendRiskAlert } from './services/emailService'; // Import Email Service
+import { getRiskLevel } from './utils/riskUtils'; // Import Risk Utils
 
+// --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
@@ -47,7 +48,7 @@ interface AppContextType {
   t: (key: string, fallback?: string) => string;
   login: (userId: string) => void;
   logout: () => void;
-  can: (action: Action, resource: Resource, data?: any) => boolean;
+  can: (action: Action, resource: Resource) => boolean;
   impersonatingAdmin: User | null;
   impersonateUser: (userId: string) => void;
   stopImpersonating: () => void;
@@ -129,8 +130,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const can = (action: Action, resource: Resource, data?: any): boolean => {
-    return checkPermission(activeUser, action, resource, data);
+  const can = (action: Action, resource: Resource): boolean => {
+    if (!activeUser) return false;
+    const userRole = roles.find(r => r.key === activeUser.role);
+    if (!userRole) return false;
+    const permission = userRole.permissions.find(p => p.resource === resource);
+    return permission ? permission.actions.includes(action) : false;
   };
 
   const language = activeUser?.preferences?.language || 'en';
@@ -173,7 +178,6 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
-  rolesList: RoleDefinition[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -181,6 +185,7 @@ interface DataContextType {
   
   handleCreateProject: (data: any) => void;
   handleCreateReport: (data: any) => void;
+  handleUpdateReport: (id: string, data: Partial<Report>) => void; // NEW
   handleStatusChange: (id: string, status: any) => void;
   handleCapaActionChange: (id: string, index: number, status: any) => void;
   handleAcknowledgeReport: (id: string) => void;
@@ -202,80 +207,32 @@ interface DataContextType {
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
-  handleUpdateRole: (role: RoleDefinition) => void;
-  handleCreateRole: (role: RoleDefinition) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { activeOrg, activeUser, setUsersList } = useAppContext();
+    const { activeOrg, activeUser, setUsersList, usersList } = useAppContext();
     const { currentUser } = useAuth();
     const toast = useToast();
     
     const [isLoading, setIsLoading] = useState(true);
     
-    // Raw Data
-    const [rawProjects, setProjects] = useState<Project[]>(initialProjects || []);
-    const [rawReportList, setReportList] = useState<Report[]>([]);
-    const [rawInspectionList, setInspectionList] = useState<Inspection[]>([]);
-    const [rawChecklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
-    const [rawPlanList, setPlanList] = useState<PlanType[]>(initialPlans || []);
-    const [rawRamsList, setRamsList] = useState<RamsType[]>(initialRams || []);
-    const [rawTbtList, setTbtList] = useState<TbtSession[]>([]);
-    const [rawTrainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>([]);
-    const [rawTrainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>([]);
-    const [rawTrainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>([]);
-    const [rawNotifications, setNotifications] = useState<Notification[]>([]);
-    const [rawPtwList, setPtwList] = useState<Ptw[]>([]);
-    const [rawSigns, setSigns] = useState<Sign[]>(initialSigns || []);
-    const [rawChecklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
-    const [rawStandaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
-    const [rolesList, setRolesList] = useState<RoleDefinition[]>(Object.values(ROLE_DEFINITIONS));
-
-    // --- SECURITY FILTERING ---
-    // This ensures users only see data they are allowed to see based on their role scope
-    
-    const filterData = <T extends { org_id?: string, project_id?: string, reporter_id?: string, creator_id?: string, user_id?: string }>(
-        data: T[], 
-        resource: Resource
-    ): T[] => {
-        if (!activeUser) return [];
-        const scope = getPermissionScope(activeUser, resource, 'read');
-        
-        if (!scope) return []; // No read permission
-        if (scope === 'org') return data; // See everything in org
-        if (scope === 'project') {
-            // In a real app, check user.project_ids. For now, we assume project scope means "all projects in org" 
-            // but ideally it should filter by assigned projects.
-            return data; 
-        }
-        if (scope === 'own') {
-            return data.filter(item => 
-                item.reporter_id === activeUser.id || 
-                item.creator_id === activeUser.id || 
-                item.user_id === activeUser.id
-            );
-        }
-        return [];
-    };
-
-    const projects = useMemo(() => filterData(rawProjects, 'projects'), [rawProjects, activeUser]);
-    const reportList = useMemo(() => filterData(rawReportList, 'reports'), [rawReportList, activeUser]);
-    const inspectionList = useMemo(() => filterData(rawInspectionList, 'inspections'), [rawInspectionList, activeUser]);
-    const ptwList = useMemo(() => filterData(rawPtwList, 'ptw'), [rawPtwList, activeUser]);
-    const planList = useMemo(() => filterData(rawPlanList, 'plans'), [rawPlanList, activeUser]);
-    const ramsList = useMemo(() => filterData(rawRamsList, 'rams'), [rawRamsList, activeUser]);
-    const tbtList = useMemo(() => filterData(rawTbtList, 'tbt'), [rawTbtList, activeUser]);
-    const checklistRunList = useMemo(() => filterData(rawChecklistRunList, 'checklists'), [rawChecklistRunList, activeUser]);
-    
-    // Public/Shared Data (Less restricted)
-    const signs = rawSigns;
-    const checklistTemplates = rawChecklistTemplates;
-    const trainingCourseList = rawTrainingCourseList;
-    const trainingSessionList = rawTrainingSessionList;
-    const trainingRecordList = rawTrainingRecordList;
-    const notifications = rawNotifications;
+    const [projects, setProjects] = useState<Project[]>(initialProjects || []);
+    const [reportList, setReportList] = useState<Report[]>([]);
+    const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
+    const [checklistRunList, setChecklistRunList] = useState<ChecklistRun[]>([]);
+    const [planList, setPlanList] = useState<PlanType[]>(initialPlans || []);
+    const [ramsList, setRamsList] = useState<RamsType[]>(initialRams || []);
+    const [tbtList, setTbtList] = useState<TbtSession[]>([]);
+    const [trainingCourseList, setTrainingCourseList] = useState<TrainingCourse[]>([]);
+    const [trainingRecordList, setTrainingRecordList] = useState<TrainingRecord[]>([]);
+    const [trainingSessionList, setTrainingSessionList] = useState<TrainingSession[]>([]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [ptwList, setPtwList] = useState<Ptw[]>([]);
+    const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
+    const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
+    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -288,8 +245,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             const snap = await getDocs(collection(db, name));
             const data = snap.docs.map(d => d.data());
-            if (data.length > 0) setter(data);
-            else setter(initialData); 
+            if (data.length > 0) {
+                 setter(data);
+            } else {
+                 setter(initialData); 
+            }
           };
 
           await Promise.all([
@@ -309,7 +269,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('training_records', setTrainingRecordList),
             fetchCol('training_sessions', setTrainingSessionList),
             fetchCol('notifications', setNotifications),
-            fetchCol('roles', setRolesList, Object.values(ROLE_DEFINITIONS)),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -322,57 +281,291 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [currentUser, setUsersList]);
 
     const updateDB = async (collectionName: string, id: string, data: any) => {
-        try { await updateDoc(doc(db, collectionName, id), data); } catch (e) { console.error(e); }
+        try {
+            await updateDoc(doc(db, collectionName, id), data);
+        } catch (e) {
+            console.error(`Error updating ${collectionName}:`, e);
+        }
     };
 
-    // --- HANDLERS (Keep existing logic) ---
     const handleCreateReport = async (reportData: any) => {
-        const newReport = { ...reportData, id: `rep_${Date.now()}`, org_id: activeOrg.id, reporter_id: activeUser?.id || 'unknown', status: 'submitted', audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }], capa: [], acknowledgements: [] };
+        const newReport = {
+            ...reportData,
+            id: `rep_${Date.now()}`,
+            org_id: activeOrg.id,
+            reporter_id: activeUser?.id || 'unknown',
+            status: reportData.status || 'submitted',
+            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Report Created' }],
+            capa: [],
+            acknowledgements: []
+        };
+        
         setReportList(prev => [newReport, ...prev]);
-        try { await setDoc(doc(db, 'reports', newReport.id), newReport); toast.success("Report saved."); } catch (e) { console.error(e); }
+        
+        try { 
+            await setDoc(doc(db, 'reports', newReport.id), newReport); 
+            toast.success("Report saved."); 
+
+            // --- AUTOMATED RISK NOTIFICATION ---
+            const risk = getRiskLevel(newReport.risk_pre_control);
+            if (risk.level === 'Critical' || risk.level === 'High') {
+                // Find admins and managers
+                const recipients = usersList
+                    .filter(u => u.role === 'ADMIN' || u.role === 'HSE_MANAGER' || u.role === 'ORG_ADMIN')
+                    .map(u => u.email);
+                
+                if (recipients.length > 0) {
+                    sendRiskAlert(recipients, newReport.type, risk.level, newReport.description, newReport.id);
+                    toast.info(`Risk Alert sent to ${recipients.length} managers.`);
+                }
+            }
+
+        } catch (e) { console.error(e); }
     };
+
+    // --- NEW: Generic Update Report Function ---
+    const handleUpdateReport = async (id: string, data: Partial<Report>) => {
+        setReportList(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
+        try {
+            await updateDoc(doc(db, 'reports', id), data);
+            toast.success("Report updated.");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to update report.");
+        }
+    };
+
     const handleCreateInspection = async (data: any) => {
-        const newInspection = { ...data, id: `insp_${Date.now()}`, org_id: activeOrg.id, findings: [], status: data.status || 'Ongoing', audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }] };
+        const newInspection = {
+            ...data,
+            id: `insp_${Date.now()}`,
+            org_id: activeOrg.id,
+            findings: [],
+            status: data.status || 'Ongoing',
+            audit_trail: [{ user_id: activeUser?.id || 'system', timestamp: new Date().toISOString(), action: 'Inspection Created' }]
+        };
         setInspectionList(prev => [newInspection, ...prev]);
         try { await setDoc(doc(db, 'inspections', newInspection.id), newInspection); toast.success("Inspection created."); } catch (e) { console.error(e); }
     };
+
     const handleCreateStandaloneAction = async (data: any) => {
-        const newAction = { id: `act_${Date.now()}`, action: data.action, owner_id: data.owner_id, due_date: data.due_date, status: 'Open', priority: data.priority, project_id: data.project_id, source: { type: 'Standalone', id: '-', description: 'Direct Entry' }, origin: { type: 'standalone', parentId: '', itemId: '' } };
+        const newAction = {
+            id: `act_${Date.now()}`,
+            action: data.action,
+            owner_id: data.owner_id,
+            due_date: data.due_date,
+            status: 'Open',
+            priority: data.priority,
+            project_id: data.project_id,
+            source: { type: 'Standalone', id: '-', description: 'Direct Entry' },
+            origin: { type: 'standalone', parentId: '', itemId: '' }
+        };
         setStandaloneActions(prev => [newAction as any, ...prev]);
         try { await setDoc(doc(db, 'actions', newAction.id), newAction); toast.success("Action created."); } catch (e) { console.error(e); }
     };
+    
     const handleCreateProject = async (data: any) => {
-        try { const projectData = { ...data, org_id: data.org_id || activeOrg.id, status: 'active', created_at: new Date().toISOString() }; const docRef = await addDoc(collection(db, 'projects'), projectData); const newProj = { id: docRef.id, ...projectData }; setProjects(prev => [newProj, ...prev]); toast.success("Project created."); } catch (e) { console.error(e); toast.error("Failed to create project"); }
+        try {
+            const projectData = {
+                ...data,
+                org_id: activeOrg.id,
+                status: 'active',
+                created_at: new Date().toISOString()
+            };
+            const docRef = await addDoc(collection(db, 'projects'), projectData);
+            const newProj = { id: docRef.id, ...projectData };
+            setProjects(prev => [newProj, ...prev]);
+            toast.success("Project created.");
+        } catch (e) { 
+            console.error(e);
+            toast.error("Failed to create project");
+        }
     };
+
     const handleCreatePtw = async (data: any) => {
         const newPtw = { ...data, id: `ptw_${Date.now()}`, status: 'DRAFT' };
         setPtwList(prev => [newPtw, ...prev]);
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
+
     const handleCreateChecklistTemplate = async (data: any) => {
         const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
         setChecklistTemplates(prev => [...prev, newTemplate]);
         try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
     };
-    const handleStatusChange = (id: string, status: any) => { setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r)); updateDB('reports', id, { status }); };
-    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => { const report = reportList.find(r => r.id === reportId); if (report) { const newCapa = [...report.capa]; if (newCapa[capaIndex]) { newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus }; setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r)); updateDB('reports', reportId, { capa: newCapa }); } } };
-    const handleUpdateActionStatus = (origin: any, newStatus: any) => { if (origin.type === 'report-capa') { handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus); } else if (origin.type === 'standalone') { setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a)); updateDB('actions', origin.parentId, { status: newStatus }); } };
-    const handleUpdateInspection = (inspection: any, action?: any) => { let updatedInspection = { ...inspection }; if (action === 'submit') updatedInspection.status = 'Submitted'; if (action === 'approve') updatedInspection.status = 'Approved'; if (action === 'close') updatedInspection.status = 'Closed'; if (action === 'request_revision') updatedInspection.status = 'Ongoing'; setInspectionList(prev => prev.map(x => x.id === inspection.id ? updatedInspection : x)); updateDB('inspections', inspection.id, updatedInspection); toast.success("Inspection updated."); };
-    const handleUpdatePtw = (ptw: any, action?: any) => { let updatedPtw = { ...ptw }; if (action === 'submit') updatedPtw.status = 'SUBMITTED'; if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL'; if (action === 'approve_hse') updatedPtw.status = 'ACTIVE'; if (action === 'reject') updatedPtw.status = 'DRAFT'; if (action === 'suspend') updatedPtw.status = 'HOLD'; if (action === 'resume') updatedPtw.status = 'ACTIVE'; if (action === 'close') updatedPtw.status = 'CLOSED'; setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p)); updateDB('ptws', ptw.id, updatedPtw); toast.success("Permit updated."); };
-    const handleUpdatePlan = (plan: any) => { setPlanList(prev => prev.map(p => p.id === plan.id ? plan : p)); updateDB('plans', plan.id, plan); toast.success("Plan saved."); };
-    const handlePlanStatusChange = (id: string, status: any) => { setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p)); updateDB('plans', id, { status }); };
-    const handleUpdateRams = (rams: any) => { setRamsList(prev => prev.map(r => r.id === rams.id ? rams : r)); updateDB('rams', rams.id, rams); toast.success("RAMS saved."); };
-    const handleRamsStatusChange = (id: string, status: any) => { setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r)); updateDB('rams', id, { status }); };
-    const handleUpdateTbt = (tbt: any) => { setTbtList(prev => prev.map(t => t.id === tbt.id ? tbt : t)); updateDB('tbt_sessions', tbt.id, tbt); toast.success("TBT updated."); };
-    const handleAcknowledgeReport = (id: string) => { const report = reportList.find(r => r.id === id); if (report) { const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }]; setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: newAcks } : r)); updateDB('reports', id, { acknowledgements: newAcks }); } };
+
+    const handleStatusChange = (id: string, status: any) => {
+        setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+        updateDB('reports', id, { status });
+    };
+
+    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
+        const report = reportList.find(r => r.id === reportId);
+        if (report) {
+            const newCapa = [...report.capa];
+            if (newCapa[capaIndex]) {
+                newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
+                setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
+                updateDB('reports', reportId, { capa: newCapa });
+            }
+        }
+    };
+
+    const handleUpdateActionStatus = (origin: any, newStatus: any) => {
+        if (origin.type === 'report-capa') {
+            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
+        } else if (origin.type === 'standalone') {
+             setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a));
+             updateDB('actions', origin.parentId, { status: newStatus });
+        }
+    };
+
+    const handleUpdateInspection = (inspection: any, action?: any) => {
+        let updatedInspection = { ...inspection };
+        if (action === 'submit') updatedInspection.status = 'Submitted';
+        if (action === 'approve') updatedInspection.status = 'Approved';
+        if (action === 'close') updatedInspection.status = 'Closed';
+        if (action === 'request_revision') updatedInspection.status = 'Ongoing';
+
+        setInspectionList(prev => prev.map(x => x.id === inspection.id ? updatedInspection : x));
+        updateDB('inspections', inspection.id, updatedInspection);
+        toast.success("Inspection updated.");
+    };
+
+    const handleUpdatePtw = (ptw: any, action?: any) => {
+        let updatedPtw = { ...ptw };
+        if (action === 'submit') updatedPtw.status = 'SUBMITTED';
+        if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL';
+        if (action === 'approve_hse') updatedPtw.status = 'ACTIVE';
+        if (action === 'reject') updatedPtw.status = 'DRAFT';
+        if (action === 'suspend') updatedPtw.status = 'HOLD';
+        if (action === 'resume') updatedPtw.status = 'ACTIVE';
+        if (action === 'close') updatedPtw.status = 'CLOSED';
+
+        setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p));
+        updateDB('ptws', ptw.id, updatedPtw);
+        toast.success("Permit updated.");
+    };
+
+    const handleUpdatePlan = (plan: any) => {
+        setPlanList(prev => prev.map(p => p.id === plan.id ? plan : p));
+        updateDB('plans', plan.id, plan);
+        toast.success("Plan saved.");
+    };
+
+    const handlePlanStatusChange = (id: string, status: any) => {
+        setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+        updateDB('plans', id, { status });
+    };
+
+    const handleUpdateRams = (rams: any) => {
+        setRamsList(prev => prev.map(r => r.id === rams.id ? rams : r));
+        updateDB('rams', rams.id, rams);
+        toast.success("RAMS saved.");
+    };
+
+    const handleRamsStatusChange = (id: string, status: any) => {
+        setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+        updateDB('rams', id, { status });
+    };
+
+    const handleUpdateTbt = (tbt: any) => {
+        setTbtList(prev => prev.map(t => t.id === tbt.id ? tbt : t));
+        updateDB('tbt_sessions', tbt.id, tbt);
+        toast.success("TBT updated.");
+    };
+
+    const handleAcknowledgeReport = (id: string) => {
+        const report = reportList.find(r => r.id === id);
+        if (report) {
+            const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }];
+            setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: newAcks } : r));
+            updateDB('reports', id, { acknowledgements: newAcks });
+        }
+    };
+
     const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
     const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
     const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
-    const handleCreatePlan = (d: any) => { const newPlan: any = { id: `plan_${Date.now()}`, org_id: activeOrg.id, project_id: d.project_id, type: d.type, title: d.title, version: 'v1.0', status: 'draft', people: { prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '', signed_at: new Date().toISOString() } }, dates: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }, content: { body_json: d.sections || [], attachments: [] }, meta: { tags: [], change_note: 'Initial creation' }, audit_trail: [] }; setPlanList(prev => [newPlan, ...prev]); try { setDoc(doc(db, 'plans', newPlan.id), newPlan); toast.success("Plan created successfully."); } catch(e) { console.error(e); } };
-    const handleCreateRams = (d: any) => { const newRams: any = { id: `rams_${Date.now()}`, org_id: activeOrg.id, project_id: d.project_id, activity: d.activity, location: d.location, status: 'draft', version: 'v1.0', prepared_by: { name: activeUser?.name || 'Unknown', email: activeUser?.email || '', role: activeUser?.role || 'User', signed_at: new Date().toISOString() }, times: { created_at: new Date().toISOString(), updated_at: new Date().toISOString(), valid_from: new Date().toISOString(), valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }, method_statement: d.aiContent ? { overview: d.aiContent.overview || '', competence: d.aiContent.competence || '', sequence_of_operations: d.aiContent.sequence_of_operations || [], emergency_arrangements: d.aiContent.emergency_arrangements || '' } : { overview: '', competence: '', sequence_of_operations: [], emergency_arrangements: '' }, overall_risk_before: 0, overall_risk_after: 0, attachments: [], linked_ptw_types: [], audit_log: [] }; setRamsList(prev => [newRams, ...prev]); try { setDoc(doc(db, 'rams', newRams.id), newRams); toast.success("RAMS created successfully."); } catch(e) { console.error(e); } };
+
+    const handleCreatePlan = (d: any) => {
+        const newPlan: any = {
+            id: `plan_${Date.now()}`,
+            org_id: activeOrg.id,
+            project_id: d.project_id,
+            type: d.type,
+            title: d.title,
+            version: 'v1.0',
+            status: 'draft',
+            people: {
+                prepared_by: {
+                    name: activeUser?.name || 'Unknown',
+                    email: activeUser?.email || '',
+                    signed_at: new Date().toISOString()
+                }
+            },
+            dates: {
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                next_review_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            content: {
+                body_json: d.sections || [], 
+                attachments: []
+            },
+            meta: { tags: [], change_note: 'Initial creation' },
+            audit_trail: []
+        };
+        
+        setPlanList(prev => [newPlan, ...prev]);
+        try {
+            setDoc(doc(db, 'plans', newPlan.id), newPlan);
+            toast.success("Plan created successfully.");
+        } catch(e) { console.error(e); }
+    };
+
+    const handleCreateRams = (d: any) => {
+        const newRams: any = {
+            id: `rams_${Date.now()}`,
+            org_id: activeOrg.id,
+            project_id: d.project_id,
+            activity: d.activity,
+            location: d.location,
+            status: 'draft',
+            version: 'v1.0',
+            prepared_by: {
+                name: activeUser?.name || 'Unknown',
+                email: activeUser?.email || '',
+                role: activeUser?.role || 'User',
+                signed_at: new Date().toISOString()
+            },
+            times: {
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                valid_from: new Date().toISOString(),
+                valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+            },
+            method_statement: d.aiContent ? {
+                overview: d.aiContent.overview || '',
+                competence: d.aiContent.competence || '',
+                sequence_of_operations: d.aiContent.sequence_of_operations || [],
+                emergency_arrangements: d.aiContent.emergency_arrangements || ''
+            } : { overview: '', competence: '', sequence_of_operations: [], emergency_arrangements: '' },
+            overall_risk_before: 0,
+            overall_risk_after: 0,
+            attachments: [],
+            linked_ptw_types: [],
+            audit_log: []
+        };
+
+        setRamsList(prev => [newRams, ...prev]);
+        try {
+            setDoc(doc(db, 'rams', newRams.id), newRams);
+            toast.success("RAMS created successfully.");
+        } catch(e) { console.error(e); }
+    };
+
     const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
-    const handleUpdateRole = async (role: RoleDefinition) => { setRolesList(prev => prev.map(r => r.key === role.key ? role : r)); try { await setDoc(doc(db, 'roles', role.key), role); toast.success("Permissions updated."); } catch (e) { console.error(e); toast.error("Failed to save permissions."); } };
-    const handleCreateRole = async (role: RoleDefinition) => { setRolesList(prev => [...prev, role]); try { await setDoc(doc(db, 'roles', role.key), role); toast.success("Role created."); } catch (e) { console.error(e); toast.error("Failed to create role."); } };
 
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
@@ -392,21 +585,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
             }
         });
-        return [...items, ...rawStandaloneActions];
-    }, [reportList, rawStandaloneActions]);
+        return [...items, ...standaloneActions];
+    }, [reportList, standaloneActions]);
 
     const value = {
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems, rolesList,
+        actionItems,
         setInspectionList, setChecklistRunList, setPtwList,
-        handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
+        handleCreateProject, handleCreateReport, handleUpdateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate, handleUpdateRole, handleCreateRole
+        handleCreateChecklistTemplate
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
@@ -415,7 +608,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useDataContext = () => useContext(DataContext);
 
 // --- MODAL CONTEXT ---
-// (Keep ModalContext exactly as it was)
 interface ModalContextType {
   selectedReport: any; setSelectedReport: any;
   isReportCreationModalOpen: any; setIsReportCreationModalOpen: any;

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType } from '../types';
+import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, ReportDistribution, ReportType, Witness } from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
 import { uploadFileToCloud } from '../services/storageService';
 import { generateSafetyReport } from '../services/geminiService';
+import { Sparkles, UserPlus, Trash2, Clock, FileText } from 'lucide-react';
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -32,12 +33,13 @@ const REPORT_TYPES: { type: ReportType; icon: string; description: string; color
 
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 const GpsIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>;
-const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.624l-.259 1.035L16.38 20.624a3.375 3.375 0 00-2.455-2.455l-1.036-.259.259-1.035a3.375 3.375 0 002.456-2.456l.259-1.035.259 1.035a3.375 3.375 0 00-2.456 2.456z" /></svg>;
 
 export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen, onClose, initialData }) => {
   const { projects, handleCreateReport } = useDataContext();
-  const { activeUser, usersList, activeOrg } = useAppContext();
+  const { activeUser } = useAppContext();
   
+  const [reportingMode, setReportingMode] = useState<'quick' | 'detailed'>('quick');
+
   const defaultDetails = useMemo(() => ({
     injury: { person_name: '', designation: '', nature_of_injury: 'Other', body_part_affected: '', treatment_given: '' } as AccidentDetails,
     incident: { property_damage_details: '', environmental_impact: null } as IncidentDetails,
@@ -57,7 +59,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
         evidence_urls: [] as string[],
         risk_pre_control: { severity: 1 as Severity, likelihood: 1 as Likelihood },
         work_related: true,
-        impacted_party: [] as ImpactedParty[],
+        impacted_party: [],
         conditions: '',
         immediate_actions: '',
         further_corrective_action_required: false,
@@ -69,9 +71,10 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
             notify_on_update: true,
         } as ReportDistribution,
         identification: { was_fire: false, was_injury: false, was_environment: false },
-        classification_codes: [] as string[],
+        classification_codes: [],
         ai_evidence_summary: '',
-        ai_suggested_evidence: [] as string[],
+        ai_suggested_evidence: [],
+        witnesses: [] as Witness[],
     };
     if (initialData) {
       return { ...defaultState, ...initialData };
@@ -79,7 +82,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     return defaultState;
   };
 
-  // Use 'any' to prevent strict type checking issues during form state updates
   const [formData, setFormData] = useState<any>(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
@@ -88,6 +90,9 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+
+  // New Witness State
+  const [newWitness, setNewWitness] = useState<Partial<Witness>>({ name: '', contact: '', statement: '', type: 'employee' });
 
   useEffect(() => {
     if (!formData.project_id && projects.length > 0) {
@@ -153,6 +158,23 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     );
   };
 
+  const handleAddWitness = () => {
+      if (!newWitness.name) return;
+      const witness: Witness = {
+          id: `wit_${Date.now()}`,
+          name: newWitness.name || '',
+          contact: newWitness.contact || '',
+          statement: newWitness.statement || '',
+          type: newWitness.type as any || 'employee'
+      };
+      setFormData((prev: any) => ({ ...prev, witnesses: [...(prev.witnesses || []), witness] }));
+      setNewWitness({ name: '', contact: '', statement: '', type: 'employee' });
+  };
+
+  const handleRemoveWitness = (id: string) => {
+      setFormData((prev: any) => ({ ...prev, witnesses: prev.witnesses.filter((w: Witness) => w.id !== id) }));
+  };
+
   const handleQuickAiReport = async () => {
       if(!aiPrompt.trim()) return;
       setIsAiLoading(true);
@@ -205,7 +227,10 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
       }
 
       setUploadProgress('Saving report...');
-      await handleCreateReport({ ...formData, evidence_urls: realUrls });
+      // Set status based on mode
+      const status = reportingMode === 'quick' ? 'submitted' : 'under_investigation';
+      
+      await handleCreateReport({ ...formData, evidence_urls: realUrls, status });
       
       onClose();
     } catch (err: any) {
@@ -228,12 +253,28 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
         
         {/* Header */}
         <div className="p-6 border-b dark:border-dark-border flex justify-between items-center bg-white dark:bg-dark-card sticky top-0 z-10 rounded-t-xl">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">New HSE Report</h2>
+            <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">New HSE Report</h2>
+                <div className="flex gap-2 mt-2">
+                    <button 
+                        onClick={() => setReportingMode('quick')}
+                        className={`text-xs px-3 py-1 rounded-full border ${reportingMode === 'quick' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'text-gray-500 border-gray-200'}`}
+                    >
+                        <Clock className="w-3 h-3 inline mr-1"/> Quick Report
+                    </button>
+                    <button 
+                        onClick={() => setReportingMode('detailed')}
+                        className={`text-xs px-3 py-1 rounded-full border ${reportingMode === 'detailed' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'text-gray-500 border-gray-200'}`}
+                    >
+                        <FileText className="w-3 h-3 inline mr-1"/> Detailed Investigation
+                    </button>
+                </div>
+            </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full"><CloseIcon className="w-6 h-6 text-gray-500" /></button>
         </div>
         
         <div className="p-6 overflow-y-auto space-y-8 custom-scrollbar">
-            {/* Report Type Selection - FIXED GRID */}
+            {/* Report Type Selection */}
             <section>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-4">What do you want to report?</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 gap-3">
@@ -257,7 +298,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
             {/* AI Helper */}
             <section className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800">
                 <div className="flex items-start gap-4">
-                    <div className="bg-white dark:bg-black p-2 rounded-full shadow-sm text-blue-600"><SparklesIcon className="w-6 h-6" /></div>
+                    <div className="bg-white dark:bg-black p-2 rounded-full shadow-sm text-blue-600"><Sparkles className="w-6 h-6" /></div>
                     <div className="flex-1">
                         <label className="block text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">AI Form Assistant</label>
                         <div className="flex gap-2">
@@ -311,6 +352,31 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                         </div>
                     </section>
 
+                    {/* DETAILED MODE: Witness Statements */}
+                    {reportingMode === 'detailed' && (
+                        <section className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <h3 className="text-md font-bold mb-3 text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                                <UserPlus className="w-4 h-4" /> Witness Statements
+                            </h3>
+                            <div className="space-y-3 mb-4">
+                                {formData.witnesses?.map((w: Witness) => (
+                                    <div key={w.id} className="flex justify-between items-start p-3 bg-white dark:bg-gray-900 rounded border dark:border-gray-700">
+                                        <div>
+                                            <p className="font-bold text-sm dark:text-white">{w.name} <span className="text-xs font-normal text-gray-500">({w.type})</span></p>
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 italic">"{w.statement}"</p>
+                                        </div>
+                                        <button onClick={() => handleRemoveWitness(w.id)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4"/></button>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                <input placeholder="Name" value={newWitness.name} onChange={e => setNewWitness({...newWitness, name: e.target.value})} className="p-2 text-sm border rounded dark:bg-gray-900 dark:border-gray-700 dark:text-white" />
+                                <input placeholder="Statement" value={newWitness.statement} onChange={e => setNewWitness({...newWitness, statement: e.target.value})} className="p-2 text-sm border rounded dark:bg-gray-900 dark:border-gray-700 dark:text-white" />
+                                <Button size="sm" onClick={handleAddWitness} variant="secondary">Add Witness</Button>
+                            </div>
+                        </section>
+                    )}
+
                     {isInjuryType && (
                         <section className="bg-red-50 dark:bg-red-900/10 p-4 rounded-xl border border-red-200 dark:border-red-800">
                             <h3 className="text-md font-bold mb-3 text-red-800 dark:text-red-300">Injury Details</h3>
@@ -337,7 +403,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Evidence</h3>
                  <div className="grid grid-cols-1 gap-4">
                     <FormField label="Photo/Video Evidence">
-                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer relative">
                             <input type="file" multiple onChange={handleFileChange} className="hidden" id="file-upload" />
                             <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
                                 <span className="text-4xl mb-2">📷</span>
