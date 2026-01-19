@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
-  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage,
-  PtwWorkflowStage
+  Ptw, PtwSafetyRequirement, PtwWorkAtHeightPayload, 
+  PtwStoppage, PtwWorkflowStage 
 } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext } from '../contexts';
-import { usePtwWorkflow } from '../contexts/PtwWorkflowContext'; // <--- NEW IMPORT
+import { usePtwWorkflow } from '../contexts/PtwWorkflowContext';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
 import { useToast } from './ui/Toast';
 import { ActionsBar } from './ui/ActionsBar';
@@ -15,7 +14,7 @@ import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
 import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
-import { AlertTriangle, CheckCircle, Clock, XCircle, ArrowRight } from 'lucide-react';
+import { CloseIcon } from './InspectionConductModal'; // Reusing icon
 
 interface PtwDetailModalProps {
   ptw: Ptw;
@@ -36,7 +35,54 @@ const sections: { key: SectionKey, title: string }[] = [
     { key: 'IX', title: 'Permit Closure'},
 ];
 
-// --- SMART WORKFLOW ACTIONS COMPONENT ---
+// --- HELPER COMPONENTS ---
+
+const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, disabled?: boolean }> = ({ label, value, onChange, type = 'text', required = false, disabled = false }) => (
+    <div>
+        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
+        <input
+            type={type}
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            required={required}
+            disabled={disabled}
+        />
+    </div>
+);
+
+const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, disabled?: boolean }> = ({ label, value, onChange, disabled = false }) => (
+    <div>
+        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
+        <input
+            type="text"
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-200 disabled:opacity-60"
+            placeholder={disabled ? "Signed" : "Type name to sign"}
+            disabled={disabled}
+        />
+    </div>
+);
+
+const InfoField: React.FC<{label: string, value: React.ReactNode}> = ({label, value}) => (
+    <div className="border-b py-2 dark:border-dark-border">
+        <span className="font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
+        <span className="ml-2 text-gray-800 dark:text-gray-200">{value}</span>
+    </div>
+);
+
+const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChange: (value: PtwSafetyRequirement) => void; disabled: boolean }> = ({ index, item, onChange, disabled }) => (
+    <tr className={`border-b dark:border-dark-border ${disabled ? '' : 'hover:bg-gray-50 dark:hover:bg-dark-background'}`}>
+        <td className="p-2 w-8 text-center text-gray-600 dark:text-gray-400">{index}</td>
+        <td className="p-2 text-gray-900 dark:text-gray-200">{item.text}</td>
+        <td className="p-2 w-16 text-center"><input type="radio" checked={item.response === 'Yes'} onChange={() => onChange({ ...item, response: 'Yes' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
+        <td className="p-2 w-16 text-center"><input type="radio" checked={item.response === 'No'} onChange={() => onChange({ ...item, response: 'No' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
+        <td className="p-2 w-16 text-center"><input type="radio" checked={item.response === 'N/A'} onChange={() => onChange({ ...item, response: 'N/A' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
+    </tr>
+);
+
+// --- WORKFLOW ACTIONS ---
 const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({ ptw, onUpdate }) => {
     const { activeUser } = useAppContext();
     const { getNextPossibleStages, validateUserPermission, moveToNextStage, getStageResponsibilities } = usePtwWorkflow();
@@ -51,14 +97,12 @@ const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({
     const responsibilities = getStageResponsibilities(ptw.status);
 
     const handleTransition = (stage: PtwWorkflowStage) => {
-        // Check permissions
         const permission = validateUserPermission(ptw, activeUser.id, activeUser.role);
         if (!permission) {
             toast.error("You do not have permission to perform this action.");
             return;
         }
 
-        // If comment needed (e.g. rejection), show input
         if ((stage === 'REJECTED' || stage === 'SUSPENDED') && !showComment) {
             setTargetStage(stage);
             setShowComment(true);
@@ -80,22 +124,8 @@ const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({
         return 'secondary';
     };
 
-    const getActionLabel = (stage: string) => {
-        switch(stage) {
-            case 'SUBMITTED': return 'Submit for Review';
-            case 'ISSUER_REVIEW': return 'Accept for Review';
-            case 'SITE_INSPECTION': return 'Start Site Inspection';
-            case 'APPROVAL': return 'Submit for Approval';
-            case 'ACTIVE': return 'Activate Permit';
-            case 'SUSPENDED': return 'Suspend Work';
-            case 'CLOSED': return 'Close Permit';
-            default: return stage.replace('_', ' ');
-        }
-    };
-
     return (
         <div className="flex flex-col gap-4 w-full">
-            {/* Current Responsibilities Hint */}
             {responsibilities.length > 0 && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200">
                     <strong>Current Stage Requirements:</strong>
@@ -105,7 +135,6 @@ const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({
                 </div>
             )}
 
-            {/* Comment Input for Rejections/Suspensions */}
             {showComment && (
                 <div className="flex gap-2 animate-fade-in">
                     <input 
@@ -113,89 +142,47 @@ const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({
                         value={comment} 
                         onChange={e => setComment(e.target.value)}
                         placeholder="Reason for this action..."
-                        className="flex-1 p-2 border rounded text-sm dark:bg-gray-800 dark:border-gray-700"
+                        className="flex-1 p-2 border rounded text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                     />
                     <Button size="sm" onClick={() => targetStage && handleTransition(targetStage)}>Confirm</Button>
                     <Button size="sm" variant="ghost" onClick={() => setShowComment(false)}>Cancel</Button>
                 </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex flex-wrap justify-end gap-2">
                 {nextStages.map(stage => (
                     <Button 
                         key={stage} 
                         variant={getActionColor(stage)}
                         onClick={() => handleTransition(stage)}
-                        disabled={!validateUserPermission(ptw, activeUser.id, activeUser.role)}
-                        title={!validateUserPermission(ptw, activeUser.id, activeUser.role) ? "Role not authorized" : ""}
                     >
-                        {getActionLabel(stage)}
+                        {stage.replace('_', ' ')}
                     </Button>
                 ))}
                 {nextStages.length === 0 && (
-                    <span className="text-sm text-gray-500 italic">No further actions available (Terminal State)</span>
+                    <span className="text-sm text-gray-500 italic">No further actions available</span>
                 )}
             </div>
         </div>
     );
 };
 
-// --- HELPER COMPONENTS ---
-const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChange: (value: PtwSafetyRequirement) => void; disabled: boolean }> = ({ index, item, onChange, disabled }) => (
-    <tr className={`border-b dark:border-dark-border ${disabled ? '' : 'hover:bg-gray-50 dark:hover:bg-dark-background'}`}>
-        <td className="p-2 w-8 text-center text-gray-600 dark:text-gray-400">{index}</td>
-        <td className="p-2 text-gray-900 dark:text-gray-200">{item.text}</td>
-        <td className="p-2 w-16 text-center"><input type="radio" name={`check-${item.id}`} checked={item.response === 'Yes'} onChange={() => onChange({ ...item, response: 'Yes' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
-        <td className="p-2 w-16 text-center"><input type="radio" name={`check-${item.id}`} checked={item.response === 'No'} onChange={() => onChange({ ...item, response: 'No' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
-        <td className="p-2 w-16 text-center"><input type="radio" name={`check-${item.id}`} checked={item.response === 'N/A'} onChange={() => onChange({ ...item, response: 'N/A' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
-    </tr>
-);
-
-const InfoField: React.FC<{label: string, value: React.ReactNode}> = ({label, value}) => (
-    <div className="border-b py-2 dark:border-dark-border">
-        <span className="font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
-        <span className="ml-2 text-gray-800 dark:text-gray-200">{value}</span>
-    </div>
-)
-
-const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, disabled?: boolean }> = ({ label, value, onChange, type = 'text', required = false, disabled = false }) => (
-    <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
-        <input
-            type={type}
-            value={value || ''}
-            onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm read-only:bg-gray-100 dark:read-only:bg-white/5"
-            required={required}
-            readOnly={disabled}
-        />
-    </div>
-);
-
-const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, disabled?: boolean }> = ({ label, value, onChange, disabled = false }) => (
-    <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
-        <input
-            type="text"
-            value={value || ''}
-            onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-200 read-only:bg-gray-100 dark:read-only:bg-white/5"
-            placeholder={disabled ? "Signed" : "Type name to sign"}
-            readOnly={disabled}
-        />
-    </div>
-);
-
-export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
-  const { ptw, onClose, onUpdate } = props;
+// --- MAIN COMPONENT ---
+export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, onUpdate }) => {
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
-  // Determine editability based on status
+  // Editability Flags
   const isEditable = formData.status === 'DRAFT' || formData.status === 'REQUESTED';
-  
+  const isProponentEditable = formData.status === 'ISSUER_REVIEW' || formData.status === 'SUBMITTED';
+  const isHseEditable = formData.status === 'PRE_SCREEN' || formData.status === 'APPROVAL';
+  const isInspectionEditable = formData.status === 'SITE_INSPECTION' || formData.status === 'JOINT_INSPECTION';
+  const isStoppageEditable = formData.status === 'ACTIVE';
+  const isExtensionEditable = formData.status === 'ACTIVE';
+  const isClosureEditable = formData.status === 'COMPLETED' || formData.status === 'CLOSED';
+
   useEffect(() => {
       setFormData(JSON.parse(JSON.stringify(ptw)));
   }, [ptw]);
@@ -223,6 +210,36 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
       });
   }
 
+  const handleLogStoppage = () => {
+    const newStoppage: PtwStoppage = {
+        ...stoppageFormData,
+        time: new Date().toISOString(),
+        restarted_time: '',
+        signature: '',
+    } as PtwStoppage;
+
+    const updatedFormData = {
+        ...formData,
+        payload: {
+            ...formData.payload,
+            holding_or_stoppage: [...(formData.payload.holding_or_stoppage || []), newStoppage]
+        }
+    };
+    setFormData(updatedFormData);
+    onUpdate(updatedFormData, 'SUSPENDED'); // Trigger workflow update
+    setStoppageFormData({ reason: '', stopped_by: '', informed_to: '' });
+  };
+
+  const handleResumeWork = (signature: string, index: number) => {
+      const updatedFormData = { ...formData };
+      if (updatedFormData.payload.holding_or_stoppage && updatedFormData.payload.holding_or_stoppage[index]) {
+          updatedFormData.payload.holding_or_stoppage[index].restarted_time = new Date().toISOString();
+          updatedFormData.payload.holding_or_stoppage[index].signature = signature;
+      }
+      setFormData(updatedFormData);
+      onUpdate(updatedFormData, 'ACTIVE'); // Trigger workflow update
+  };
+
   const renderSectionContent = () => {
     switch(activeSection) {
         case 'I':
@@ -230,29 +247,16 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <InfoField label="Permit Type" value={formData.type} />
-                        <InfoField label="Permit Status" value={
-                            <Badge color={
-                                formData.status === 'ACTIVE' ? 'green' : 
-                                formData.status === 'HOLD' ? 'red' :
-                                formData.status === 'APPROVAL' ? 'blue' :
-                                'gray'
-                            }>
-                                {formData.status.replace(/_/g, ' ')}
-                            </Badge>
-                        } />
+                        <InfoField label="Permit Status" value={<Badge color="blue">{formData.status.replace('_', ' ')}</Badge>} />
                         <InfoField label="Permit Number" value={formData.payload.permit_no || 'Draft'} />
                         <InfoField label="Project" value={formData.project_id} />
                         <InfoField label="Work Location" value={formData.payload.work.location} />
                         <InfoField label="Number of Workers" value={formData.payload.work.number_of_workers || 'Not specified'} />
                     </div>
-                    
                     <div className="mt-4">
                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Work Description</h4>
-                        <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded">
-                            {formData.payload.work.description}
-                        </p>
+                        <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded">{formData.payload.work.description}</p>
                     </div>
-                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <InfoField label="Start Time" value={`${formData.payload.work.coverage.start_date} ${formData.payload.work.coverage.start_time}`} />
                         <InfoField label="End Time" value={`${formData.payload.work.coverage.end_date} ${formData.payload.work.coverage.end_time}`} />
@@ -270,7 +274,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                             disabled={!isEditable}
                         />
                     )}
-                    
                     {formData.type === 'Confined Space Entry' && 'gas_tests' in formData.payload && (
                         <GasTestLogSection 
                             gasTests={formData.payload.gas_tests}
@@ -278,7 +281,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                             disabled={!isEditable}
                         />
                     )}
-                    
                     {formData.type === 'Confined Space Entry' && 'entry_log' in formData.payload && (
                         <PersonnelEntryLogSection 
                             entries={formData.payload.entry_log}
@@ -286,7 +288,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                             disabled={!isEditable}
                         />
                     )}
-                    
                     {formData.type === 'Work at Height' && 'access_equipment' in formData.payload && (
                         <WorkAtHeightPermit 
                             payload={formData.payload as PtwWorkAtHeightPayload}
@@ -294,7 +295,6 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                             readOnly={!isEditable}
                         />
                     )}
-                    
                     <div className="border rounded-lg overflow-hidden">
                         <div className="bg-gray-100 dark:bg-gray-800 p-3 border-b">
                             <h4 className="font-bold text-gray-800 dark:text-gray-200">Safety Requirements Checklist</h4>
@@ -312,34 +312,10 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                                 </thead>
                                 <tbody>
                                     {formData.payload.safety_requirements.map((item, index) => (
-                                        <ChecklistRow 
-                                            key={item.id}
-                                            index={index + 1}
-                                            item={item}
-                                            onChange={handleChecklistChange}
-                                            disabled={!isEditable}
-                                        />
+                                        <ChecklistRow key={item.id} index={index + 1} item={item} onChange={handleChecklistChange} disabled={!isEditable} />
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-                    
-                    <div className="border rounded-lg p-4">
-                        <h4 className="font-bold mb-3 text-base text-gray-800 dark:text-gray-200">Personal Protective Equipment (PPE)</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {Object.entries(formData.payload.ppe || {}).map(([key, value]) => (
-                                <label key={key} className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={!!value}
-                                        onChange={(e) => handlePayloadChange(`ppe.${key}`, e.target.checked)}
-                                        disabled={!isEditable}
-                                        className="rounded"
-                                    />
-                                    <span className="text-sm capitalize">{key.replace(/_/g, ' ')}</span>
-                                </label>
-                            ))}
                         </div>
                     </div>
                 </div>
@@ -367,9 +343,10 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                 <div>
                     <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section IV – Client Proponent / Stakeholder</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="Name" value={formData.payload.signoffs?.client_proponent.name} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} disabled={formData.status !== 'ISSUER_REVIEW'} />
+                        <FormInput label="Name" value={formData.payload.signoffs?.client_proponent.name} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} disabled={!isProponentEditable} />
+                        <FormInput label="Designation" value={formData.payload.signoffs?.client_proponent.designation} onChange={val => handlePayloadChange('signoffs.client_proponent.designation', val)} disabled={!isProponentEditable} />
                         <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_proponent.signature} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={formData.status !== 'ISSUER_REVIEW'} />
+                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_proponent.signature} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={!isProponentEditable} />
                         </div>
                     </div>
                 </div>
@@ -380,16 +357,112 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
                  <div>
                     <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section V – Client HSE Department</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="HSE Representative Name" value={formData.payload.signoffs?.client_hs.name} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} disabled={formData.status !== 'PRE_SCREEN'} />
+                        <FormInput label="HSE Representative Name" value={formData.payload.signoffs?.client_hs.name} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} disabled={!isHseEditable} />
                         <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_hs.signature} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={formData.status !== 'PRE_SCREEN'} />
+                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_hs.signature} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={!isHseEditable} />
                         </div>
                     </div>
                 </div>
             );
 
+        case 'VI':
+            return (
+                <div>
+                    <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section VI — Joint Site Inspection</h3>
+                    <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6">
+                        <p className="text-sm italic text-gray-700 dark:text-gray-300">“The work area has been jointly inspected by all parties, and all safety requirements specified in Section II have been implemented and verified.”</p>
+                    </div>
+                    <div className="space-y-6">
+                        <FormInput label="Remarks" value={formData.payload.joint_inspection?.remarks} onChange={val => handlePayloadChange('joint_inspection.remarks', val)} disabled={!isInspectionEditable} />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <SignatureInput label="Permit Requester" value={formData.payload.joint_inspection?.requester.signature} onChange={val => handlePayloadChange('joint_inspection.requester.signature', val)} disabled={!isInspectionEditable} />
+                            <SignatureInput label="Client Proponent" value={formData.payload.joint_inspection?.client_proponent.signature} onChange={val => handlePayloadChange('joint_inspection.client_proponent.signature', val)} disabled={!isInspectionEditable} />
+                            <SignatureInput label="Client HSE" value={formData.payload.joint_inspection?.client_hs.signature} onChange={val => handlePayloadChange('joint_inspection.client_hs.signature', val)} disabled={!isInspectionEditable} />
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'VII':
+            return (
+                <div>
+                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section VII – Holding / Stoppage of Work</h3>
+                    <div className="space-y-4">
+                        {formData.payload.holding_or_stoppage?.map((stoppage, index) => (
+                            <div key={index} className="p-4 border rounded-md dark:border-dark-border text-gray-800 dark:text-gray-200">
+                                <p className="font-bold">Stoppage #{index+1} at {new Date(stoppage.time).toLocaleString()}</p>
+                                <p><strong>Reason:</strong> {stoppage.reason}</p>
+                                <p><strong>Stopped By:</strong> {stoppage.stopped_by}</p>
+                                {stoppage.restarted_time ? (
+                                    <div className="mt-2 pt-2 border-t dark:border-dark-border">
+                                        <p className="text-green-600 font-semibold">Resumed at {new Date(stoppage.restarted_time).toLocaleString()}</p>
+                                        <p><strong>Signed by:</strong> {stoppage.signature}</p>
+                                    </div>
+                                ) : (
+                                     <div className="mt-4">
+                                        {formData.status === 'SUSPENDED' && (
+                                            <div className="flex items-center space-x-2">
+                                                <input type="text" placeholder="Your Name for Signature" className="w-full p-2 border rounded-md text-sm bg-white dark:bg-dark-background dark:border-dark-border text-gray-900 dark:text-white" onBlur={e => handleResumeWork(e.target.value, index)} />
+                                                <Button size="sm">Resume Work</Button>
+                                            </div>
+                                        )}
+                                     </div>
+                                )}
+                            </div>
+                        ))}
+                        {(formData.payload.holding_or_stoppage?.length ?? 0) === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">No work stoppages have been logged.</p>}
+                    </div>
+
+                    {isStoppageEditable && (
+                        <div className="mt-6 border-t pt-4 dark:border-dark-border">
+                            <h4 className="font-semibold mb-2 text-gray-800 dark:text-gray-200">Log a New Work Stoppage</h4>
+                             <div className="grid grid-cols-2 gap-4">
+                                <FormInput label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} />
+                                <FormInput label="Stopped By" value={stoppageFormData.stopped_by} onChange={val => setStoppageFormData(p => ({...p, stopped_by: val}))} />
+                                <div className="col-span-2"><FormInput label="Informed To" value={stoppageFormData.informed_to} onChange={val => setStoppageFormData(p => ({...p, informed_to: val}))} /></div>
+                            </div>
+                            <Button className="mt-4" variant="danger" onClick={handleLogStoppage}>Log Stoppage & Suspend Permit</Button>
+                        </div>
+                    )}
+                </div>
+            );
+
+        case 'VIII':
+            return (
+                <div>
+                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section VIII – Extension</h3>
+                    <div className="space-y-6">
+                        <FormInput label="Reason for Extension" value={formData.payload.extension?.reason} onChange={val => handlePayloadChange('extension.reason', val)} disabled={!isExtensionEditable} />
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormInput label="New From Date/Time" type="datetime-local" value={formData.payload.extension?.days.from} onChange={val => handlePayloadChange('extension.days.from', val)} disabled={!isExtensionEditable} />
+                            <FormInput label="New To Date/Time" type="datetime-local" value={formData.payload.extension?.hours.to} onChange={val => handlePayloadChange('extension.hours.to', val)} disabled={!isExtensionEditable} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                            <SignatureInput label="Requester" value={formData.payload.extension?.requester.signature} onChange={val => handlePayloadChange('extension.requester.signature', val)} disabled={!isExtensionEditable} />
+                            <SignatureInput label="Client Proponent" value={formData.payload.extension?.client_proponent.signature} onChange={val => handlePayloadChange('extension.client_proponent.signature', val)} disabled={!isExtensionEditable} />
+                            <SignatureInput label="Client HSE" value={formData.payload.extension?.client_hs.signature} onChange={val => handlePayloadChange('extension.client_hs.signature', val)} disabled={!isExtensionEditable} />
+                        </div>
+                    </div>
+                </div>
+            );
+
+        case 'IX':
+            return (
+                 <div>
+                    <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section IX – Permit Closure</h3>
+                    <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6">
+                        <p className="text-sm italic text-gray-700 dark:text-gray-300">“We confirm the work is complete, the area is clean and safe, all isolations have been removed, and the permit is now closed.”</p>
+                    </div>
+                    <FormInput label="Closure Note / Handover" value={formData.payload.closure?.note} onChange={val => handlePayloadChange('closure.note', val)} disabled={!isClosureEditable} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                         <SignatureInput label="Requester Closure Sign" value={formData.payload.closure?.permit_requester.signature} onChange={val => handlePayloadChange('closure.permit_requester.signature', val)} disabled={!isClosureEditable} />
+                         <SignatureInput label="Proponent Closure Sign" value={formData.payload.closure?.client_proponent.signature} onChange={val => handlePayloadChange('closure.client_proponent.signature', val)} disabled={!isClosureEditable} />
+                         <SignatureInput label="HSE Closure Sign" value={formData.payload.closure?.client_hs.signature} onChange={val => handlePayloadChange('closure.client_hs.signature', val)} disabled={!isClosureEditable} />
+                    </div>
+                </div>
+            );
         default:
-            return <div className="text-center py-10 text-gray-500">Section content not available in this view.</div>;
+            return null;
     }
   };
 
@@ -401,14 +474,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{ptw.type} - {ptw.payload.permit_no || `Draft #${ptw.id.slice(-6)}`}</h2>
               <div className="flex items-center space-x-2">
-                <Badge color={
-                    ptw.status === 'ACTIVE' ? 'green' : 
-                    ptw.status.includes('SUBMITTED') ? 'yellow' : 
-                    ptw.status === 'APPROVAL' ? 'blue' : 
-                    'gray'
-                }>
-                    {ptw.status.replace(/_/g, ' ')}
-                </Badge>
+                <Badge color={ptw.status === 'ACTIVE' ? 'green' : 'blue'}>{ptw.status.replace('_', ' ')}</Badge>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -459,5 +525,3 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
     </>
   );
 };
-
-const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
