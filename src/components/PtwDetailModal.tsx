@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { 
-  Ptw, PtwSafetyRequirement, PtwWorkAtHeightPayload, 
-  PtwStoppage, PtwWorkflowStage 
+  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
+  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage,
+  PtwWorkflowStage
 } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -14,7 +15,7 @@ import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
 import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
-import { CloseIcon } from './InspectionConductModal'; // Reusing icon
+import { AlertTriangle, CheckCircle, Clock, XCircle, ArrowRight } from 'lucide-react';
 
 interface PtwDetailModalProps {
   ptw: Ptw;
@@ -36,6 +37,12 @@ const sections: { key: SectionKey, title: string }[] = [
 ];
 
 // --- HELPER COMPONENTS ---
+
+const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
 
 const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, disabled?: boolean }> = ({ label, value, onChange, type = 'text', required = false, disabled = false }) => (
     <div>
@@ -400,7 +407,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                                     </div>
                                 ) : (
                                      <div className="mt-4">
-                                        {formData.status === 'SUSPENDED' && (
+                                        {formData.status === 'HOLD' && (
                                             <div className="flex items-center space-x-2">
                                                 <input type="text" placeholder="Your Name for Signature" className="w-full p-2 border rounded-md text-sm bg-white dark:bg-dark-background dark:border-dark-border text-gray-900 dark:text-white" onBlur={e => handleResumeWork(e.target.value, index)} />
                                                 <Button size="sm">Resume Work</Button>
@@ -468,18 +475,30 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4 print:hidden" onClick={onClose}>
-        <div className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4 print:hidden" onClick={onClose} aria-modal="true" role="dialog" aria-labelledby="ptw-title">
+        <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
           <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0 print:hidden">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{ptw.type} - {ptw.payload.permit_no || `Draft #${ptw.id.slice(-6)}`}</h2>
+              <h2 id="ptw-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">{ptw.type} - {ptw.payload.permit_no || `Draft #${ptw.id.slice(-6)}`}</h2>
               <div className="flex items-center space-x-2">
-                <Badge color={ptw.status === 'ACTIVE' ? 'green' : 'blue'}>{ptw.status.replace('_', ' ')}</Badge>
+                <Badge color={
+                    ptw.status === 'ACTIVE' ? 'green' : 
+                    ptw.status.includes('SUBMITTED') ? 'yellow' : 
+                    ptw.status === 'APPROVAL' ? 'blue' : 
+                    'gray'
+                }>
+                    {ptw.status.replace(/_/g, ' ')}
+                </Badge>
+                {ptw.compliance_level && (
+                    <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        <span className="text-yellow-500">⚠️</span> {ptw.compliance_level} Compliance
+                    </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-4">
               <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} downloadOptions={[{ label: 'Download PDF', handler: () => window.print() }]} />
-              <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
+              <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
             </div>
           </header>
 
@@ -522,6 +541,15 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
         documentLink={`${window.location.href}?ptw=${ptw.id}`}
         defaultRecipients={[...Object.values(ptw.payload.signoffs ?? {}).flat(), ptw.payload.requester].filter(Boolean) as Partial<User>[]}
       />
+
+      <style>{`
+          @media print {
+              body * { visibility: hidden; }
+              #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
+              #ptw-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+              @page { size: A4; margin: 1.5cm; }
+          }
+      `}</style>
     </>
   );
 };
