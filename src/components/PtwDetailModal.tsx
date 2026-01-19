@@ -14,7 +14,7 @@ import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
 import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
-import { Activity, AlertTriangle, CheckCircle, Clock, FileText, Shield, X, ArrowRight } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Clock, FileText, Shield, X, ArrowRight, Lock } from 'lucide-react';
 import { IsolationManagementModal } from './permit/IsolationManagementModal';
 
 interface PtwDetailModalProps {
@@ -116,11 +116,13 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   const { ptw, onClose, onUpdate } = props;
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
+  const [activeTab, setActiveTab] = useState<'details' | 'workflow' | 'isolations'>('details');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [isIsolationModalOpen, setIsIsolationModalOpen] = useState(false);
   const toast = useToast();
   
   const { activeUser } = useAppContext();
+  const { moveToNextStage, getNextPossibleStages, getStageResponsibilities } = usePtwWorkflow();
   
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
@@ -220,10 +222,16 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
       onUpdate(updatedFormData, 'save');
   };
   
-  const handleWorkflowAction = (action: any) => {
-        if (!action) return;
-        onUpdate(formData, action);
+  const handleWorkflowAction = (stage: string) => {
+    if (!activeUser) return;
+    const updatedPtw = moveToNextStage(ptw, activeUser.id, `Moved to ${stage}`);
+    if (updatedPtw) {
+      onUpdate(updatedPtw, stage as any);
+    }
   };
+
+  const nextStages = getNextPossibleStages(ptw);
+  const currentResponsibilities = getStageResponsibilities(ptw.status);
 
   const renderSectionContent = () => {
     switch(activeSection) {
@@ -574,30 +582,105 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
             </div>
           </header>
 
-          <div className="flex-grow flex overflow-hidden">
-            <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0 print:hidden">
-              <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">SECTIONS</h3>
-              <ul className="space-y-1">
-                {sections.map(section => (
-                  <li key={section.key}>
-                    <button
-                      onClick={() => setActiveSection(section.key)}
-                      className={`w-full text-left p-3 rounded-md text-sm font-medium transition-colors ${
-                        activeSection === section.key 
-                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-4 border-primary-500' 
-                          : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 border-l-4 border-transparent'
-                      }`}
-                    >
-                      {section.key}. {section.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </nav>
+          {/* TABS */}
+          <div className="flex border-b dark:border-gray-800 px-6">
+              <button onClick={() => setActiveTab('details')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'details' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>Details</button>
+              <button onClick={() => setActiveTab('workflow')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'workflow' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>Workflow & Audit</button>
+              <button onClick={() => setActiveTab('isolations')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'isolations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>Isolations (LOTO)</button>
+          </div>
 
-            <main className="flex-1 p-8 overflow-y-auto">
-              {renderSectionContent()}
-            </main>
+          <div className="flex-grow flex overflow-hidden">
+            
+            {activeTab === 'details' ? (
+                <>
+                    {/* SIDEBAR NAVIGATION FOR SECTIONS I-IX */}
+                    <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0 print:hidden">
+                        <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">SECTIONS</h3>
+                        <ul className="space-y-1">
+                            {sections.map(section => (
+                            <li key={section.key}>
+                                <button
+                                onClick={() => setActiveSection(section.key)}
+                                className={`w-full text-left p-3 rounded-md text-sm font-medium transition-colors ${
+                                    activeSection === section.key 
+                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-4 border-primary-500' 
+                                    : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 border-l-4 border-transparent'
+                                }`}
+                                >
+                                {section.key}. {section.title}
+                                </button>
+                            </li>
+                            ))}
+                        </ul>
+                    </nav>
+
+                    {/* MAIN CONTENT AREA */}
+                    <main className="flex-1 p-8 overflow-y-auto bg-white dark:bg-dark-card">
+                        {renderSectionContent()}
+                    </main>
+                </>
+            ) : activeTab === 'workflow' ? (
+                <div className="flex-1 p-6 overflow-y-auto space-y-6">
+                    {/* Current Stage Actions */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-xl border border-blue-200 dark:border-blue-800">
+                        <h3 className="font-bold text-blue-900 dark:text-blue-200 mb-3 flex items-center gap-2">
+                        <Activity className="w-5 h-5" /> Current Stage: {ptw.status.replace(/_/g, ' ')}
+                        </h3>
+                        
+                        {currentResponsibilities.length > 0 && (
+                            <div className="mb-4 bg-white dark:bg-gray-800 p-3 rounded-lg text-sm">
+                                <p className="font-semibold mb-1">Pending Actions:</p>
+                                <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
+                                    {currentResponsibilities.map((resp, i) => <li key={i}>{resp}</li>)}
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                        {nextStages.map(stage => (
+                            <Button key={stage} onClick={() => handleWorkflowAction(stage)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                Move to {stage.replace(/_/g, ' ')} <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                        ))}
+                        {nextStages.length === 0 && (
+                            <p className="text-sm text-gray-500">No further actions available for this stage.</p>
+                        )}
+                        </div>
+                    </div>
+
+                    {/* Audit Log */}
+                    <div className="bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 overflow-hidden">
+                        <div className="p-4 border-b dark:border-gray-700 font-bold">Workflow History</div>
+                        <div className="divide-y dark:divide-gray-700">
+                            {ptw.workflow_log?.map((log, i) => (
+                                <div key={i} className="p-4 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="font-semibold">{log.action}</span>
+                                        <span className="text-gray-500">{new Date(log.timestamp).toLocaleString()}</span>
+                                    </div>
+                                    <p className="text-gray-500 mt-1">User ID: {log.user_id}</p>
+                                </div>
+                            ))}
+                            {(!ptw.workflow_log || ptw.workflow_log.length === 0) && <div className="p-4 text-gray-500 italic">No history recorded.</div>}
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="flex-1 p-6 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Shield className="w-5 h-5 text-red-500" /> Active Isolations
+                        </h3>
+                        <Button size="sm" variant="secondary" onClick={() => setIsIsolationModalOpen(true)}>
+                            Manage LOTO
+                        </Button>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-dashed text-center text-gray-500">
+                        No active isolations recorded. Click "Manage LOTO" to add points.
+                    </div>
+                </div>
+            )}
+
           </div>
 
           <footer className="p-4 border-t bg-gray-100 dark:bg-black/20 dark:border-dark-border flex justify-end items-center flex-shrink-0 print:hidden">
