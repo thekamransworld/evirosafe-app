@@ -1,23 +1,375 @@
-// ... (continuation from previous message)
+// src/types.ts
 
-export interface ChecklistRunResult { 
-    item_id: string; 
-    result: 'pass' | 'fail' | 'na'; 
-    remarks?: string; 
-    evidence_urls?: string[]; 
+// --- CORE ---
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  domain: string;
+  status: 'active' | 'suspended';
+  timezone: string;
+  primaryLanguage: string;
+  secondaryLanguages: string[];
+  branding: {
+    logoUrl: string;
+    primaryColor?: string;
+  };
+  industry: string;
+  country: string;
+  created_at?: string;
+  // Enhanced Fields
+  contact_details?: {
+    phone: string;
+    email: string;
+    address: string;
+    website: string;
+    contact_person: string;
+  };
+  operational_details?: {
+    timezone: string;
+    working_hours: string;
+    holidays: string[];
+    emergency_contacts: { name: string; role: string; phone: string; email: string; }[];
+  };
+  safety_metrics?: {
+    incident_rate: number;
+    safety_score: number;
+    last_audit_date: string;
+    compliance_level: 'Low' | 'Medium' | 'High' | 'Excellent';
+  };
+  subscription?: {
+    plan: 'Free' | 'Basic' | 'Professional' | 'Enterprise';
+    seats: number;
+    renewal_date: string;
+    features: string[];
+  };
 }
 
-export interface ChecklistRun { 
-    id: string; 
-    org_id: string; 
-    project_id: string; 
-    template_id: string; 
-    executed_by_id: string; 
-    executed_at: string; 
-    status: 'in_progress' | 'completed'; 
-    score?: number; 
-    results: ChecklistRunResult[]; 
+export interface User {
+  id: string;
+  org_id: string;
+  email: string;
+  name: string;
+  avatar_url: string;
+  role: 'ADMIN' | 'ORG_ADMIN' | 'HSE_MANAGER' | 'HSE_OFFICER' | 'SUPERVISOR' | 'INSPECTOR' | 'WORKER' | 'CLIENT_VIEWER' | 'CUSTOM_SITE_LEAD';
+  status: 'active' | 'inactive' | 'invited' | 'pending_approval' | string; 
+  mobile?: string;
+  designation?: string;
+  company?: string;
+  department?: string;
+  phone?: string;
+  preferences: {
+    language: string;
+    default_view: string;
+    units: {
+      temperature: 'C' | 'F';
+      wind_speed?: 'km/h' | 'mph';
+      height?: 'm' | 'ft';
+      weight: 'kg' | 'lbs';
+      distance?: 'km' | 'mi';
+    };
+  };
+  project_ids?: string[];
 }
+
+export interface Project {
+  id: string;
+  org_id: string;
+  name: string;
+  code: string;
+  status: 'active' | 'pending' | 'archived' | 'completed' | 'on_hold'; 
+  location: string;
+  start_date: string;
+  finish_date: string;
+  end_date?: string;
+  manager_id: string;
+  type: string;
+  safety_score?: number;
+  progress?: number;
+  budget?: number;
+  budget_spent?: number;
+  team_members?: string[];
+}
+
+export type Resource = 
+  | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights';
+
+export type View = Resource | string;
+export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
+export type Scope = 'org' | 'project' | 'own';
+
+export interface Permission {
+  resource: Resource;
+  actions: Action[];
+  scope: Scope;
+}
+
+export interface Role {
+  org_id: string | null;
+  key: string;
+  label: string;
+  is_system: boolean;
+  permissions: Permission[];
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  report_id: string;
+  message: string;
+  timestamp: string;
+  is_read: boolean;
+}
+
+export interface AuditLogEntry {
+  user_id: string;
+  timestamp: string;
+  action: string;
+  details?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  action: string;
+  owner_id: string;
+  due_date: string;
+  status: 'Open' | 'In Progress' | 'Closed';
+  project_id: string;
+  priority?: 'Low' | 'Medium' | 'High' | 'Critical';
+  source: {
+    type: 'Report' | 'Inspection' | 'Standalone';
+    id: string;
+    description: string;
+  };
+  origin: {
+      type: 'report-capa' | 'standalone';
+      parentId: string;
+      itemId: string;
+  }
+}
+
+export interface ActivityItem {
+    id: string;
+    type: 'report' | 'inspection' | 'ptw' | 'rams' | 'equipment' | 'training' | 'message' | 'incident' | 'milestone';
+    title: string;
+    description: string;
+    user: User;
+    timestamp: string;
+    data: any;
+    status?: string;
+    priority?: 'low' | 'medium' | 'high';
+}
+
+// --- REPORTING ---
+export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed';
+export type ReportClassification = 'To Be Determined' | 'Minor' | 'Moderate' | 'Major' | 'Fatal';
+export type ImpactedParty = 'Employee' | 'Contractor' | 'Visitor' | 'Public' | 'Environment';
+export type RootCause = 'Human Error' | 'Equipment Failure' | 'Process Deficiency' | 'Environment' | 'Other';
+export type Severity = 1 | 2 | 3 | 4 | 5;
+export type Likelihood = 1 | 2 | 3 | 4 | 5;
+
+export type ReportType = 
+  | 'Incident' | 'Accident' | 'Near Miss' | 'Unsafe Act' | 'Unsafe Condition'
+  | 'First Aid Case (FAC)' | 'Medical Treatment Case (MTC)' | 'Lost Time Injury (LTI)'
+  | 'Restricted Work Case (RWC)' | 'Property / Asset Damage' | 'Environmental Incident'
+  | 'Fire Event' | 'Leadership Event' | 'Positive Observation';
+
+export interface RiskMatrix {
+  severity: Severity;
+  likelihood: Likelihood;
+}
+
+export interface CapaAction {
+  type: 'Corrective' | 'Preventive';
+  action: string;
+  owner_id: string;
+  due_date: string;
+  status: 'Open' | 'In Progress' | 'Closed';
+  verified_at?: string;
+  verified_by_id?: string;
+}
+
+export interface ReportDistribution {
+  user_ids: string[];
+  additional_recipients?: string[];
+  send_alert_on_submit: boolean;
+  notify_on_update: boolean;
+  cc_role_key?: string;
+}
+
+export interface ReportAcknowledgement {
+  user_id: string;
+  acknowledged_at: string;
+}
+
+export interface AccidentDetails { person_name: string; designation: string; nature_of_injury: string; body_part_affected: string; treatment_given: string; days_lost?: number; medical_report_urls?: string[]; }
+export interface IncidentDetails { property_damage_details?: string; environmental_impact: { type_of_impact: string; quantity_extent: string; containment_action: string; authority_notified: boolean; notification_ref?: string; } | null; }
+export interface NearMissDetails { potential_consequence: string; }
+export interface UnsafeActDetails { act_category: string; coaching_given: boolean; coaching_notes?: string; }
+export interface UnsafeConditionDetails { condition_category: string; temporary_control_applied: string; }
+export interface LeadershipEventDetails { event_type_code: string; leader_name?: string; attendees_count?: number; key_observations?: string; }
+
+export type ReportDetails = AccidentDetails | IncidentDetails | NearMissDetails | UnsafeActDetails | UnsafeConditionDetails | LeadershipEventDetails;
+
+export interface Report {
+    id: string;
+    creator_id: string;
+    org_id: string;
+    project_id: string;
+    type: ReportType;
+    status: ReportStatus;
+    classification: ReportClassification;
+    reporter_id: string;
+    reported_at: string;
+    work_related: boolean;
+    impacted_party: ImpactedParty[];
+    occurred_at: string;
+    location: { text: string; specific_area: string; geo?: { lat: number; lng: number }; };
+    description: string;
+    conditions?: string;
+    immediate_actions: string;
+    further_corrective_action_required: boolean;
+    evidence_urls: string[];
+    ai_evidence_summary?: string;
+    ai_suggested_evidence?: string[];
+    risk_pre_control: RiskMatrix;
+    root_cause?: RootCause;
+    capa: CapaAction[];
+    distribution: ReportDistribution;
+    acknowledgements: ReportAcknowledgement[];
+    audit_trail: AuditLogEntry[];
+    details: ReportDetails;
+    identification?: { was_fire: boolean; was_injury: boolean; was_environment: boolean; };
+    classification_codes?: string[];
+    created_at?: string;
+    costs?: {
+        directCosts: { medical: number; repair: number; compensation: number; fines: number; };
+        indirectCosts: { downtime: number; lostProductivity: number; training: number; administrative: number; };
+        totalEstimated: number;
+        insuranceCoverage: number;
+    };
+    lessons_learned?: string;
+    prevention_strategy?: string;
+    compliance?: { oshaReportable: boolean; rinaReportable: boolean; insuranceNotified: boolean; };
+}
+
+// --- INSPECTIONS (ENHANCED) ---
+export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue' | 'Completed';
+
+export type InspectionPhase = 
+  | 'planning'
+  | 'opening_meeting'
+  | 'execution'
+  | 'documentation'
+  | 'closing_meeting'
+  | 'follow_up'
+  | 'closed';
+
+export type ObservationCategory = 
+  | 'people_behaviors'
+  | 'equipment_machinery'
+  | 'materials_substances'
+  | 'work_environment'
+  | 'documentation'
+  | 'emergency_preparedness'
+  | 'management_systems';
+
+export type ObservationType = 
+  | 'unsafe_act'
+  | 'unsafe_condition'
+  | 'non_compliance'
+  | 'best_practice'
+  | 'observation';
+
+export interface OpeningMeetingData {
+  conducted_at: string;
+  supervisor_present: string;
+  hazards_discussed: string;
+  emergency_procedures_confirmed: boolean;
+  permits_verified: boolean;
+  stop_work_authority_confirmed: boolean;
+  attendees: string[];
+  notes: string;
+}
+
+export interface ClosingMeetingData {
+  conducted_at: string;
+  key_findings_summary: string;
+  immediate_actions_agreed: string;
+  follow_up_required: boolean;
+  next_inspection_date?: string;
+  supervisor_acknowledged: boolean;
+  recommendations: string;
+}
+
+export interface ImmediateControl {
+  action: string;
+  taken_by: string;
+  taken_at: string;
+  effectiveness: 'effective' | 'partially_effective' | 'ineffective';
+}
+
+export interface InspectionFinding {
+    id: string;
+    checklist_item_id?: string;
+    description: string;
+    risk_level: 'Low' | 'Medium' | 'High' | 'Critical';
+    category: 'Unsafe Act' | 'Unsafe Condition' | 'Documentation' | 'Equipment' | 'Environmental';
+    evidence_urls: string[];
+    corrective_action_required: boolean;
+    responsible_person_id?: string;
+    responsible_person?: { name: string };
+    due_date?: string;
+    gps_tag?: { lat: number, lng: number };
+    observation_category: ObservationCategory;
+    observation_type: ObservationType;
+    immediate_controls: ImmediateControl[];
+    root_causes?: string[];
+    status: 'open' | 'in_progress' | 'closed';
+    created_at: string;
+    created_by: string;
+    verification_data?: {
+        verified_by: string;
+        verified_at: string;
+        evidence_urls: string[];
+        notes: string;
+    };
+}
+
+export interface Inspection {
+    id: string;
+    org_id: string;
+    project_id: string;
+    title: string;
+    type: 'Safety' | 'Quality' | 'Environmental' | 'Fire' | 'Equipment';
+    status: InspectionStatus;
+    person_responsible_id: string;
+    person_responsible?: { name: string };
+    checklist_template_id: string;
+    schedule_at: string;
+    team_member_ids: string[];
+    observers: string[];
+    findings: InspectionFinding[];
+    overall_comments?: string;
+    audit_trail: AuditLogEntry[];
+    inspection_id?: string;
+    location_area?: string;
+    created_at?: string;
+    phase?: InspectionPhase;
+    opening_meeting?: OpeningMeetingData;
+    closing_meeting?: ClosingMeetingData;
+    scheduled_follow_up?: string;
+}
+
+export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; 
+    response?: { value: 'pass' | 'fail' | 'na'; comments?: string; evidence_ids?: string[]; timestamp: Date; responder: string; };
+    category?: string;
+    requirement?: string;
+    criteria?: string;
+}
+export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
+export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
+export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
 
 export type PlanStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
 export type PlanType = 'HSEMP' | 'Lifting' | 'Work at Height' | 'Confined Space' | 'Fire' | 'ERP' | 'EMP' | 'Waste';

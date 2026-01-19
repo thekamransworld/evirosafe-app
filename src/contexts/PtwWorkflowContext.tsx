@@ -70,8 +70,7 @@ export const PtwWorkflowProvider: React.FC<{ children: ReactNode }> = ({ childre
       ISSUER_SIGNED: ['IV Provider: Independent verification (if critical)'],
       IV_REVIEW: ['IV Provider: Conduct safety review', 'IV Provider: Verify controls'],
       PENDING_APPROVAL: ['Approver: Review and authorize'],
-      APPROVAL: ['Approver: Final safety check', 'Approver: Budget/scope verification'],
-      APPROVED: ['Approver: Final sign-off'],
+      APPROVAL: ['Approver: Final safety check', 'Approver: Budget/scope verification'], // Fixed typo
       APPROVER_SIGNED: ['Issuer: Prepare for handover'],
       AUTHORIZATION: ['Issuer: Generate permit documents'],
       HANDOVER_PENDING: ['Issuer: Conduct pre-job briefing'],

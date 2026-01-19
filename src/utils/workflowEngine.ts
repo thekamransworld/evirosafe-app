@@ -12,8 +12,7 @@ export class PtwWorkflowEngine {
     ISSUER_SIGNED: ['IV_REVIEW', 'PENDING_APPROVAL'],
     IV_REVIEW: ['PENDING_APPROVAL', 'DRAFT'],
     PENDING_APPROVAL: ['APPROVAL'],
-    APPROVAL: ['APPROVED', 'DRAFT', 'ACTIVE'],
-    APPROVED: ['APPROVER_SIGNED'],
+    APPROVAL: ['APPROVER_SIGNED', 'DRAFT', 'ACTIVE'], // Fixed typo here
     APPROVER_SIGNED: ['AUTHORIZATION'],
     AUTHORIZATION: ['HANDOVER_PENDING'],
     HANDOVER_PENDING: ['SITE_HANDOVER'],
@@ -92,9 +91,6 @@ export class PtwWorkflowEngine {
       case 'APPROVAL':
         return { allowed: isApprover, message: 'Only approver can review and sign' };
       
-      case 'APPROVED':
-        return { allowed: isApprover, message: 'Only approver can sign off' };
-
       case 'AUTHORIZATION':
         return { allowed: isIssuer, message: 'Only issuer can authorize permit' };
       
