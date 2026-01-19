@@ -3,10 +3,9 @@ import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useAppContext } from '../contexts';
-import { ProjectCreationModal } from './ProjectCreationModal';
 import { 
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar, Legend
+  AreaChart, Area, XAxis, YAxis, CartesianGrid
 } from 'recharts';
 import { 
   ArrowLeft, AlertTriangle, FileText, ClipboardCheck, 
@@ -18,10 +17,7 @@ import {
   Award, Trophy,
   FileCheck,
   Activity as ActivityIcon,
-  List,
-  DollarSign,
-  Briefcase,
-  Folder, Upload, Trash2, Settings
+  List
 } from 'lucide-react';
 
 interface ProjectDetailsProps {
@@ -39,9 +35,9 @@ const DashboardWidget: React.FC<{
   className?: string;
   actions?: React.ReactNode;
 }> = ({ title, children, className, actions }) => (
-  <div className={`bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 flex flex-col shadow-sm ${className}`}>
+  <div className={`bg-gradient-to-br from-slate-900/50 to-slate-800/30 border border-white/10 backdrop-blur-md rounded-xl p-6 flex flex-col shadow-xl ${className}`}>
     <div className="flex justify-between items-center mb-6">
-      <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
+      <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
         {title}
       </h3>
       {actions && (
@@ -64,12 +60,11 @@ const StatBox: React.FC<{
   color: string;
   change?: number;
   trend?: 'up' | 'down' | 'neutral';
-  subtext?: string;
-}> = ({ label, value, icon, color, change, trend, subtext }) => (
-  <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 p-5 rounded-xl flex items-center justify-between hover:border-blue-500/50 transition-all duration-300 group">
+}> = ({ label, value, icon, color, change, trend }) => (
+  <div className="bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-white/5 p-5 rounded-xl flex items-center justify-between hover:border-white/10 transition-all duration-300 group hover:scale-[1.02]">
     <div>
-      <p className="text-gray-500 dark:text-gray-400 text-xs uppercase font-semibold tracking-wide mb-2">{label}</p>
-      <p className="text-3xl font-black text-gray-900 dark:text-white mb-1">{value}</p>
+      <p className="text-slate-400 text-xs uppercase font-semibold tracking-wide mb-2">{label}</p>
+      <p className="text-3xl font-black text-white mb-1">{value}</p>
       {change !== undefined && (
         <div className="flex items-center gap-1">
           {trend === 'up' ? (
@@ -79,14 +74,13 @@ const StatBox: React.FC<{
           ) : (
             <Activity className="w-4 h-4 text-blue-500" />
           )}
-          <span className={`text-xs font-medium ${trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-blue-600'}`}>
-            {trend === 'up' ? '+' : ''}{change}%
+          <span className={`text-xs font-medium ${trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-blue-400'}`}>
+            {trend === 'up' ? '+' : ''}{change}% from last month
           </span>
         </div>
       )}
-      {subtext && <p className="text-xs text-gray-400 mt-1">{subtext}</p>}
     </div>
-    <div className={`p-3 rounded-lg bg-gray-50 dark:bg-white/5 ${color} group-hover:scale-110 transition-transform duration-300`}>
+    <div className={`p-3 rounded-lg bg-white/5 ${color} group-hover:scale-110 transition-transform duration-300`}>
       {icon}
     </div>
   </div>
@@ -139,7 +133,7 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
     const typeLabel = activity.type ? (activity.type.charAt(0).toUpperCase() + activity.type.slice(1)) : 'Unknown';
 
     return (
-        <div className="flex items-start gap-4 p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/5 hover:border-blue-300 dark:hover:border-white/10 transition-colors group">
+        <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors group">
             <div className="flex-shrink-0">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
                     {activity.user?.name?.charAt(0) || '?'}
@@ -147,7 +141,7 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-gray-900 dark:text-white">{activity.user?.name || 'Unknown User'}</span>
+                    <span className="font-semibold text-white">{activity.user?.name || 'Unknown User'}</span>
                     <Badge color={getBadgeColor()} size="sm">
                         {typeLabel}
                     </Badge>
@@ -157,10 +151,10 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
                         </Badge>
                     )}
                 </div>
-                <p className="text-gray-800 dark:text-gray-200 font-medium mb-1">{activity.title}</p>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">{activity.description}</p>
+                <p className="text-white font-medium mb-1">{activity.title}</p>
+                <p className="text-slate-400 text-sm mb-2">{activity.description}</p>
                 <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-slate-500">
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
                         <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -169,6 +163,20 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
                             <Calendar className="w-3 h-3" />
                             {new Date(activity.timestamp).toLocaleDateString()}
                         </span>
+                        {activity.status && (
+                            <span className={`flex items-center gap-1 ${activity.status === 'completed' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                                {activity.status}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                            <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                            <MessageSquare className="w-4 h-4" />
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -183,21 +191,22 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
 const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[] }> = ({ user, activities }) => {
     const userActivities = activities.filter(a => a.user?.id === user.id);
     const recentActivity = userActivities[0];
+
     const roleLabel = (user.role || 'Unknown').replace(/_/g, ' ');
 
     return (
-        <div className="p-4 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/5 hover:border-blue-400 dark:hover:border-white/10 transition-colors">
+        <div className="p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors">
             <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                     <div className="relative">
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg">
                             {user.name?.charAt(0) || '?'}
                         </div>
-                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-white dark:border-slate-900"></div>
+                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-green-500 border-2 border-slate-900"></div>
                     </div>
                     <div>
-                        <h4 className="font-bold text-gray-900 dark:text-white">{user.name || 'Unknown'}</h4>
-                        <p className="text-xs text-gray-500 dark:text-slate-400">{user.email}</p>
+                        <h4 className="font-bold text-white">{user.name || 'Unknown'}</h4>
+                        <p className="text-xs text-slate-400">{user.email}</p>
                         <Badge color={
                             user.role === 'ADMIN' ? 'purple' :
                             user.role === 'HSE_MANAGER' ? 'blue' :
@@ -208,26 +217,39 @@ const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[] }> = ({ 
                         </Badge>
                     </div>
                 </div>
-                <button className="text-gray-400 hover:text-gray-600 dark:hover:text-white">
+                <button className="text-slate-400 hover:text-white">
                     <MoreVertical className="w-5 h-5" />
                 </button>
             </div>
 
             <div className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500 dark:text-slate-400">Activities Today</span>
-                    <span className="text-gray-900 dark:text-white font-bold">{userActivities.length}</span>
+                    <span className="text-slate-400">Activities Today</span>
+                    <span className="text-white font-bold">{userActivities.length}</span>
                 </div>
 
                 {recentActivity && (
-                    <div className="pt-3 border-t border-gray-100 dark:border-white/5">
-                        <p className="text-xs text-gray-400 dark:text-slate-400 mb-1">Recent Activity</p>
-                        <p className="text-sm text-gray-800 dark:text-white truncate">{recentActivity.title}</p>
-                        <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                    <div className="pt-3 border-t border-white/5">
+                        <p className="text-xs text-slate-400 mb-1">Recent Activity</p>
+                        <p className="text-sm text-white truncate">{recentActivity.title}</p>
+                        <p className="text-xs text-slate-500 mt-1">
                             {new Date(recentActivity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                     </div>
                 )}
+
+                <div className="pt-3 border-t border-white/5">
+                    <div className="flex gap-2">
+                        <Button size="sm" variant="ghost" className="flex-1">
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            Message
+                        </Button>
+                        <Button size="sm" variant="ghost" className="flex-1">
+                            <Eye className="w-4 h-4 mr-2" />
+                            View
+                        </Button>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -240,8 +262,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
     inspectionList, 
     ramsList, 
     trainingSessionList, 
-    tbtList,
-    handleCreateProject // Used for updating project
+    tbtList
   } = useDataContext();
   
   const { usersList } = useAppContext();
@@ -249,7 +270,6 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
   const [activeTab, setActiveTab] = useState('Overview');
   const [activityFilter, setActivityFilter] = useState<string>('all');
   const [teamView, setTeamView] = useState<'grid' | 'list'>('grid');
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Filter Data for this Project
   const projectReports = useMemo(() => reportList.filter(r => r.project_id === project.id), [reportList, project.id]);
@@ -357,26 +377,12 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
       return userActivityCounts[user.id] > (userActivityCounts[mostActive.id] || 0) ? user : mostActive;
     }, projectTeam[0]) : { id: '', name: 'No users' };
 
-    // Financials
-    const budget = project.budget || 0;
-    const spent = project.budget_spent || 0;
-    const remaining = budget - spent;
-    const burnRate = budget > 0 ? Math.round((spent / budget) * 100) : 0;
-
-    // Schedule
-    const start = new Date(project.start_date).getTime();
-    const end = new Date(project.finish_date).getTime();
-    const now = new Date().getTime();
-    const totalDuration = end - start;
-    const elapsed = now - start;
-    const timeProgress = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
-
     return {
       openReports: projectReports.filter(r => r.status !== 'closed').length,
       activePtws: projectPtws.filter(p => p.status === 'ACTIVE').length,
       pendingInspections: projectInspections.filter(i => i.status !== 'Closed').length,
       safetyScore: 92, // Mock
-      progress: project.progress || 0,
+      progress: 0, // Mock
       totalActivities: activityFeed.length,
       todayActivities: todayActivities.length,
       teamSize: projectTeam.length,
@@ -389,39 +395,30 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
         rams: projectRams.length,
         training: projectTraining.length,
         tbt: projectTbt.length
-      },
-      financials: { budget, spent, remaining, burnRate },
-      schedule: { timeProgress, daysLeft: Math.ceil((end - now) / (1000 * 60 * 60 * 24)) }
+      }
     };
-  }, [projectReports, projectPtws, projectInspections, projectRams, projectTraining, projectTbt, activityFeed, projectTeam, project]);
+  }, [projectReports, projectPtws, projectInspections, projectRams, projectTraining, projectTbt, activityFeed, projectTeam]);
 
   const projectStatus = (project.status || 'Unknown').toUpperCase();
 
-  const handleUpdateProject = (data: any) => {
-      // In a real app, this would call an update function, not create
-      // For now, we'll just log it as we are using mock data mostly
-      console.log("Updating project:", data);
-      setIsEditModalOpen(false);
-  };
-
   return (
-    <div className="space-y-6 animate-fade-in pb-10 bg-gray-50 dark:bg-slate-950 min-h-screen">
+    <div className="space-y-6 animate-fade-in pb-10 bg-gradient-to-b from-slate-950 to-slate-900 min-h-screen">
       {/* Header */}
-      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+      <div className="bg-gradient-to-r from-slate-900/50 to-slate-800/30 border border-white/10 rounded-2xl p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-6">
-            <Button variant="secondary" onClick={onBack} leftIcon={<ArrowLeft className="w-4 h-4" />} className="bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 border-transparent">Back</Button>
+            <Button variant="secondary" onClick={onBack} leftIcon={<ArrowLeft className="w-4 h-4" />} className="bg-white/5 hover:bg-white/10 border-white/10">Back</Button>
             <div className="flex items-center gap-6">
-              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg border-4 border-white dark:border-slate-800">
+              <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-2xl border-4 border-white/20">
                 {project.name.charAt(0)}
               </div>
               <div>
                 <div className="flex items-center gap-4 mb-2">
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{project.name}</h1>
+                  <h1 className="text-3xl font-bold text-white">{project.name}</h1>
                   <Badge color={project.status === 'active' ? 'green' : 'yellow'}>{projectStatus}</Badge>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-gray-500 dark:text-slate-300 text-sm">
-                  <span className="font-mono bg-gray-100 dark:bg-white/10 px-3 py-1 rounded-lg text-xs">{project.code || 'PRJ-001'}</span>
+                <div className="flex flex-wrap items-center gap-4 text-slate-300 text-sm">
+                  <span className="font-mono bg-white/10 px-3 py-1 rounded-lg text-xs">{project.code || 'PRJ-001'}</span>
                   <span className="flex items-center gap-2"><MapPin className="w-4 h-4"/> {project.location}</span>
                   <span className="flex items-center gap-2"><Users className="w-4 h-4"/> {stats.teamSize} members</span>
                   <span className="flex items-center gap-2"><ActivityIcon className="w-4 h-4"/> {stats.totalActivities} activities</span>
@@ -430,27 +427,25 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
             </div>
           </div>
           <div className="flex gap-3">
-             <Button variant="outline" className="border-gray-300 dark:border-white/10 text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><Download className="w-4 h-4" /></Button>
-             <Button variant="outline" className="border-gray-300 dark:border-white/10 text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><Share2 className="w-4 h-4" /></Button>
-             <Button variant="outline" onClick={() => window.print()} className="border-gray-300 dark:border-white/10 text-gray-700 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10"><Printer className="w-4 h-4" /></Button>
+             <Button variant="outline" className="border-white/10 text-white hover:bg-white/10"><Download className="w-4 h-4" /></Button>
+             <Button variant="outline" className="border-white/10 text-white hover:bg-white/10"><Share2 className="w-4 h-4" /></Button>
+             <Button variant="outline" onClick={() => window.print()} className="border-white/10 text-white hover:bg-white/10"><Printer className="w-4 h-4" /></Button>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden px-6 py-3 shadow-sm">
-        <nav className="flex space-x-8 overflow-x-auto">
-          {['Overview', 'Financials', 'Schedule', 'Team', 'Safety', 'Documents', 'Settings'].map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`relative py-3 font-medium text-sm transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === tab ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'}`}>
+      <div className="bg-slate-900/50 border border-white/10 rounded-xl overflow-hidden px-6 py-3">
+        <nav className="flex space-x-8">
+          {['Overview', 'Team', 'Activities', 'Safety', 'Documents'].map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`relative py-3 font-medium text-sm transition-colors flex items-center gap-2 ${activeTab === tab ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-200'}`}>
               {tab === 'Overview' && <BarChart3 className="w-4 h-4" />}
-              {tab === 'Financials' && <DollarSign className="w-4 h-4" />}
-              {tab === 'Schedule' && <Calendar className="w-4 h-4" />}
               {tab === 'Team' && <Users className="w-4 h-4" />}
+              {tab === 'Activities' && <ActivityIcon className="w-4 h-4" />}
               {tab === 'Safety' && <Shield className="w-4 h-4" />}
               {tab === 'Documents' && <FileText className="w-4 h-4" />}
-              {tab === 'Settings' && <Settings className="w-4 h-4" />}
               {tab}
-              {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400"></span>}
+              {activeTab === tab && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-green-500"></span>}
             </button>
           ))}
         </nav>
@@ -475,8 +470,8 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                             ))
                         ) : (
                             <div className="text-center py-12">
-                                <ActivityIcon className="w-16 h-16 text-gray-300 dark:text-slate-700 mx-auto mb-4" />
-                                <p className="text-gray-500 dark:text-slate-500">No activities found</p>
+                                <ActivityIcon className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+                                <p className="text-slate-500">No activities found</p>
                             </div>
                         )}
                     </div>
@@ -502,8 +497,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }} />
-                                <Legend />
+                                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
@@ -512,90 +506,29 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
         </div>
       )}
 
-      {activeTab === 'Financials' && (
-          <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <StatBox label="Total Budget" value={`$${stats.financials.budget.toLocaleString()}`} icon={<DollarSign className="w-6 h-6"/>} color="text-green-600" />
-                  <StatBox label="Spent to Date" value={`$${stats.financials.spent.toLocaleString()}`} icon={<TrendingDown className="w-6 h-6"/>} color="text-red-600" />
-                  <StatBox label="Remaining" value={`$${stats.financials.remaining.toLocaleString()}`} icon={<Briefcase className="w-6 h-6"/>} color="text-blue-600" />
-              </div>
-
-              <DashboardWidget title="Budget Burn Rate">
-                  <div className="mb-4">
-                      <div className="flex justify-between text-sm mb-2">
-                          <span className="text-gray-600 dark:text-gray-400">Budget Used</span>
-                          <span className="font-bold text-gray-900 dark:text-white">{stats.financials.burnRate}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
-                          <div 
-                            className={`h-4 rounded-full transition-all duration-1000 ${stats.financials.burnRate > 90 ? 'bg-red-500' : stats.financials.burnRate > 75 ? 'bg-yellow-500' : 'bg-green-500'}`} 
-                            style={{ width: `${stats.financials.burnRate}%` }}
-                          ></div>
-                      </div>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                      {stats.financials.burnRate > 100 
-                        ? "⚠️ Project is over budget." 
-                        : "✅ Project is within budget limits."}
-                  </p>
-              </DashboardWidget>
-          </div>
-      )}
-
-      {activeTab === 'Schedule' && (
-          <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <StatBox label="Days Remaining" value={stats.schedule.daysLeft} icon={<Clock className="w-6 h-6"/>} color="text-blue-600" subtext={`Ends on ${new Date(project.finish_date).toLocaleDateString()}`} />
-                  <StatBox label="Timeline Progress" value={`${stats.schedule.timeProgress}%`} icon={<Calendar className="w-6 h-6"/>} color="text-purple-600" />
-              </div>
-
-              <DashboardWidget title="Project Timeline">
-                  <div className="relative pt-8 pb-4">
-                      <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 dark:bg-gray-700 -translate-y-1/2"></div>
-                      <div className="flex justify-between relative z-10">
-                          <div className="flex flex-col items-center">
-                              <div className="w-4 h-4 rounded-full bg-green-500 border-4 border-white dark:border-slate-900"></div>
-                              <span className="mt-2 text-xs font-bold text-gray-600 dark:text-gray-400">Start</span>
-                              <span className="text-[10px] text-gray-400">{new Date(project.start_date).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex flex-col items-center" style={{ left: `${stats.schedule.timeProgress}%`, position: 'absolute' }}>
-                              <div className="w-6 h-6 rounded-full bg-blue-600 border-4 border-white dark:border-slate-900 shadow-lg"></div>
-                              <span className="mt-2 text-xs font-bold text-blue-600">Today</span>
-                          </div>
-                          <div className="flex flex-col items-center">
-                              <div className="w-4 h-4 rounded-full bg-gray-400 border-4 border-white dark:border-slate-900"></div>
-                              <span className="mt-2 text-xs font-bold text-gray-600 dark:text-gray-400">Finish</span>
-                              <span className="text-[10px] text-gray-400">{new Date(project.finish_date).toLocaleDateString()}</span>
-                          </div>
-                      </div>
-                  </div>
-              </DashboardWidget>
-          </div>
-      )}
-
       {activeTab === 'Team' && (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Project Team</h2>
-                    <p className="text-gray-500 dark:text-slate-400 text-sm">{stats.teamSize} members working on this project</p>
+                    <h2 className="text-xl font-bold text-white mb-1">Project Team</h2>
+                    <p className="text-slate-400 text-sm">{stats.teamSize} members working on this project</p>
                 </div>
                 <div className="flex gap-3">
-                    <div className="flex border rounded-lg border-gray-300 dark:border-white/10 bg-white dark:bg-slate-900">
+                    <div className="flex border rounded-lg border-white/10">
                         <button 
                             onClick={() => setTeamView('grid')}
-                            className={`p-2 rounded-l-lg ${teamView === 'grid' ? 'bg-gray-100 dark:bg-white/10' : ''}`}
+                            className={`p-2 ${teamView === 'grid' ? 'bg-white/10' : ''}`}
                         >
-                            <BarChart3 className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                            <BarChart3 className="w-4 h-4" />
                         </button>
                         <button 
                             onClick={() => setTeamView('list')}
-                            className={`p-2 rounded-r-lg ${teamView === 'list' ? 'bg-gray-100 dark:bg-white/10' : ''}`}
+                            className={`p-2 ${teamView === 'list' ? 'bg-white/10' : ''}`}
                         >
-                            <List className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                            <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={onEdit}>
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600" onClick={onEdit}>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Member
                     </Button>
@@ -612,7 +545,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                         />
                     ))}
                     {projectTeam.length === 0 && (
-                        <p className="text-gray-500 italic col-span-full text-center">No team members assigned.</p>
+                        <p className="text-slate-500 italic col-span-full text-center">No team members assigned.</p>
                     )}
                 </div>
             ) : (
@@ -620,30 +553,32 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-gray-200 dark:border-white/10">
-                                    <th className="pb-3 text-left text-gray-500 dark:text-slate-400 font-medium">Member</th>
-                                    <th className="pb-3 text-left text-gray-500 dark:text-slate-400 font-medium">Role</th>
-                                    <th className="pb-3 text-left text-gray-500 dark:text-slate-400 font-medium">Activities</th>
-                                    <th className="pb-3 text-left text-gray-500 dark:text-slate-400 font-medium">Last Active</th>
-                                    <th className="pb-3 text-left text-gray-500 dark:text-slate-400 font-medium">Status</th>
-                                    <th className="pb-3 text-left text-gray-500 dark:text-slate-400 font-medium">Actions</th>
+                                <tr className="border-b border-white/10">
+                                    <th className="pb-3 text-left text-slate-400 font-medium">Member</th>
+                                    <th className="pb-3 text-left text-slate-400 font-medium">Role</th>
+                                    <th className="pb-3 text-left text-slate-400 font-medium">Activities</th>
+                                    <th className="pb-3 text-left text-slate-400 font-medium">Last Active</th>
+                                    <th className="pb-3 text-left text-slate-400 font-medium">Status</th>
+                                    <th className="pb-3 text-left text-slate-400 font-medium">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                            <tbody className="divide-y divide-white/5">
                                 {projectTeam.map(user => {
                                     const userActivities = activityFeed.filter(a => a.user?.id === user.id);
                                     const lastActivity = userActivities[0];
                                     
+                                    const roleLabel = (user.role || 'Unknown').replace(/_/g, ' ');
+
                                     return (
-                                        <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                                        <tr key={user.id} className="hover:bg-white/5 transition-colors">
                                             <td className="py-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold">
                                                         {user.name?.charAt(0) || '?'}
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-gray-900 dark:text-white">{user.name}</p>
-                                                        <p className="text-xs text-gray-500 dark:text-slate-500">{user.email}</p>
+                                                        <p className="font-medium text-white">{user.name}</p>
+                                                        <p className="text-xs text-slate-500">{user.email}</p>
                                                     </div>
                                                 </div>
                                             </td>
@@ -654,31 +589,31 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                                                     user.role === 'SUPERVISOR' ? 'green' :
                                                     user.role === 'INSPECTOR' ? 'amber' : 'gray'
                                                 } size="sm">
-                                                    {(user.role || 'Unknown').replace('_', ' ')}
+                                                    {roleLabel}
                                                 </Badge>
                                             </td>
                                             <td className="py-3">
-                                                <div className="text-gray-900 dark:text-white font-medium">{userActivities.length}</div>
-                                                <div className="text-xs text-gray-500">total activities</div>
+                                                <div className="text-white font-medium">{userActivities.length}</div>
+                                                <div className="text-xs text-slate-500">total activities</div>
                                             </td>
                                             <td className="py-3">
                                                 {lastActivity ? (
                                                     <>
-                                                        <div className="text-gray-900 dark:text-white text-sm">
+                                                        <div className="text-white text-sm">
                                                             {new Date(lastActivity.timestamp).toLocaleDateString()}
                                                         </div>
-                                                        <div className="text-xs text-gray-500">
+                                                        <div className="text-xs text-slate-500">
                                                             {lastActivity.type}
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <div className="text-gray-500 text-sm">No activity</div>
+                                                    <div className="text-slate-500 text-sm">No activity</div>
                                                 )}
                                             </td>
                                             <td className="py-3">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                                    <span className="text-sm text-gray-600 dark:text-slate-300">Active</span>
+                                                    <span className="text-sm text-slate-300">Active</span>
                                                 </div>
                                             </td>
                                             <td className="py-3">
@@ -717,10 +652,10 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={[{name: 'Mon', val: 2}, {name: 'Tue', val: 1}, {name: 'Wed', val: 3}, {name: 'Thu', val: 0}, {name: 'Fri', val: 1}]}>
                                 <defs><linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#EF4444" stopOpacity={0.4}/><stop offset="95%" stopColor="#EF4444" stopOpacity={0}/></linearGradient></defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(128,128,128,0.1)" vertical={false} />
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                 <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
                                 <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-                                <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#1e293b' }} />
+                                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: '#fff' }} />
                                 <Area type="monotone" dataKey="val" stroke="#EF4444" strokeWidth={2} fillOpacity={1} fill="url(#colorVal)" />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -728,78 +663,15 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                 </DashboardWidget>
                 <DashboardWidget title="Environmental Monitoring">
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20"><div className="flex justify-between mb-2"><span className="text-sm text-gray-600 dark:text-slate-300">Temp</span><Thermometer className="w-5 h-5 text-blue-400"/></div><p className="text-2xl font-bold text-gray-900 dark:text-white">32°C</p></div>
-                        <div className="p-4 rounded-xl bg-cyan-50 dark:bg-cyan-900/10 border border-cyan-100 dark:border-cyan-900/20"><div className="flex justify-between mb-2"><span className="text-sm text-gray-600 dark:text-slate-300">Humidity</span><Droplets className="w-5 h-5 text-cyan-400"/></div><p className="text-2xl font-bold text-gray-900 dark:text-white">65%</p></div>
-                        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20"><div className="flex justify-between mb-2"><span className="text-sm text-gray-600 dark:text-slate-300">Air Quality</span><Wind className="w-5 h-5 text-emerald-400"/></div><p className="text-2xl font-bold text-gray-900 dark:text-white">Good</p></div>
-                        <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20"><div className="flex justify-between mb-2"><span className="text-sm text-gray-600 dark:text-slate-300">Noise</span><CloudLightning className="w-5 h-5 text-amber-400"/></div><p className="text-2xl font-bold text-gray-900 dark:text-white">85 dB</p></div>
+                        <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20"><div className="flex justify-between mb-2"><span className="text-sm text-slate-300">Temp</span><Thermometer className="w-5 h-5 text-blue-400"/></div><p className="text-2xl font-bold text-white">32°C</p></div>
+                        <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20"><div className="flex justify-between mb-2"><span className="text-sm text-slate-300">Humidity</span><Droplets className="w-5 h-5 text-cyan-400"/></div><p className="text-2xl font-bold text-white">65%</p></div>
+                        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20"><div className="flex justify-between mb-2"><span className="text-sm text-slate-300">Air Quality</span><Wind className="w-5 h-5 text-emerald-400"/></div><p className="text-2xl font-bold text-white">Good</p></div>
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20"><div className="flex justify-between mb-2"><span className="text-sm text-slate-300">Noise</span><CloudLightning className="w-5 h-5 text-amber-400"/></div><p className="text-2xl font-bold text-white">85 dB</p></div>
                     </div>
                 </DashboardWidget>
             </div>
         </div>
       )}
-
-      {activeTab === 'Documents' && (
-          <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">Project Documents</h3>
-                  <Button leftIcon={<Upload className="w-4 h-4" />}>Upload File</Button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {['Blueprints', 'Safety Plans', 'Permits', 'Reports', 'Contracts'].map(folder => (
-                      <div key={folder} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl flex items-center gap-3 hover:shadow-md cursor-pointer transition-all">
-                          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
-                              <Folder className="w-6 h-6" />
-                          </div>
-                          <div>
-                              <p className="font-bold text-gray-900 dark:text-white">{folder}</p>
-                              <p className="text-xs text-gray-500">0 files</p>
-                          </div>
-                      </div>
-                  ))}
-              </div>
-
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-8 text-center">
-                  <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-                      <FileText className="w-8 h-8" />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900 dark:text-white">No documents yet</h4>
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Upload project files to share with your team.</p>
-              </div>
-          </div>
-      )}
-
-      {activeTab === 'Settings' && (
-          <div className="space-y-6">
-              <DashboardWidget title="Project Settings">
-                  <div className="space-y-4">
-                      <div className="flex justify-between items-center p-4 border border-gray-200 dark:border-gray-800 rounded-lg">
-                          <div>
-                              <h4 className="font-bold text-gray-900 dark:text-white">Edit Project Details</h4>
-                              <p className="text-sm text-gray-500">Update name, location, or timeline.</p>
-                          </div>
-                          <Button variant="secondary" onClick={() => setIsEditModalOpen(true)}>Edit</Button>
-                      </div>
-                      
-                      <div className="flex justify-between items-center p-4 border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 rounded-lg">
-                          <div>
-                              <h4 className="font-bold text-red-700 dark:text-red-400">Archive Project</h4>
-                              <p className="text-sm text-red-600 dark:text-red-300">This will hide the project from the main list.</p>
-                          </div>
-                          <Button variant="danger" leftIcon={<Trash2 className="w-4 h-4" />}>Archive</Button>
-                      </div>
-                  </div>
-              </DashboardWidget>
-          </div>
-      )}
-
-      <ProjectCreationModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSubmit={handleUpdateProject}
-        users={usersList}
-        initialData={project}
-      />
     </div>
   );
 };

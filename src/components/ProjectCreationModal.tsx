@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { 
@@ -11,6 +11,7 @@ interface ProjectCreationModalProps {
   onClose: () => void;
   onSubmit: (data: any) => void;
   users: User[];
+  initialData?: Partial<Project> | null; // <--- Added this prop
 }
 
 const STEPS = [
@@ -20,9 +21,10 @@ const STEPS = [
   { id: 4, title: 'Review', icon: CheckCircle },
 ];
 
-export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onClose, onSubmit, users }) => {
+export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOpen, onClose, onSubmit, users, initialData }) => {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
+  
+  const defaultData = {
     name: '',
     code: '',
     location: '',
@@ -34,18 +36,30 @@ export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOp
     safety_officer_id: '',
     initial_risk_level: 'Medium',
     budget: 0,
-  });
+  };
+
+  const [formData, setFormData] = useState(defaultData);
   const [error, setError] = useState('');
 
+  // Reset or Populate form when modal opens
+  useEffect(() => {
+    if (isOpen) {
+        setStep(1);
+        if (initialData) {
+            setFormData({ ...defaultData, ...initialData });
+        } else {
+            setFormData(defaultData);
+        }
+    }
+  }, [isOpen, initialData]);
+
   // --- FILTER USERS FOR DROPDOWNS ---
-  // Allow Admins, Org Admins, and Managers to be Project Managers
   const availableManagers = useMemo(() => {
     return users.filter(u => 
       ['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR'].includes(u.role)
     );
   }, [users]);
 
-  // Allow Officers, Inspectors, and Managers to be Safety Leads
   const availableOfficers = useMemo(() => {
     return users.filter(u => 
       ['HSE_OFFICER', 'INSPECTOR', 'HSE_MANAGER'].includes(u.role)
@@ -95,7 +109,7 @@ export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOp
         {/* Header */}
         <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900 rounded-t-2xl">
           <div>
-            <h2 className="text-2xl font-bold text-white">New Project Setup</h2>
+            <h2 className="text-2xl font-bold text-white">{initialData ? 'Edit Project' : 'New Project Setup'}</h2>
             <p className="text-slate-400 text-sm mt-1">Step {step} of 4</p>
           </div>
           
@@ -278,9 +292,9 @@ export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOp
               <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-10 h-10 text-green-500" />
               </div>
-              <h3 className="text-2xl font-bold text-white">Ready to Launch?</h3>
+              <h3 className="text-2xl font-bold text-white">Ready to {initialData ? 'Update' : 'Launch'}?</h3>
               <p className="text-slate-400 max-w-md mx-auto">
-                You are about to create project <span className="text-white font-bold">{formData.name}</span>. 
+                You are about to {initialData ? 'update' : 'create'} project <span className="text-white font-bold">{formData.name}</span>. 
                 Team members will be notified immediately.
               </p>
               
@@ -324,7 +338,7 @@ export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOp
             </Button>
           ) : (
             <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/20">
-              Launch Project
+              {initialData ? 'Update Project' : 'Launch Project'}
             </Button>
           )}
         </div>
