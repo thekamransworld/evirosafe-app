@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext'; // <--- IMPORT THIS
 import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
@@ -52,10 +53,10 @@ import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
 
-// --- Auth Sync ---
+// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
-  const { setUsersList, login, logout, activeOrg } = useAppContext();
+  const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
 
   useEffect(() => {
     if (!currentUser) {
@@ -67,16 +68,27 @@ const AuthSync: React.FC = () => {
     const email = currentUser.email || `user-${uid.slice(0, 6)}@evirosafe.local`;
     const displayName = currentUser.displayName || email.split('@')[0];
 
+    // Ensure user exists in local state
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
 
+      const existingUser = prev[0];
+      
       const defaultPreferences: User['preferences'] = {
           language: 'en',
           default_view: 'dashboard',
-          units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' }
+          units: { 
+            temperature: 'C', 
+            wind_speed: 'km/h', 
+            height: 'm', 
+            weight: 'kg' 
+          }
       };
 
-      const newUser: User = {
+      const template = existingUser ? {
+        ...existingUser,
+        preferences: existingUser.preferences || defaultPreferences
+      } : {
         id: uid,
         org_id: activeOrg?.id || 'org1',
         email,
@@ -87,9 +99,19 @@ const AuthSync: React.FC = () => {
         preferences: defaultPreferences
       };
 
+      const newUser: User = {
+        ...template,
+        id: uid,
+        org_id: activeOrg?.id || template.org_id,
+        email,
+        name: displayName,
+        status: 'active'
+      } as User;
+
       return [newUser, ...prev];
     });
 
+    // Force login to set activeUser
     login(uid);
   }, [currentUser, activeOrg?.id]);
 
@@ -102,15 +124,11 @@ const GlobalModals = () => {
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
-    // Plans Modals
     isPlanCreationModalOpen, setIsPlanCreationModalOpen, selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit,
-    // RAMS Modals
     isRamsCreationModalOpen, setIsRamsCreationModalOpen, selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit,
-    // TBT & Training
     isTbtCreationModalOpen, setIsTbtCreationModalOpen, selectedTbt, setSelectedTbt,
     isCourseModalOpen, setCourseModalOpen, isSessionModalOpen, setSessionModalOpen, isAttendanceModalOpen, setAttendanceModalOpen,
     courseForSession, sessionForAttendance,
-    // Actions & Inspections
     isActionCreationModalOpen, setIsActionCreationModalOpen,
     isInspectionCreationModalOpen, setIsInspectionCreationModalOpen
   } = useModalContext();
@@ -130,32 +148,21 @@ const GlobalModals = () => {
 
   return (
     <>
-      {/* Reports */}
       <ReportCreationModal isOpen={isReportCreationModalOpen} onClose={() => setIsReportCreationModalOpen(false)} initialData={reportInitialData} />
       {selectedReport && <ReportDetailModal report={selectedReport} users={usersList} activeUser={activeUser} onClose={() => setSelectedReport(null)} onStatusChange={handleStatusChange} onCapaActionChange={handleCapaActionChange} onAcknowledgeReport={handleAcknowledgeReport} />}
-      
-      {/* PTW */}
       <PtwCreationModal isOpen={isPtwCreationModalOpen} onClose={() => setIsPtwCreationModalOpen(false)} onSubmit={handleCreatePtw} mode={ptwCreationMode} />
       {selectedPtw && <PtwDetailModal ptw={selectedPtw} onClose={() => setSelectedPtw(null)} onUpdate={handleUpdatePtw} />}
-      
-      {/* PLANS - THIS WAS MISSING OR BROKEN */}
       <PlanCreationModal isOpen={isPlanCreationModalOpen} onClose={() => setIsPlanCreationModalOpen(false)} onSubmit={handleCreatePlan} projects={projects} />
       {selectedPlan && <PlanDetailModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onStatusChange={handlePlanStatusChange} />}
       {selectedPlanForEdit && <PlanEditorModal plan={selectedPlanForEdit} onClose={() => setSelectedPlanForEdit(null)} onSave={handleUpdatePlan} onSubmitForReview={handlePlanStatusChange} />}
-      
-      {/* RAMS */}
       <RamsCreationModal isOpen={isRamsCreationModalOpen} onClose={() => setIsRamsCreationModalOpen(false)} onSubmit={handleCreateRams} projects={projects} activeUser={activeUser} />
       {selectedRams && <RamsDetailModal rams={selectedRams} onClose={() => setSelectedRams(null)} onStatusChange={handleRamsStatusChange} />}
       {selectedRamsForEdit && <RamsEditorModal rams={selectedRamsForEdit} onClose={() => setSelectedRamsForEdit(null)} onSave={handleUpdateRams} onSubmitForReview={handleRamsStatusChange} />}
-      
-      {/* TBT & Training */}
       <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={activeUser} />
       {selectedTbt && <TbtSessionModal session={selectedTbt} onClose={() => setSelectedTbt(null)} onUpdate={handleUpdateTbt} users={usersList} />}
       <TrainingCourseModal isOpen={isCourseModalOpen} onClose={() => setCourseModalOpen(false)} courses={trainingCourseList} onUpdateCourse={handleCreateOrUpdateCourse} />
       {courseForSession && <TrainingSessionModal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} onSubmit={handleScheduleSession} course={courseForSession} projects={projects} users={usersList} />}
       {sessionForAttendance && <SessionAttendanceModal isOpen={isAttendanceModalOpen} onClose={() => setAttendanceModalOpen(false)} onSubmit={handleCloseSession} session={sessionForAttendance} users={usersList} />}
-      
-      {/* Actions & Inspections */}
       <ActionCreationModal isOpen={isActionCreationModalOpen} onClose={() => setIsActionCreationModalOpen(false)} onSubmit={handleCreateStandaloneAction} users={usersList} projects={projects} />
       <InspectionCreationModal isOpen={isInspectionCreationModalOpen} onClose={() => setIsInspectionCreationModalOpen(false)} onSubmit={handleCreateInspection} projects={projects} users={usersList} checklistTemplates={checklistTemplates} />
     </>
@@ -181,6 +188,7 @@ const AppContent = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // --- LOADING STATE ---
   if (authLoading || (currentUser && dataLoading)) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-white flex-col gap-4">
@@ -221,15 +229,12 @@ const AppContent = () => {
           )}
           {currentView === 'inspections' && <Inspections />}
           {currentView === 'actions' && <Actions />}
-          
-          {/* PLANS VIEW - WIRED UP CORRECTLY */}
           {currentView === 'plans' && (
             <Plans
               onSelectPlan={(plan) => plan.status === 'draft' ? setSelectedPlanForEdit(plan) : setSelectedPlan(plan)}
               onNewPlan={() => setIsPlanCreationModalOpen(true)}
             />
           )}
-          
           {currentView === 'rams' && (
             <Rams
               onSelectRams={(rams) => rams.status === 'draft' ? setSelectedRamsForEdit(rams) : setSelectedRams(rams)}
@@ -274,9 +279,12 @@ export default function App() {
         <AppProvider>
           <AuthSync />
           <DataProvider>
-            <ModalProvider>
-              <AppContent />
-            </ModalProvider>
+            {/* WRAP WITH PTW WORKFLOW PROVIDER */}
+            <PtwWorkflowProvider>
+              <ModalProvider>
+                <AppContent />
+              </ModalProvider>
+            </PtwWorkflowProvider>
           </DataProvider>
         </AppProvider>
       </ToastProvider>
