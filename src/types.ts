@@ -16,6 +16,33 @@ export interface Organization {
   };
   industry: string;
   country: string;
+  created_at?: string; // Added
+  // Added Enhanced Fields
+  contact_details?: {
+    phone: string;
+    email: string;
+    address: string;
+    website: string;
+    contact_person: string;
+  };
+  operational_details?: {
+    timezone: string;
+    working_hours: string;
+    holidays: string[];
+    emergency_contacts: { name: string; role: string; phone: string; email: string; }[];
+  };
+  safety_metrics?: {
+    incident_rate: number;
+    safety_score: number;
+    last_audit_date: string;
+    compliance_level: 'Low' | 'Medium' | 'High' | 'Excellent';
+  };
+  subscription?: {
+    plan: 'Free' | 'Basic' | 'Professional' | 'Enterprise';
+    seats: number;
+    renewal_date: string;
+    features: string[];
+  };
 }
 
 export interface User {
@@ -29,6 +56,8 @@ export interface User {
   mobile?: string;
   designation?: string;
   company?: string;
+  department?: string; // Added
+  phone?: string;      // Added
   preferences: {
     language: string;
     default_view: string;
@@ -48,22 +77,25 @@ export interface Project {
   org_id: string;
   name: string;
   code: string;
-  status: 'active' | 'pending' | 'archived';
+  // Expanded status to fix analytics error
+  status: 'active' | 'pending' | 'archived' | 'completed' | 'on_hold'; 
   location: string;
   start_date: string;
   finish_date: string;
+  end_date?: string; // Added alias for finish_date
   manager_id: string;
   type: string;
   safety_score?: number;
   progress?: number;
   budget?: number;
   budget_spent?: number;
+  team_members?: string[]; // Added
 }
 
 export type Resource = 
   | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights';
 
-export type View = string;
+export type View = Resource | string;
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
 export type Scope = 'org' | 'project' | 'own';
 
@@ -129,18 +161,7 @@ export interface ActivityItem {
     priority?: 'low' | 'medium' | 'high';
 }
 
-// --- REPORTING ---
-export type ReportStatus = 
-  | 'draft' 
-  | 'submitted' 
-  | 'under_review' 
-  | 'under_investigation' 
-  | 'capa_required' 
-  | 'capa_in_progress' 
-  | 'pending_closure' 
-  | 'closed' 
-  | 'archived';
-
+export type ReportStatus = 'draft' | 'submitted' | 'under_review' | 'closed';
 export type ReportClassification = 'To Be Determined' | 'Minor' | 'Moderate' | 'Major' | 'Fatal';
 export type ImpactedParty = 'Employee' | 'Contractor' | 'Visitor' | 'Public' | 'Environment';
 export type RootCause = 'Human Error' | 'Equipment Failure' | 'Process Deficiency' | 'Environment' | 'Other';
@@ -190,30 +211,6 @@ export interface LeadershipEventDetails { event_type_code: string; leader_name?:
 
 export type ReportDetails = AccidentDetails | IncidentDetails | NearMissDetails | UnsafeActDetails | UnsafeConditionDetails | LeadershipEventDetails;
 
-export interface CostImpact {
-  directCosts: {
-    medical: number;
-    repair: number;
-    compensation: number;
-    fines: number;
-  };
-  indirectCosts: {
-    downtime: number;
-    lostProductivity: number;
-    training: number;
-    administrative: number;
-  };
-  totalEstimated: number;
-  insuranceCoverage: number;
-}
-
-export interface Witness {
-    name: string;
-    contact: string;
-    statement: string;
-    signature?: string;
-}
-
 export interface Report {
     id: string;
     creator_id: string;
@@ -245,117 +242,21 @@ export interface Report {
     identification?: { was_fire: boolean; was_injury: boolean; was_environment: boolean; };
     classification_codes?: string[];
     created_at?: string;
-    costs?: CostImpact;
-    witnesses?: Witness[];
-    lessons_learned?: string;
-    prevention_strategy?: string;
-    root_cause_analysis?: any;
 }
 
-// --- INSPECTIONS ---
 export type InspectionStatus = 'Draft' | 'Ongoing' | 'Submitted' | 'Under Review' | 'Approved' | 'Closed' | 'Archived' | 'In Progress' | 'Scheduled' | 'Pending Review' | 'Overdue';
-export type InspectionType = 'Safety' | 'Quality' | 'Environmental' | 'Fire' | 'Equipment' | 'Process';
-
-export type InspectionPhase = 
-  | 'planning'
-  | 'opening_meeting'
-  | 'execution'
-  | 'documentation'
-  | 'closing_meeting'
-  | 'follow_up'
-  | 'closed';
-
-export type ObservationCategory = 
-  | 'people_behaviors'
-  | 'equipment_machinery'
-  | 'materials_substances'
-  | 'work_environment'
-  | 'documentation'
-  | 'emergency_preparedness'
-  | 'management_systems';
-
-export type ObservationType = 
-  | 'unsafe_act'
-  | 'unsafe_condition'
-  | 'non_compliance'
-  | 'best_practice'
-  | 'observation';
-
-export interface ImmediateControl {
-  action: string;
-  taken_by: string;
-  taken_at: string;
-  effectiveness: 'effective' | 'partially_effective' | 'ineffective';
-}
 
 export interface InspectionFinding {
     id: string;
     checklist_item_id?: string;
     description: string;
-    risk_level: 'Low' | 'Medium' | 'High' | 'Critical';
-    category: string;
-    observation_category: string;
-    observation_type: string;
+    risk_level: 'Low' | 'Medium' | 'High';
+    category: 'Unsafe Act' | 'Unsafe Condition' | 'Documentation' | 'Equipment' | 'Environmental';
     evidence_urls: string[];
     corrective_action_required: boolean;
     responsible_person_id?: string;
     due_date?: string;
     gps_tag?: { lat: number, lng: number };
-    immediate_controls: ImmediateControl[];
-    root_causes: string[];
-    status: 'open' | 'in_progress' | 'closed';
-    created_at: string;
-    updated_at?: string;
-    created_by: string;
-    verification_data?: {
-        verified_by: string;
-        verified_at: string;
-        notes: string;
-        evidence_urls: string[];
-    };
-    finding_number?: string;
-    risk_assessment?: any;
-    type?: any;
-}
-
-export interface OpeningMeetingData {
-  conducted_at: string;
-  supervisor_present: string;
-  hazards_discussed: string;
-  emergency_procedures_confirmed: boolean;
-  permits_verified: boolean;
-  stop_work_authority_confirmed: boolean;
-  attendees: string[];
-  notes: string;
-}
-
-export interface ClosingMeetingData {
-  conducted_at: string;
-  key_findings_summary: string;
-  immediate_actions_agreed: string;
-  follow_up_required: boolean;
-  next_inspection_date?: string;
-  supervisor_acknowledged: boolean;
-  recommendations: string;
-}
-
-export interface ChecklistResponse {
-  value: 'pass' | 'fail' | 'na';
-  comments?: string;
-  evidence_ids?: string[];
-  timestamp: Date;
-  responder: string;
-}
-
-export interface ChecklistItem { 
-    id: string; 
-    text: Record<string, string>; 
-    description: Record<string, string>; 
-    riskLevel?: string;
-    requirement?: string;
-    criteria?: string;
-    category?: string;
-    response?: ChecklistResponse;
 }
 
 export interface Inspection {
@@ -363,7 +264,7 @@ export interface Inspection {
     org_id: string;
     project_id: string;
     title: string;
-    type: InspectionType;
+    type: 'Safety' | 'Quality' | 'Environmental' | 'Fire' | 'Equipment';
     status: InspectionStatus;
     person_responsible_id: string;
     checklist_template_id: string;
@@ -374,48 +275,20 @@ export interface Inspection {
     overall_comments?: string;
     audit_trail: AuditLogEntry[];
     inspection_id?: string;
-    phase?: InspectionPhase;
-    opening_meeting?: OpeningMeetingData;
-    closing_meeting?: ClosingMeetingData;
-    scheduled_follow_up?: string;
     location_area?: string;
     created_at?: string;
-    checklist_items?: ChecklistItem[];
-    schedule?: { scheduled_date: Date; scheduled_time: string };
-    inspection_team?: { team_lead?: any; inspectors?: any[] };
-    evidence?: Evidence[];
-    entity_id?: string;
+    // Enhanced Inspection Fields
+    phase?: 'planning' | 'opening_meeting' | 'execution' | 'documentation' | 'closing_meeting' | 'follow_up' | 'closed';
+    opening_meeting?: any;
+    closing_meeting?: any;
+    scheduled_follow_up?: string;
 }
 
-// --- ALIASES FOR BACKWARD COMPATIBILITY ---
-export type HSEInspection = Inspection;
-export type HSEFinding = InspectionFinding;
-
-export interface Evidence {
-  id: string;
-  type: 'photograph' | 'video_recording' | 'audio_note' | 'document_scan';
-  title: string;
-  description: string;
-  url: string;
-  file_name: string;
-  file_size: number;
-  file_type: string;
-  uploaded_by: string;
-  uploaded_at: Date;
-  gps_coordinates?: { latitude: number; longitude: number; accuracy: number };
-  timestamp: Date;
-  device_info?: any;
-  tags: string[];
-  encrypted: boolean;
-  access_control: string[];
-}
-
-// --- CHECKLISTS ---
+export interface ChecklistItem { id: string; text: Record<string, string>; description: Record<string, string>; riskLevel?: string; }
 export interface ChecklistTemplate { id: string; org_id: string; category: string; title: Record<string, string>; items: ChecklistItem[]; popularity?: number; estimatedTime?: number; aiGenerated?: boolean; }
 export interface ChecklistRunResult { item_id: string; result: 'pass' | 'fail' | 'na'; remarks?: string; evidence_urls?: string[]; }
 export interface ChecklistRun { id: string; org_id: string; project_id: string; template_id: string; executed_by_id: string; executed_at: string; status: 'in_progress' | 'completed'; score?: number; results: ChecklistRunResult[]; }
 
-// --- PLANS & RAMS ---
 export type PlanStatus = 'draft' | 'under_review' | 'approved' | 'published' | 'archived';
 export type PlanType = 'HSEMP' | 'Lifting' | 'Work at Height' | 'Confined Space' | 'Fire' | 'ERP' | 'EMP' | 'Waste';
 export interface PlanContentSection { title: string; content: string; is_complete: boolean; }
@@ -457,7 +330,6 @@ export interface Rams {
     audit_log: AuditLogEntry[];
 }
 
-// --- SIGNAGE & TBT ---
 export type SignCategory = 'Prohibition' | 'Mandatory' | 'Warning' | 'Emergency' | 'Fire' | 'Environmental' | 'Traffic' | 'Informational';
 export type HazardType = 'Fire' | 'Fall' | 'Electrical' | 'Chemical' | 'Noise' | 'Dropped Object' | 'Overhead Load' | 'Trip' | 'Slippery' | 'Explosion' | 'Moving Machinery' | 'Confined Space' | 'Excavation';
 export interface Sign { id: string; org_id: string; category: SignCategory; title: Record<string, string>; icon_url: string; description: Record<string, string>; matched_activities: PtwType[]; hazards: HazardType[]; }
@@ -471,14 +343,12 @@ export interface TbtSession {
     status: 'draft' | 'scheduled' | 'delivered' | 'closed' | 'archived'; audit_log: AuditLogEntry[];
 }
 
-// --- TRAINING ---
 export interface TrainingCourse { id: string; org_id: string; title: string; category: string; validity_months: number; syllabus: string; learning_objectives: string[]; requires_assessment: boolean; }
 export interface TrainingSession { id: string; course_id: string; project_id: string; scheduled_at: string; trainer_id: string; status: 'scheduled' | 'completed' | 'cancelled'; roster: string[]; attendance: { user_id: string; attended: boolean; score?: number; }[]; }
 export interface TrainingRecord { id: string; org_id: string; user_id: string; course_id: string; session_id: string; issued_at: string; expires_at: string; score?: number; status: 'valid' | 'expiring_soon' | 'expired'; }
 
-// --- PTW ---
-export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work' | 'Mechanical Work' | 'Chemical Handling';
-export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'APPROVED' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
+export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work';
+export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
 export type PtwCategory = 'standard' | 'high_risk' | 'operational' | 'emergency' | 'urgent';
 export type PtwWorkflowStage = PtwStatus;
 
@@ -501,12 +371,12 @@ export interface PtwClosure { note: string; permit_requester: PtwSignature; clie
 export interface CanonicalPtwPayload {
     creator_id: string; permit_no: string; category: PtwCategory;
     requester: any; contractor_safety_personnel?: any;
-    work: { location: string; description: string; coverage: { start_date: string; end_date: string; start_time: string; end_time: string; }; associated_permits?: string[]; number_of_workers?: number; risk_assessment_ref?: string; emergency_contact?: string; environmental_concerns?: string; work_method_statement?: string; };
+    work: { location: string; description: string; coverage: { start_date: string; end_date: string; start_time: string; end_time: string; }; associated_permits?: string[]; number_of_workers?: number; risk_assessment_ref?: string; emergency_contact?: string; };
     safety_requirements: PtwSafetyRequirement[]; ppe: PtwPpe;
     signoffs?: { client_proponent: PtwSignoff; other_stakeholders: PtwSignoff[]; client_hs: PtwSignoff; };
     joint_inspection?: { remarks: string; requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; };
     holding_or_stoppage?: PtwStoppage[]; extension?: PtwExtension; closure?: PtwClosure; attachments?: { name: string; url: string }[]; audit?: AuditLogEntry[];
-    global_compliance?: { standards: string[]; requirements_met?: Record<string, boolean>; created_at?: string; last_audit?: string | null; };
+    global_compliance?: { standards: string[] };
 }
 export interface PtwHotWorkPayload extends CanonicalPtwPayload { fire_watcher: { name: string; mobile: string; }; post_watch_minutes: number; }
 export interface PtwWorkAtHeightPayload extends CanonicalPtwPayload { access_equipment: any; }
