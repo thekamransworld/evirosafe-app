@@ -10,7 +10,8 @@ import {
   Sun as SunIcon, 
   Moon as MoonIcon, 
   Globe as LanguageIcon, 
-  Bell as BellIcon 
+  Bell as BellIcon,
+  WifiOff // <--- Added this
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,6 +21,30 @@ interface HeaderProps {
   user: User;
   toggleSidebar: () => void;
 }
+
+// --- OFFLINE INDICATOR COMPONENT ---
+const OfflineIndicator = () => {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleStatusChange = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleStatusChange);
+    window.addEventListener('offline', handleStatusChange);
+    return () => {
+      window.removeEventListener('online', handleStatusChange);
+      window.removeEventListener('offline', handleStatusChange);
+    };
+  }, []);
+
+  if (isOnline) return null;
+
+  return (
+    <div className="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-2 animate-pulse mr-2">
+      <WifiOff className="w-3 h-3" />
+      <span>Offline</span>
+    </div>
+  );
+};
 
 export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organizations, user, toggleSidebar }) => {
   const { notifications } = useDataContext();
@@ -86,7 +111,10 @@ export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organiz
        </div>
 
       <div className="flex items-center space-x-2 sm:space-x-3">
-         {/* --- THEME TOGGLE BUTTON --- */}
+         {/* Offline Indicator */}
+         <OfflineIndicator />
+
+         {/* Theme Toggle */}
          <button 
             onClick={toggleTheme} 
             className="p-2 rounded-full text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white transition-colors"
