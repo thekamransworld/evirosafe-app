@@ -11,7 +11,7 @@ interface ProjectCreationModalProps {
   onClose: () => void;
   onSubmit: (data: any) => void;
   users: User[];
-  initialData?: Partial<Project> | null; // <--- Added this prop
+  initialData?: Partial<Project> | null;
 }
 
 const STEPS = [
@@ -53,18 +53,29 @@ export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOp
     }
   }, [isOpen, initialData]);
 
-  // --- FILTER USERS FOR DROPDOWNS ---
+  // --- ROBUST USER FILTERING ---
   const availableManagers = useMemo(() => {
-    return users.filter(u => 
-      ['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR'].includes(u.role)
+    // 1. Try to find specific roles
+    const managers = users.filter(u => 
+      ['admin', 'org_admin', 'hse_manager', 'supervisor'].includes((u.role || '').toLowerCase())
     );
+    // 2. If no managers found, return ALL users (Fallback to prevent blocking)
+    return managers.length > 0 ? managers : users;
   }, [users]);
 
   const availableOfficers = useMemo(() => {
-    return users.filter(u => 
-      ['HSE_OFFICER', 'INSPECTOR', 'HSE_MANAGER'].includes(u.role)
+    const officers = users.filter(u => 
+      ['hse_officer', 'inspector', 'hse_manager'].includes((u.role || '').toLowerCase())
     );
+    return officers.length > 0 ? officers : users;
   }, [users]);
+
+  // Auto-select first manager if none selected
+  useEffect(() => {
+      if (step === 3 && !formData.manager_id && availableManagers.length > 0) {
+          setFormData(prev => ({ ...prev, manager_id: availableManagers[0].id }));
+      }
+  }, [step, availableManagers]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -248,7 +259,7 @@ export const ProjectCreationModal: React.FC<ProjectCreationModalProps> = ({ isOp
                       ))}
                     </select>
                     {availableManagers.length === 0 && (
-                        <p className="text-xs text-amber-500 mt-1">No managers found. You can assign yourself or invite a manager later.</p>
+                        <p className="text-xs text-amber-500 mt-1">No specific managers found. Showing all users.</p>
                     )}
                   </div>
 

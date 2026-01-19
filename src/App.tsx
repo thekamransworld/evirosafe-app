@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext'; // <--- IMPORT THIS
+import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext';
 import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
@@ -66,7 +66,9 @@ const AuthSync: React.FC = () => {
 
     const uid = currentUser.uid;
     const email = currentUser.email || `user-${uid.slice(0, 6)}@evirosafe.local`;
-    const displayName = currentUser.displayName || email.split('@')[0];
+    
+    // FIX: Better name fallback if displayName is missing
+    const displayName = currentUser.displayName || email.split('@')[0].replace(/[0-9]/g, '').replace('.', ' ') || 'User';
 
     // Ensure user exists in local state
     setUsersList(prev => {
