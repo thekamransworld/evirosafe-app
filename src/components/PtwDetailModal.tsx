@@ -81,17 +81,46 @@ const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any)
     </div>
 );
 
+const WorkflowActions: React.FC<{ onAction: (action: any) => void, onSave: () => void, ptw: Ptw }> = ({ onAction, onSave, ptw }) => {
+    const { activeUser, can } = useAppContext();
+    const canApprove = can('approve', 'ptw');
+    
+    return (
+        <div className="flex items-center space-x-2">
+            {ptw.status === 'DRAFT' && <Button variant="secondary" onClick={onSave}>Save Draft</Button>}
+            {ptw.status === 'DRAFT' && <Button onClick={() => onAction('submit')}>Submit for Review</Button>}
+            
+            {ptw.status === 'SUBMITTED' && canApprove && (
+                <>
+                    <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
+                    <Button onClick={() => onAction('approve_proponent')}>Approve (Proponent)</Button>
+                </>
+            )}
+            
+            {ptw.status === 'APPROVAL' && canApprove && (
+                 <>
+                    <Button variant="secondary" onClick={() => onAction('request_revision')}>Request Revision</Button>
+                    <Button variant="danger" onClick={() => onAction('reject')}>Reject</Button>
+                    <Button onClick={() => onAction('approve_hse')}>Approve (HSE)</Button>
+                </>
+            )}
+
+            {ptw.status === 'ACTIVE' && canApprove && <Button variant="danger" onClick={() => onAction('suspend')}>Suspend Permit</Button>}
+            {ptw.status === 'HOLD' && canApprove && <Button onClick={() => onAction('resume')}>Resume Work</Button>}
+            {(ptw.status === 'ACTIVE' || ptw.status === 'HOLD') && <Button onClick={() => onAction('close')}>Close Permit</Button>}
+        </div>
+    )
+}
+
 export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
   const { ptw, onClose, onUpdate } = props;
   const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'workflow' | 'isolations'>('details');
+  const [isIsolationModalOpen, setIsIsolationModalOpen] = useState(false);
   const toast = useToast();
   
   const { activeUser } = useAppContext();
-  const { moveToNextStage, getNextPossibleStages, getStageResponsibilities } = usePtwWorkflow();
-  const [isIsolationModalOpen, setIsIsolationModalOpen] = useState(false);
   
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
   
@@ -191,16 +220,10 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
       onUpdate(updatedFormData, 'save');
   };
   
-  const handleWorkflowAction = (stage: string) => {
-    if (!activeUser) return;
-    const updatedPtw = moveToNextStage(ptw, activeUser.id, `Moved to ${stage}`);
-    if (updatedPtw) {
-      onUpdate(updatedPtw, stage as any);
-    }
+  const handleWorkflowAction = (action: any) => {
+        if (!action) return;
+        onUpdate(formData, action);
   };
-
-  const nextStages = getNextPossibleStages(ptw);
-  const currentResponsibilities = getStageResponsibilities(ptw.status);
 
   const renderSectionContent = () => {
     switch(activeSection) {
@@ -524,137 +547,72 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end">
-        <div className="w-full max-w-4xl bg-white dark:bg-gray-900 h-full shadow-2xl flex flex-col animate-slide-in-right">
-          
-          {/* Header */}
-          <div className="p-6 border-b dark:border-gray-800 flex justify-between items-start bg-white dark:bg-gray-900">
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4 print:hidden" onClick={onClose} aria-modal="true" role="dialog" aria-labelledby="ptw-title">
+        <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0 print:hidden">
             <div>
-              <div className="flex items-center gap-3 mb-2">
-                <Badge color={ptw.status === 'ACTIVE' ? 'green' : 'blue'}>
-                  {ptw.status.replace(/_/g, ' ')}
+              <h2 id="ptw-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">{ptw.type} - {ptw.payload.permit_no || `Draft #${ptw.id.slice(-6)}`}</h2>
+              <div className="flex items-center space-x-2">
+                <Badge color={
+                    ptw.status === 'ACTIVE' ? 'green' : 
+                    ptw.status.includes('SUBMITTED') ? 'yellow' : 
+                    ptw.status === 'APPROVAL' ? 'blue' : 
+                    'gray'
+                }>
+                    {ptw.status.replace(/_/g, ' ')}
                 </Badge>
-                <span className="text-xs font-mono text-gray-500">{ptw.payload.permit_no || 'DRAFT'}</span>
+                {ptw.compliance_level && (
+                    <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                        <span className="text-yellow-500">⚠️</span> {ptw.compliance_level} Compliance
+                    </span>
+                )}
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{ptw.title}</h2>
-              <p className="text-sm text-gray-500">{ptw.type} • {ptw.project_id}</p>
             </div>
-            <div className="flex gap-2">
-               <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} />
-               <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-                  <X className="w-6 h-6 text-gray-500" />
-               </button>
+            <div className="flex items-center gap-4">
+              <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} downloadOptions={[{ label: 'Download PDF', handler: () => window.print() }]} />
+              <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
             </div>
+          </header>
+
+          <div className="flex-grow flex overflow-hidden">
+            <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0 print:hidden">
+              <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">SECTIONS</h3>
+              <ul className="space-y-1">
+                {sections.map(section => (
+                  <li key={section.key}>
+                    <button
+                      onClick={() => setActiveSection(section.key)}
+                      className={`w-full text-left p-3 rounded-md text-sm font-medium transition-colors ${
+                        activeSection === section.key 
+                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-4 border-primary-500' 
+                          : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 border-l-4 border-transparent'
+                      }`}
+                    >
+                      {section.key}. {section.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            <main className="flex-1 p-8 overflow-y-auto">
+              {renderSectionContent()}
+            </main>
           </div>
 
-          {/* Tabs */}
-          <div className="flex border-b dark:border-gray-800 px-6">
-              <button onClick={() => setActiveTab('details')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'details' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>Details</button>
-              <button onClick={() => setActiveTab('workflow')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'workflow' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>Workflow & Audit</button>
-              <button onClick={() => setActiveTab('isolations')} className={`px-4 py-3 text-sm font-medium border-b-2 ${activeTab === 'isolations' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500'}`}>Isolations (LOTO)</button>
-          </div>
-
-          {/* Body */}
-          <div className="flex-1 overflow-hidden flex">
-            
-            {activeTab === 'details' ? (
-                <>
-                    {/* SIDEBAR NAVIGATION FOR SECTIONS I-IX */}
-                    <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0">
-                        <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">SECTIONS</h3>
-                        <ul className="space-y-1">
-                            {sections.map(section => (
-                            <li key={section.key}>
-                                <button
-                                onClick={() => setActiveSection(section.key)}
-                                className={`w-full text-left p-3 rounded-md text-sm font-medium transition-colors ${
-                                    activeSection === section.key 
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-4 border-primary-500' 
-                                    : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 border-l-4 border-transparent'
-                                }`}
-                                >
-                                {section.key}. {section.title}
-                                </button>
-                            </li>
-                            ))}
-                        </ul>
-                    </nav>
-
-                    {/* MAIN CONTENT AREA */}
-                    <main className="flex-1 p-8 overflow-y-auto bg-white dark:bg-dark-card">
-                        {renderSectionContent()}
-                    </main>
-                </>
-            ) : activeTab === 'workflow' ? (
-                <div className="flex-1 p-6 overflow-y-auto space-y-6">
-                    {/* Current Stage Actions */}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-5 rounded-xl border border-blue-200 dark:border-blue-800">
-                        <h3 className="font-bold text-blue-900 dark:text-blue-200 mb-3 flex items-center gap-2">
-                        <Activity className="w-5 h-5" /> Current Stage: {ptw.status.replace(/_/g, ' ')}
-                        </h3>
-                        
-                        {currentResponsibilities.length > 0 && (
-                            <div className="mb-4 bg-white dark:bg-gray-800 p-3 rounded-lg text-sm">
-                                <p className="font-semibold mb-1">Pending Actions:</p>
-                                <ul className="list-disc list-inside text-gray-600 dark:text-gray-400">
-                                    {currentResponsibilities.map((resp, i) => <li key={i}>{resp}</li>)}
-                                </ul>
-                            </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-2">
-                        {nextStages.map(stage => (
-                            <Button key={stage} onClick={() => handleWorkflowAction(stage)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                                Move to {stage.replace(/_/g, ' ')} <ArrowRight className="w-4 h-4 ml-2" />
-                            </Button>
-                        ))}
-                        {nextStages.length === 0 && (
-                            <p className="text-sm text-gray-500">No further actions available for this stage.</p>
-                        )}
-                        </div>
-                    </div>
-
-                    {/* Audit Log */}
-                    <div className="bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-700 overflow-hidden">
-                        <div className="p-4 border-b dark:border-gray-700 font-bold">Workflow History</div>
-                        <div className="divide-y dark:divide-gray-700">
-                            {ptw.workflow_log?.map((log, i) => (
-                                <div key={i} className="p-4 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="font-semibold">{log.action}</span>
-                                        <span className="text-gray-500">{new Date(log.timestamp).toLocaleString()}</span>
-                                    </div>
-                                    <p className="text-gray-500 mt-1">User ID: {log.user_id}</p>
-                                </div>
-                            ))}
-                            {(!ptw.workflow_log || ptw.workflow_log.length === 0) && <div className="p-4 text-gray-500 italic">No history recorded.</div>}
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div className="flex-1 p-6 overflow-y-auto">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <Shield className="w-5 h-5 text-red-500" /> Active Isolations
-                        </h3>
-                        <Button size="sm" variant="secondary" onClick={() => setIsIsolationModalOpen(true)}>
-                            Manage LOTO
-                        </Button>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 p-8 rounded-xl border border-dashed text-center text-gray-500">
-                        No active isolations recorded. Click "Manage LOTO" to add points.
-                    </div>
-                </div>
-            )}
-
-          </div>
-
-          {/* Footer */}
           <footer className="p-4 border-t bg-gray-100 dark:bg-black/20 dark:border-dark-border flex justify-end items-center flex-shrink-0 print:hidden">
-             <WorkflowActions onAction={handleWorkflowAction} onSave={() => onUpdate(formData, 'save')} ptw={formData} />
+            <WorkflowActions onAction={handleWorkflowAction} onSave={() => onUpdate(formData, 'save')} ptw={formData} />
           </footer>
         </div>
       </div>
+
+      <EmailModal 
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        documentTitle={`PTW: ${ptw.payload.permit_no || ptw.id}`}
+        documentLink={`${window.location.href}?ptw=${ptw.id}`}
+        defaultRecipients={[...Object.values(ptw.payload.signoffs ?? {}).flat(), ptw.payload.requester, ptw.payload.contractor_safety_personnel].filter(Boolean) as Partial<User>[]}
+      />
 
       {isIsolationModalOpen && (
         <IsolationManagementModal 
@@ -666,15 +624,17 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = (props) => {
           }}
         />
       )}
-      
-      <EmailModal 
-        isOpen={isEmailModalOpen}
-        onClose={() => setIsEmailModalOpen(false)}
-        documentTitle={`PTW: ${ptw.payload.permit_no}`}
-        documentLink="#"
-        defaultRecipients={[]}
-      />
-    </div>
+
+      <style>{`
+          @media print {
+              body * { visibility: hidden; }
+              #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
+              #ptw-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+              @page { size: A4; margin: 1.5cm; }
+          }
+      `}</style>
     </>
   );
 };
+
+const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
