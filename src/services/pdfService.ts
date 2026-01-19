@@ -1,86 +1,37 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { PtwType } from '../types';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
-// Initialize Gemini
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
-// FIX: Renamed interface to match the import in PtwCreationModal
-export interface AiRiskAnalysisResult {
-  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
-  hazards: string[];
-  controls: string[];
-  ppe: string[];
-  requiredCertifications: string[];
-}
-
-// Mock fallback if API key is missing
-const mockAssessment = (type: string): AiRiskAnalysisResult => ({
-  riskLevel: 'High',
-  hazards: ['Falling objects', 'Electrical shock', 'Slip/Trip'],
-  controls: ['Barricade area', 'Use insulated tools', 'Wear harness'],
-  ppe: ['Helmet', 'Safety Shoes', 'Gloves'],
-  requiredCertifications: ['Work at Height', 'Electrical Safety']
-});
-
-export const analyzePtwRisk = async (
-  type: PtwType, 
-  description: string, 
-  location: string
-): Promise<AiRiskAnalysisResult> => {
-  if (!apiKey) return mockAssessment(type);
+export const generatePdf = async (elementId: string, fileName: string) => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`Element with id ${elementId} not found`);
+    return;
+  }
 
   try {
-    const prompt = `
-      Analyze this Permit to Work request:
-      Type: ${type}
-      Location: ${location}
-      Description: "${description}"
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowWidth: 1920
+    });
 
-      Return a JSON object with:
-      - riskLevel: "Low", "Medium", "High", or "Critical"
-      - hazards: array of strings (max 5)
-      - controls: array of strings (max 5 specific safety controls)
-      - ppe: array of strings (required PPE)
-      - requiredCertifications: array of strings (e.g. "Confined Space Training")
-    `;
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text().replace(/```json|```/g, "").trim();
-    
-    return JSON.parse(text);
+    const pdfWidth = 297;
+    const pdfHeight = 210;
+
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`${fileName}.pdf`);
+
   } catch (error) {
-    console.error("PTW AI Analysis failed:", error);
-    return mockAssessment(type);
+    console.error("PDF Generation Error:", error);
+    alert("Failed to generate PDF. Please try again.");
   }
-};
-
-export const checkSimopsConflicts = (
-  currentLocation: string,
-  startTime: string,
-  endTime: string,
-  activePermits: any[]
-): string[] => {
-  const conflicts: string[] = [];
-  const start = new Date(startTime).getTime();
-  const end = new Date(endTime).getTime();
-
-  activePermits.forEach(ptw => {
-    // 1. Check Location Overlap (Simple string match for demo)
-    if (ptw.payload.work.location.toLowerCase().includes(currentLocation.toLowerCase()) || 
-        currentLocation.toLowerCase().includes(ptw.payload.work.location.toLowerCase())) {
-      
-      // 2. Check Time Overlap
-      const ptwStart = new Date(ptw.payload.work.coverage.start_date + 'T' + ptw.payload.work.coverage.start_time).getTime();
-      const ptwEnd = new Date(ptw.payload.work.coverage.end_date + 'T' + ptw.payload.work.coverage.end_time).getTime();
-
-      if ((start >= ptwStart && start <= ptwEnd) || (end >= ptwStart && end <= ptwEnd)) {
-        conflicts.push(`Conflict with Active Permit #${ptw.payload.permit_no} (${ptw.type}) at ${ptw.payload.work.location}`);
-      }
-    }
-  });
-
-  return conflicts;
 };

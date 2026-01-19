@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type {
   Ptw,
   PtwType,
@@ -15,8 +15,9 @@ import { Button } from './ui/Button';
 import { ptwTypeDetails, emptySignoff, emptySignature, emptyExtension, emptyClosure, ptwChecklistData } from '../config';
 import { useDataContext, useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
+// FIX: Ensure this import matches the exported interface in ptwAiService.ts
 import { analyzePtwRisk, checkSimopsConflicts, AiRiskAnalysisResult } from '../services/ptwAiService';
-import { Sparkles, AlertTriangle, ShieldAlert, CheckCircle } from 'lucide-react';
+import { Sparkles, AlertTriangle } from 'lucide-react';
 
 // Icons
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>;

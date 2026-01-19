@@ -1,12 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { PtwType, PtwSafetyRequirement } from '../types';
+import type { PtwType } from '../types';
 
 // Initialize Gemini
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-export interface AiRiskAssessmentResult {
+// FIX: Ensure this interface is exported with this exact name
+export interface AiRiskAnalysisResult {
   riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
   hazards: string[];
   controls: string[];
@@ -15,7 +16,7 @@ export interface AiRiskAssessmentResult {
 }
 
 // Mock fallback if API key is missing
-const mockAssessment = (type: string): AiRiskAssessmentResult => ({
+const mockAssessment = (type: string): AiRiskAnalysisResult => ({
   riskLevel: 'High',
   hazards: ['Falling objects', 'Electrical shock', 'Slip/Trip'],
   controls: ['Barricade area', 'Use insulated tools', 'Wear harness'],
@@ -27,7 +28,7 @@ export const analyzePtwRisk = async (
   type: PtwType, 
   description: string, 
   location: string
-): Promise<AiRiskAssessmentResult> => {
+): Promise<AiRiskAnalysisResult> => {
   if (!apiKey) return mockAssessment(type);
 
   try {
@@ -68,7 +69,6 @@ export const checkSimopsConflicts = (
 
   activePermits.forEach(ptw => {
     // 1. Check Location Overlap (Simple string match for demo)
-    // In production, use GIS coordinates
     if (ptw.payload.work.location.toLowerCase().includes(currentLocation.toLowerCase()) || 
         currentLocation.toLowerCase().includes(ptw.payload.work.location.toLowerCase())) {
       
