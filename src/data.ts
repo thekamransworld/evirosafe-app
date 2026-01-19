@@ -1,4 +1,4 @@
-import type { Organization, User, Project, Report, Inspection, ChecklistTemplate, ChecklistRun, Plan, Rams, Sign, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, Notification, Ptw, CertificationProfile } from './types';
+import type { Organization, User, Project, Report, Inspection, ChecklistTemplate, ChecklistRun, Plan, Rams, Sign, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, Notification, Ptw, CertificationProfile, ActionItem } from './types';
 import { logoSrc } from './config';
 
 // --- ORGANIZATIONS ---
@@ -15,6 +15,28 @@ export const organizations: Organization[] = [
     branding: { logoUrl: logoSrc, primaryColor: '#00A86B' },
     industry: 'Construction',
     country: 'AE',
+    created_at: '2023-01-01T00:00:00Z',
+    contact_details: {
+      phone: '+971 50 123 4567',
+      email: 'contact@clint.com',
+      address: 'Business Bay, Dubai, UAE',
+      website: 'https://clint.com',
+      contact_person: 'John Doe'
+    },
+    operational_details: {
+      timezone: 'Asia/Dubai',
+      working_hours: '08:00 - 17:00',
+      holidays: ['Friday', 'Saturday'],
+      emergency_contacts: [
+        { name: 'Emergency Hotline', role: 'Security', phone: '999', email: 'security@clint.com' }
+      ]
+    },
+    safety_metrics: {
+      incident_rate: 0.5,
+      safety_score: 92,
+      last_audit_date: '2023-12-15',
+      compliance_level: 'High'
+    }
   }
 ];
 
@@ -28,7 +50,9 @@ export const users: User[] = [
     avatar_url: 'https://ui-avatars.com/api/?name=Kamran&background=0D8ABC&color=fff',
     role: 'ADMIN',
     status: 'active',
-    preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } }
+    preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } },
+    department: 'Management',
+    phone: '+971 55 111 2222'
   },
   {
     id: 'user_alex',
@@ -38,7 +62,9 @@ export const users: User[] = [
     avatar_url: 'https://ui-avatars.com/api/?name=Alex&background=random',
     role: 'HSE_MANAGER',
     status: 'active',
-    preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } }
+    preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } },
+    department: 'HSE',
+    phone: '+971 55 333 4444'
   }
 ];
 
@@ -55,6 +81,10 @@ export const projects: Project[] = [
     finish_date: '2025-12-31',
     manager_id: 'user_kamran',
     type: 'Construction',
+    progress: 45,
+    budget: 5000000,
+    budget_spent: 2100000,
+    team_members: ['user_kamran', 'user_alex']
   },
   {
     id: 'proj_2',
@@ -67,6 +97,10 @@ export const projects: Project[] = [
     finish_date: '2024-11-30',
     manager_id: 'user_alex',
     type: 'Maintenance',
+    progress: 15,
+    budget: 1200000,
+    budget_spent: 150000,
+    team_members: ['user_alex']
   }
 ];
 
@@ -188,6 +222,7 @@ export const trainingRecords: TrainingRecord[] = [];
 export const trainingSessions: TrainingSession[] = [];
 export const notifications: Notification[] = [];
 export const ptws: Ptw[] = [];
+export const actions: ActionItem[] = [];
 
 export const certificationProfile: CertificationProfile = {
     user_id: 'user_kamran',

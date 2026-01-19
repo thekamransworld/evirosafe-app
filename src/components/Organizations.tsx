@@ -5,7 +5,10 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { OrganizationDetails } from './OrganizationDetails';
-import { Plus } from 'lucide-react';
+import { 
+  Plus, Building, Shield, Users, 
+  Briefcase, MapPin, Globe, MoreVertical 
+} from 'lucide-react';
 
 // --- Organization Creation Modal ---
 interface OrganizationCreationModalProps {
@@ -33,7 +36,7 @@ const OrganizationCreationModal: React.FC<OrganizationCreationModalProps> = ({ i
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={onClose}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
                 <div className="p-6 border-b dark:border-dark-border">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create Organization</h3>
@@ -86,9 +89,12 @@ export const Organizations: React.FC = () => {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex justify-between items-center">
+        <div>
+            <h1 className="text-3xl font-bold text-text-primary dark:text-white">Organizations</h1>
+            <p className="text-text-secondary dark:text-gray-400">Manage your company entities and subsidiaries.</p>
+        </div>
         {activeUser?.role === 'ADMIN' && (
             <Button onClick={() => setIsModalOpen(true)}>
                 <Plus className="w-5 h-5 mr-2" />
@@ -101,42 +107,62 @@ export const Organizations: React.FC = () => {
         {organizations.map(org => {
           const projectCount = projects.filter(p => p.org_id === org.id).length;
           const userCount = usersList.filter(u => u.org_id === org.id).length;
-          
-          // Safe branding access
-          const logoUrl = org.branding?.logoUrl || 'https://via.placeholder.com/50';
+          const safetyScore = org.safety_metrics?.safety_score || 0;
 
           return (
             <Card 
                 key={org.id} 
-                className="flex flex-col cursor-pointer hover:border-primary-500 transition-colors"
+                className="flex flex-col cursor-pointer hover:border-blue-500 transition-all hover:shadow-lg group"
                 onClick={() => setSelectedOrg(org)}
             >
               <div className="flex-1">
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start mb-4">
                       <div className="flex items-center space-x-4">
-                        <img src={logoUrl} alt={org.name} className="h-12 w-12 rounded-lg" />
+                        <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                            {org.name.charAt(0)}
+                        </div>
                         <div>
-                          <h3 className="text-lg font-bold text-text-primary dark:text-white">{org.name}</h3>
+                          <h3 className="text-lg font-bold text-text-primary dark:text-white group-hover:text-blue-500 transition-colors">{org.name}</h3>
                           <p className="text-sm text-text-secondary dark:text-gray-400 font-mono">{org.domain}</p>
                         </div>
                       </div>
-                      <Badge color={getStatusColor(org.status)}>
-                          {org.status.charAt(0).toUpperCase() + org.status.slice(1)}
-                      </Badge>
+                      <button className="text-gray-400 hover:text-white">
+                          <MoreVertical className="w-5 h-5" />
+                      </button>
                   </div>
-                  <div className="mt-4 flex space-x-6 text-sm text-gray-600 dark:text-gray-300">
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white">{projectCount}</div>
-                      <div>Projects</div>
-                    </div>
-                    <div>
-                      <div className="font-bold text-gray-900 dark:text-white">{userCount}</div>
-                      <div>Users</div>
-                    </div>
+
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                      <div className="bg-gray-50 dark:bg-white/5 p-2 rounded-lg text-center">
+                          <span className="block text-lg font-bold text-gray-900 dark:text-white">{projectCount}</span>
+                          <span className="text-[10px] text-gray-500 uppercase">Projects</span>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-white/5 p-2 rounded-lg text-center">
+                          <span className="block text-lg font-bold text-gray-900 dark:text-white">{userCount}</span>
+                          <span className="text-[10px] text-gray-500 uppercase">Users</span>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-white/5 p-2 rounded-lg text-center">
+                          <span className={`block text-lg font-bold ${safetyScore >= 90 ? 'text-green-500' : safetyScore >= 70 ? 'text-yellow-500' : 'text-red-500'}`}>{safetyScore}%</span>
+                          <span className="text-[10px] text-gray-500 uppercase">Safety</span>
+                      </div>
+                  </div>
+
+                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2">
+                          <Briefcase className="w-4 h-4 text-gray-400" />
+                          <span>{org.industry}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-gray-400" />
+                          <span>{org.country}</span>
+                      </div>
                   </div>
               </div>
-              <div className="mt-6 border-t dark:border-dark-border pt-4 flex justify-end space-x-2">
-                  <Button variant="secondary" size="sm">Settings</Button>
+              
+              <div className="mt-5 border-t dark:border-dark-border pt-4 flex justify-between items-center">
+                  <Badge color={getStatusColor(org.status)}>
+                      {org.status.toUpperCase()}
+                  </Badge>
+                  <span className="text-xs text-blue-500 font-medium group-hover:underline">Manage Organization →</span>
               </div>
             </Card>
           )
