@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type {
   Ptw,
   PtwType,
@@ -15,6 +15,8 @@ import { Button } from './ui/Button';
 import { ptwTypeDetails, emptySignoff, emptySignature, emptyExtension, emptyClosure, ptwChecklistData } from '../config';
 import { useDataContext, useAppContext } from '../contexts';
 import { FormField } from './ui/FormField';
+import { analyzePtwRisk, checkSimopsConflicts, AiRiskAnalysisResult } from '../services/ptwAiService';
+import { Sparkles, AlertTriangle, ShieldAlert, CheckCircle } from 'lucide-react';
 
 // Icons
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>;
@@ -38,12 +40,17 @@ interface PtwCreationModalProps {
 }
 
 export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onClose, onSubmit, mode }) => {
-    const { projects } = useDataContext();
+    const { projects, ptwList } = useDataContext();
     const { activeUser } = useAppContext();
 
     const [step, setStep] = useState(1);
     const [selectedType, setSelectedType] = useState<PtwType | null>(null);
     
+    // AI & Conflicts
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [aiAnalysis, setAiAnalysis] = useState<AiRiskAnalysisResult | null>(null);
+    const [conflicts, setConflicts] = useState<string[]>([]);
+
     // COMPLIANCE
     const [globalCompliance, setGlobalCompliance] = useState({
       riskAssessmentCompleted: false,
@@ -82,11 +89,45 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
         setEvidenceFiles(prev => prev.filter((_, i) => i !== index));
     };
 
+    const handleAiAnalysis = async () => {
+        if (!selectedType || !formData.work_description || !formData.work_location) {
+            setError("Please fill in Location and Description first.");
+            return;
+        }
+        
+        setIsAnalyzing(true);
+        setError('');
+        
+        try {
+            // 1. Check Conflicts
+            const activePermits = ptwList.filter(p => p.status === 'ACTIVE');
+            const foundConflicts = checkSimopsConflicts(
+                formData.work_location, 
+                formData.starts_at, 
+                formData.ends_at, 
+                activePermits
+            );
+            setConflicts(foundConflicts);
+
+            // 2. AI Risk Analysis
+            const analysis = await analyzePtwRisk(selectedType, formData.work_description, formData.work_location);
+            setAiAnalysis(analysis);
+
+        } catch (e) {
+            console.error(e);
+            setError("Analysis failed.");
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const resetForm = () => {
         setStep(1);
         setSelectedType(null);
         setError('');
         setEvidenceFiles([]);
+        setAiAnalysis(null);
+        setConflicts([]);
         setGlobalCompliance({
             riskAssessmentCompleted: false,
             emergencyProcedures: false,
@@ -122,6 +163,10 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
         if (!validateGlobalCompliance()) {
           setError('Please check all Global Compliance boxes to proceed.');
           return;
+        }
+        
+        if (conflicts.length > 0 && !window.confirm("There are SIMOPS conflicts. Are you sure you want to proceed?")) {
+            return;
         }
 
         if (!selectedType) return;
@@ -247,6 +292,46 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
 
                     {step === 2 && selectedType && (
                         <div className="space-y-6">
+                             {/* AI & CONFLICT ANALYSIS */}
+                             <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+                                        <Sparkles className="w-5 h-5" /> AI Risk & Conflict Analysis
+                                    </h3>
+                                    <Button size="sm" onClick={handleAiAnalysis} disabled={isAnalyzing}>
+                                        {isAnalyzing ? 'Analyzing...' : 'Analyze Permit'}
+                                    </Button>
+                                </div>
+                                
+                                {conflicts.length > 0 && (
+                                    <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+                                        <h4 className="font-bold text-red-700 dark:text-red-300 flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4" /> SIMOPS Conflicts Detected
+                                        </h4>
+                                        <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-200 mt-1">
+                                            {conflicts.map((c, i) => <li key={i}>{c}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {aiAnalysis && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                            <p className="text-xs text-gray-500 uppercase font-bold">Risk Level</p>
+                                            <p className={`text-lg font-bold ${aiAnalysis.riskLevel === 'Critical' ? 'text-red-600' : 'text-orange-500'}`}>
+                                                {aiAnalysis.riskLevel}
+                                            </p>
+                                        </div>
+                                        <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                            <p className="text-xs text-gray-500 uppercase font-bold">Suggested Controls</p>
+                                            <ul className="text-xs text-gray-700 dark:text-gray-300 list-disc list-inside">
+                                                {aiAnalysis.controls.slice(0, 3).map((c, i) => <li key={i}>{c}</li>)}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
+                             </div>
+
                              {/* GLOBAL COMPLIANCE */}
                              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                                 <h3 className="font-bold text-blue-900 dark:text-blue-200 mb-3 flex items-center">
