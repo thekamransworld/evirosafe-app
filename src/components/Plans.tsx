@@ -4,7 +4,7 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { planTypes } from '../config';
-import { useDataContext, useModalContext, useAppContext } from '../contexts';
+import { useDataContext, useAppContext } from '../contexts';
 
 interface PlansProps {
   onSelectPlan: (plan: Plan) => void;
@@ -23,7 +23,6 @@ const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red'
 };
 
 const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ plan, onSelect }) => {
-  // FIX: Ensure status string exists
   const safeStatus = plan.status || 'draft';
   
   return (

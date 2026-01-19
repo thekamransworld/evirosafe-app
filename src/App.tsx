@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext'; // <--- NEW IMPORT
 import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
@@ -36,8 +35,8 @@ import { HseStatistics } from './components/HseStatistics';
 // --- Import Modals ---
 import { ReportCreationModal } from './components/ReportCreationModal';
 import { ReportDetailModal } from './components/ReportDetailModal';
-import { PtwCreationModal } from './components/PtwCreationModal'; // Legacy, keep for fallback
-import { PtwDetailModal } from './components/PtwDetailModal'; // Legacy, keep for fallback
+import { PtwCreationModal } from './components/PtwCreationModal';
+import { PtwDetailModal } from './components/PtwDetailModal';
 import { PlanCreationModal } from './components/PlanCreationModal';
 import { PlanEditorModal } from './components/PlanEditorModal';
 import { PlanDetailModal } from './components/PlanDetailModal';
@@ -56,7 +55,7 @@ import { InspectionConductModal } from './components/InspectionConductModal';
 // --- Auth Sync ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
-  const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
+  const { setUsersList, login, logout, activeOrg } = useAppContext();
 
   useEffect(() => {
     if (!currentUser) {
@@ -71,17 +70,13 @@ const AuthSync: React.FC = () => {
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
 
-      const existingUser = prev[0];
       const defaultPreferences: User['preferences'] = {
           language: 'en',
           default_view: 'dashboard',
           units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' }
       };
 
-      const template = existingUser ? {
-        ...existingUser,
-        preferences: existingUser.preferences || defaultPreferences
-      } : {
+      const newUser: User = {
         id: uid,
         org_id: activeOrg?.id || 'org1',
         email,
@@ -92,15 +87,6 @@ const AuthSync: React.FC = () => {
         preferences: defaultPreferences
       };
 
-      const newUser: User = {
-        ...template,
-        id: uid,
-        org_id: activeOrg?.id || template.org_id,
-        email,
-        name: displayName,
-        status: 'active'
-      } as User;
-
       return [newUser, ...prev];
     });
 
@@ -110,17 +96,21 @@ const AuthSync: React.FC = () => {
   return null;
 };
 
-// --- Global Modals ---
+// --- Global Modals Component ---
 const GlobalModals = () => {
   const { activeUser, usersList } = useAppContext();
   const {
     isReportCreationModalOpen, setIsReportCreationModalOpen, selectedReport, setSelectedReport, reportInitialData,
     isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, selectedPtw, setSelectedPtw,
+    // Plans Modals
     isPlanCreationModalOpen, setIsPlanCreationModalOpen, selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit,
+    // RAMS Modals
     isRamsCreationModalOpen, setIsRamsCreationModalOpen, selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit,
+    // TBT & Training
     isTbtCreationModalOpen, setIsTbtCreationModalOpen, selectedTbt, setSelectedTbt,
     isCourseModalOpen, setCourseModalOpen, isSessionModalOpen, setSessionModalOpen, isAttendanceModalOpen, setAttendanceModalOpen,
     courseForSession, sessionForAttendance,
+    // Actions & Inspections
     isActionCreationModalOpen, setIsActionCreationModalOpen,
     isInspectionCreationModalOpen, setIsInspectionCreationModalOpen
   } = useModalContext();
@@ -140,30 +130,33 @@ const GlobalModals = () => {
 
   return (
     <>
+      {/* Reports */}
       <ReportCreationModal isOpen={isReportCreationModalOpen} onClose={() => setIsReportCreationModalOpen(false)} initialData={reportInitialData} />
       {selectedReport && <ReportDetailModal report={selectedReport} users={usersList} activeUser={activeUser} onClose={() => setSelectedReport(null)} onStatusChange={handleStatusChange} onCapaActionChange={handleCapaActionChange} onAcknowledgeReport={handleAcknowledgeReport} />}
       
-      {/* Legacy PTW Modals (New ones are handled inside Ptw.tsx) */}
+      {/* PTW */}
       <PtwCreationModal isOpen={isPtwCreationModalOpen} onClose={() => setIsPtwCreationModalOpen(false)} onSubmit={handleCreatePtw} mode={ptwCreationMode} />
       {selectedPtw && <PtwDetailModal ptw={selectedPtw} onClose={() => setSelectedPtw(null)} onUpdate={handleUpdatePtw} />}
       
+      {/* PLANS - THIS WAS MISSING OR BROKEN */}
       <PlanCreationModal isOpen={isPlanCreationModalOpen} onClose={() => setIsPlanCreationModalOpen(false)} onSubmit={handleCreatePlan} projects={projects} />
       {selectedPlan && <PlanDetailModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onStatusChange={handlePlanStatusChange} />}
       {selectedPlanForEdit && <PlanEditorModal plan={selectedPlanForEdit} onClose={() => setSelectedPlanForEdit(null)} onSave={handleUpdatePlan} onSubmitForReview={handlePlanStatusChange} />}
       
+      {/* RAMS */}
       <RamsCreationModal isOpen={isRamsCreationModalOpen} onClose={() => setIsRamsCreationModalOpen(false)} onSubmit={handleCreateRams} projects={projects} activeUser={activeUser} />
       {selectedRams && <RamsDetailModal rams={selectedRams} onClose={() => setSelectedRams(null)} onStatusChange={handleRamsStatusChange} />}
       {selectedRamsForEdit && <RamsEditorModal rams={selectedRamsForEdit} onClose={() => setSelectedRamsForEdit(null)} onSave={handleUpdateRams} onSubmitForReview={handleRamsStatusChange} />}
       
+      {/* TBT & Training */}
       <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={activeUser} />
       {selectedTbt && <TbtSessionModal session={selectedTbt} onClose={() => setSelectedTbt(null)} onUpdate={handleUpdateTbt} users={usersList} />}
-      
       <TrainingCourseModal isOpen={isCourseModalOpen} onClose={() => setCourseModalOpen(false)} courses={trainingCourseList} onUpdateCourse={handleCreateOrUpdateCourse} />
       {courseForSession && <TrainingSessionModal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} onSubmit={handleScheduleSession} course={courseForSession} projects={projects} users={usersList} />}
       {sessionForAttendance && <SessionAttendanceModal isOpen={isAttendanceModalOpen} onClose={() => setAttendanceModalOpen(false)} onSubmit={handleCloseSession} session={sessionForAttendance} users={usersList} />}
       
+      {/* Actions & Inspections */}
       <ActionCreationModal isOpen={isActionCreationModalOpen} onClose={() => setIsActionCreationModalOpen(false)} onSubmit={handleCreateStandaloneAction} users={usersList} projects={projects} />
-      
       <InspectionCreationModal isOpen={isInspectionCreationModalOpen} onClose={() => setIsInspectionCreationModalOpen(false)} onSubmit={handleCreateInspection} projects={projects} users={usersList} checklistTemplates={checklistTemplates} />
     </>
   );
@@ -173,12 +166,17 @@ const GlobalModals = () => {
 const AppContent = () => {
   const { currentView, setCurrentView } = useAppContext();
   const { currentUser, loading: authLoading } = useAuth();
-  const { isLoading: dataLoading, ptwList, projects, setPtwList } = useDataContext();
-  const { usersList } = useAppContext();
-  
-  // Modal Context for PTW
-  const { 
-    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw 
+  const { isLoading: dataLoading } = useDataContext();
+
+  const {
+    projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
+  } = useDataContext();
+
+  const {
+    setSelectedPlan, setSelectedPlanForEdit, setIsPlanCreationModalOpen,
+    setSelectedRams, setSelectedRamsForEdit, setIsRamsCreationModalOpen,
+    setCourseModalOpen, setSessionModalOpen, setCourseForSession, setAttendanceModalOpen, setSessionForAttendance,
+    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw,
   } = useModalContext();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -214,7 +212,7 @@ const AppContent = () => {
           {currentView === 'ptw' && (
             <Ptw
               ptws={ptwList}
-              users={usersList}
+              users={[]}
               projects={projects}
               onCreatePtw={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }}
               onAddExistingPtw={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}
@@ -223,11 +221,35 @@ const AppContent = () => {
           )}
           {currentView === 'inspections' && <Inspections />}
           {currentView === 'actions' && <Actions />}
-          {currentView === 'plans' && <Plans onSelectPlan={() => {}} onNewPlan={() => {}} />}
-          {currentView === 'rams' && <Rams onSelectRams={() => {}} onNewRams={() => {}} />}
+          
+          {/* PLANS VIEW - WIRED UP CORRECTLY */}
+          {currentView === 'plans' && (
+            <Plans
+              onSelectPlan={(plan) => plan.status === 'draft' ? setSelectedPlanForEdit(plan) : setSelectedPlan(plan)}
+              onNewPlan={() => setIsPlanCreationModalOpen(true)}
+            />
+          )}
+          
+          {currentView === 'rams' && (
+            <Rams
+              onSelectRams={(rams) => rams.status === 'draft' ? setSelectedRamsForEdit(rams) : setSelectedRams(rams)}
+              onNewRams={() => setIsRamsCreationModalOpen(true)}
+            />
+          )}
           {currentView === 'checklists' && <Checklists />}
           {currentView === 'tbt' && <Tbt />}
-          {currentView === 'training' && <Trainings courses={[]} records={[]} sessions={[]} users={[]} projects={[]} onManageCourses={() => {}} onScheduleSession={() => {}} onManageAttendance={() => {}} />}
+          {currentView === 'training' && (
+            <Trainings
+              courses={trainingCourseList}
+              records={trainingRecordList}
+              sessions={trainingSessionList}
+              users={[]}
+              projects={projects}
+              onManageCourses={() => setCourseModalOpen(true)}
+              onScheduleSession={(course) => { setCourseForSession(course); setSessionModalOpen(true); }}
+              onManageAttendance={(session) => { setSessionForAttendance(session); setAttendanceModalOpen(true); }}
+            />
+          )}
           {currentView === 'people' && <People />}
           {currentView === 'roles' && <Roles roles={rolesConfig} />}
           {currentView === 'organizations' && <Organizations />}
@@ -253,10 +275,7 @@ export default function App() {
           <AuthSync />
           <DataProvider>
             <ModalProvider>
-              {/* WRAP WITH PTW WORKFLOW PROVIDER */}
-              <PtwWorkflowProvider>
-                <AppContent />
-              </PtwWorkflowProvider>
+              <AppContent />
             </ModalProvider>
           </DataProvider>
         </AppProvider>
