@@ -1,57 +1,36 @@
 import React, { useState } from 'react';
 import { Plus, AlertTriangle, Trash2, AlertCircle } from 'lucide-react';
-import { HSEInspection, HSEFinding } from '../../../types';
+import { Inspection, InspectionFinding } from '../../../types';
 import { Button } from '../../ui/Button';
 
 interface Step6Props {
-  formData: Partial<HSEInspection>;
-  setFormData: (data: Partial<HSEInspection>) => void;
+  formData: Partial<Inspection>;
+  setFormData: (data: Partial<Inspection>) => void;
 }
 
 export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) => {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newFinding, setNewFinding] = useState<Partial<HSEFinding>>({
+  const [newFinding, setNewFinding] = useState<Partial<InspectionFinding>>({
     description: '',
-    risk_assessment: { severity: 1, likelihood: 1, risk_level: 'low', risk_score: 1, people_at_risk: 1, potential_consequences: [] },
-    type: 'non_conformity',
+    risk_level: 'Low',
+    category: 'Unsafe Condition',
     status: 'open'
   });
-
-  const calculateRisk = (sev: number, like: number) => {
-    const score = sev * like;
-    let level = 'low';
-    if (score >= 15) level = 'extreme';
-    else if (score >= 10) level = 'high';
-    else if (score >= 5) level = 'medium';
-    return { score, level };
-  };
 
   const handleAddFinding = () => {
     if (!newFinding.description) return;
 
-    const risk = calculateRisk(newFinding.risk_assessment!.severity, newFinding.risk_assessment!.likelihood);
-    
-    const finding: HSEFinding = {
-      ...newFinding as HSEFinding,
+    const finding: InspectionFinding = {
+      ...newFinding as InspectionFinding,
       id: `find_${Date.now()}`,
-      finding_number: `F-${(formData.findings?.length || 0) + 1}`,
-      risk_assessment: {
-        ...newFinding.risk_assessment!,
-        risk_score: risk.score,
-        risk_level: risk.level as any
-      },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      created_by: 'current_user',
-      // evidence_ids: [], <--- REMOVED THIS LINE
-      corrective_action_required: risk.score > 5,
-      immediate_controls: [],
-      root_causes: [],
+      checklist_item_id: '',
       evidence_urls: [],
-      category: 'General',
-      observation_category: 'people_behaviors',
+      corrective_action_required: newFinding.risk_level === 'High' || newFinding.risk_level === 'Critical',
+      observation_category: 'work_environment',
       observation_type: 'unsafe_condition',
-      risk_level: risk.level === 'extreme' ? 'Critical' : risk.level === 'high' ? 'High' : risk.level === 'medium' ? 'Medium' : 'Low'
+      immediate_controls: [],
+      created_at: new Date().toISOString(),
+      created_by: 'current_user'
     };
 
     setFormData({
@@ -59,10 +38,11 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
       findings: [...(formData.findings || []), finding]
     });
     
+    // Reset form
     setNewFinding({
       description: '',
-      risk_assessment: { severity: 1, likelihood: 1, risk_level: 'low', risk_score: 1, people_at_risk: 1, potential_consequences: [] },
-      type: 'non_conformity',
+      risk_level: 'Low',
+      category: 'Unsafe Condition',
       status: 'open'
     });
     setShowAddForm(false);
@@ -93,16 +73,17 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
-                    <label className="block text-sm font-medium mb-1 dark:text-gray-300">Type</label>
+                    <label className="block text-sm font-medium mb-1 dark:text-gray-300">Category</label>
                     <select 
                         className="w-full p-2 rounded border dark:bg-gray-900 dark:border-gray-700"
-                        value={newFinding.type}
-                        onChange={e => setNewFinding({...newFinding, type: e.target.value as any})}
+                        value={newFinding.category}
+                        onChange={e => setNewFinding({...newFinding, category: e.target.value as any})}
                     >
-                        <option value="non_conformity">Non-Conformity</option>
-                        <option value="observation">Observation</option>
-                        <option value="opportunity_for_improvement">Opportunity for Improvement</option>
-                        <option value="compliment">Positive Compliment</option>
+                        <option value="Unsafe Act">Unsafe Act</option>
+                        <option value="Unsafe Condition">Unsafe Condition</option>
+                        <option value="Documentation">Documentation</option>
+                        <option value="Equipment">Equipment</option>
+                        <option value="Environmental">Environmental</option>
                     </select>
                 </div>
                  <div>
@@ -119,27 +100,18 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
 
             <div className="mb-4">
                 <h5 className="text-sm font-bold mb-2 dark:text-gray-300">Risk Assessment</h5>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs text-gray-500">Severity (1-5)</label>
-                        <input 
-                            type="range" min="1" max="5" 
-                            value={newFinding.risk_assessment?.severity}
-                            onChange={e => setNewFinding({...newFinding, risk_assessment: {...newFinding.risk_assessment!, severity: parseInt(e.target.value) as any}})}
-                            className="w-full"
-                        />
-                        <div className="text-center font-bold">{newFinding.risk_assessment?.severity}</div>
-                    </div>
-                    <div>
-                        <label className="text-xs text-gray-500">Likelihood (1-5)</label>
-                        <input 
-                            type="range" min="1" max="5" 
-                            value={newFinding.risk_assessment?.likelihood}
-                            onChange={e => setNewFinding({...newFinding, risk_assessment: {...newFinding.risk_assessment!, likelihood: parseInt(e.target.value) as any}})}
-                            className="w-full"
-                        />
-                        <div className="text-center font-bold">{newFinding.risk_assessment?.likelihood}</div>
-                    </div>
+                <div>
+                    <label className="text-xs text-gray-500">Risk Level</label>
+                    <select 
+                        value={newFinding.risk_level}
+                        onChange={e => setNewFinding({...newFinding, risk_level: e.target.value as any})}
+                        className="w-full p-2 rounded border dark:bg-gray-900 dark:border-gray-700"
+                    >
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                    </select>
                 </div>
             </div>
 
@@ -155,23 +127,21 @@ export const Step6Findings: React.FC<Step6Props> = ({ formData, setFormData }) =
             <div key={finding.id} className="p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg flex justify-between items-start hover:shadow-md transition-shadow">
                 <div className="flex gap-3">
                     <div className={`p-2 rounded-lg h-fit ${
-                        finding.risk_assessment?.risk_level === 'extreme' ? 'bg-red-100 text-red-600' :
-                        finding.risk_assessment?.risk_level === 'high' ? 'bg-orange-100 text-orange-600' :
+                        finding.risk_level === 'Critical' ? 'bg-red-100 text-red-600' :
+                        finding.risk_level === 'High' ? 'bg-orange-100 text-orange-600' :
                         'bg-blue-100 text-blue-600'
                     }`}>
                         <AlertTriangle className="w-5 h-5" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900 dark:text-white">{finding.finding_number}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full uppercase font-bold ${
-                                finding.type === 'non_conformity' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
-                            }`}>{finding.type?.replace(/_/g, ' ')}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full uppercase font-bold bg-gray-100 text-gray-700`}>
+                                {finding.category}
+                            </span>
                         </div>
                         <p className="text-gray-600 dark:text-gray-300 mt-1">{finding.description}</p>
                         <div className="text-xs text-gray-500 mt-2 flex gap-4">
-                            <span>Risk Score: <strong>{finding.risk_assessment?.risk_score}</strong></span>
-                            <span>Level: <strong className="uppercase">{finding.risk_assessment?.risk_level}</strong></span>
+                            <span>Risk Level: <strong className="uppercase">{finding.risk_level}</strong></span>
                         </div>
                     </div>
                 </div>

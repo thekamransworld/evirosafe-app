@@ -1,10 +1,9 @@
 import React from 'react';
-// FIX: Updated import path
-import { HSEInspection } from '../../../types';
+import { Inspection } from '../../../types';
 
 interface Step3Props {
-  formData: Partial<HSEInspection>;
-  setFormData: (data: Partial<HSEInspection>) => void;
+  formData: Partial<Inspection>;
+  setFormData: (data: Partial<Inspection>) => void;
   users: any[];
   contractors: any[];
 }
@@ -16,30 +15,43 @@ export const Step3Team: React.FC<Step3Props> = ({ formData, setFormData, users }
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Lead Inspector</label>
         <select
-          value={formData.inspection_team?.team_lead?.id}
+          value={formData.person_responsible_id || ''}
           onChange={(e) => {
-            const user = users.find(u => u.id === e.target.value);
-            if (user) {
-              setFormData({
-                ...formData,
-                inspection_team: {
-                  ...formData.inspection_team!,
-                  team_lead: {
-                    id: user.id,
-                    name: user.name,
-                    role: user.role,
-                    qualification: 'N/A',
-                    contact: { email: user.email, phone: '' }
-                  }
-                }
-              });
-            }
+            setFormData({
+              ...formData,
+              person_responsible_id: e.target.value
+            });
           }}
           className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
         >
           <option value="">Select Lead</option>
           {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
+      </div>
+      
+      <div className="mt-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Team Members</label>
+        <div className="flex flex-wrap gap-2">
+            {users.map(u => (
+                <button
+                    key={u.id}
+                    onClick={() => {
+                        const current = formData.team_member_ids || [];
+                        const newMembers = current.includes(u.id) 
+                            ? current.filter(id => id !== u.id)
+                            : [...current, u.id];
+                        setFormData({ ...formData, team_member_ids: newMembers });
+                    }}
+                    className={`px-3 py-1 rounded-full text-sm border ${
+                        (formData.team_member_ids || []).includes(u.id)
+                        ? 'bg-blue-100 border-blue-500 text-blue-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-600'
+                    }`}
+                >
+                    {u.name}
+                </button>
+            ))}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { Report, Project, User, RiskMatrix, Severity, Likelihood, AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, UnsafeConditionDetails, LeadershipEventDetails, CapaAction, ReportClassification, ImpactedParty, RootCause, ReportDistribution, ReportType, Witness } from '../types';
+import type { 
+  Report, Project, User, RiskMatrix, Severity, Likelihood, 
+  AccidentDetails, IncidentDetails, NearMissDetails, UnsafeActDetails, 
+  UnsafeConditionDetails, LeadershipEventDetails, CapaAction, 
+  ReportClassification, ImpactedParty, RootCause, ReportDistribution, 
+  ReportType, Witness 
+} from '../types';
 import { Button } from './ui/Button';
 import { RiskMatrixInput } from './RiskMatrixInput';
 import { FormField } from './ui/FormField';
@@ -72,7 +78,6 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
         classification_codes: [] as string[],
         ai_evidence_summary: '',
         ai_suggested_evidence: [] as string[],
-        witnesses: [] as Witness[], // Added missing field
     };
     if (initialData) {
       return { ...defaultState, ...initialData };
@@ -80,6 +85,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
     return defaultState;
   };
 
+  // Use 'any' to prevent strict type checking issues during form state updates
   const [formData, setFormData] = useState<any>(getInitialState);
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
@@ -337,7 +343,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Evidence</h3>
                  <div className="grid grid-cols-1 gap-4">
                     <FormField label="Photo/Video Evidence">
-                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 text-center hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer relative">
                             <input type="file" multiple onChange={handleFileChange} className="hidden" id="file-upload" />
                             <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
                                 <span className="text-4xl mb-2">📷</span>

@@ -1,13 +1,12 @@
 import React from 'react';
 import { Button } from '../../ui/Button';
 import { Send, CheckCircle, ShieldCheck } from 'lucide-react';
-// FIX: Updated import path
-import { HSEInspection } from '../../../types';
+import { Inspection } from '../../../types';
 
 interface Step9Props {
   onSubmit: () => void;
   saving: boolean;
-  formData: Partial<HSEInspection>;
+  formData: Partial<Inspection>;
 }
 
 export const Step9Submission: React.FC<Step9Props> = ({ onSubmit, saving, formData }) => {
@@ -24,7 +23,7 @@ export const Step9Submission: React.FC<Step9Props> = ({ onSubmit, saving, formDa
       </p>
 
       <div className="w-full max-w-md bg-gray-50 dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 mb-8 text-left">
-          <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-4 border-b dark:border-gray-700 pb-2">Submission Checklist</h4>
+          <h4 className="font-bold text-gray-700 dark:text-gray-300 mb-4 border-b pb-2">Submission Checklist</h4>
           <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                   <CheckCircle className="w-4 h-4 text-green-500"/> Team assigned
@@ -34,9 +33,6 @@ export const Step9Submission: React.FC<Step9Props> = ({ onSubmit, saving, formDa
               </li>
               <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                   <CheckCircle className="w-4 h-4 text-green-500"/> Findings recorded
-              </li>
-              <li className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                  <CheckCircle className="w-4 h-4 text-green-500"/> Evidence attached
               </li>
           </ul>
       </div>

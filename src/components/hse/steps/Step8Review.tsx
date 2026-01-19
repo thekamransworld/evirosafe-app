@@ -1,25 +1,23 @@
 import React from 'react';
-// FIX: Updated import path
-import { HSEInspection } from '../../../types';
+import { Inspection } from '../../../types';
 import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
 import { CheckCircle, AlertTriangle, Camera, Users, Calendar } from 'lucide-react';
 
 interface Step8Props {
-  formData: Partial<HSEInspection>;
+  formData: Partial<Inspection>;
   projects: any[];
   users: any[];
   contractors?: any[];
 }
 
 export const Step8Review: React.FC<Step8Props> = ({ formData, projects, users }) => {
-  const project = projects.find(p => p.id === formData.entity_id);
-  const lead = users.find(u => u.id === formData.inspection_team?.team_lead?.id);
+  const project = projects.find(p => p.id === formData.project_id);
+  const lead = users.find(u => u.id === formData.person_responsible_id);
 
   const findingsCount = formData.findings?.length || 0;
-  const criticalCount = formData.findings?.filter(f => f.risk_assessment?.risk_level === 'high' || f.risk_assessment?.risk_level === 'extreme').length || 0;
-  const evidenceCount = formData.evidence?.length || 0;
-
+  const criticalCount = formData.findings?.filter(f => f.risk_level === 'High' || f.risk_level === 'Critical').length || 0;
+  
   return (
     <div className="space-y-6">
       <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
@@ -36,7 +34,7 @@ export const Step8Review: React.FC<Step8Props> = ({ formData, projects, users })
                  </div>
                  <div className="flex justify-between border-b pb-2">
                      <span className="text-gray-500">Type</span>
-                     <Badge color="blue">{formData.type}</Badge>
+                     <Badge color="blue">{formData.type || 'Safety'}</Badge>
                  </div>
                  <div className="flex justify-between border-b pb-2">
                      <span className="text-gray-500">Project</span>
@@ -45,7 +43,7 @@ export const Step8Review: React.FC<Step8Props> = ({ formData, projects, users })
                   <div className="flex justify-between">
                      <span className="text-gray-500">Date</span>
                      <span className="font-medium dark:text-white flex items-center gap-1">
-                        <Calendar className="w-3 h-3"/> {new Date(formData.schedule?.scheduled_date || Date.now()).toLocaleDateString()}
+                        <Calendar className="w-3 h-3"/> {new Date(formData.schedule_at || Date.now()).toLocaleDateString()}
                      </span>
                  </div>
              </div>
@@ -60,7 +58,7 @@ export const Step8Review: React.FC<Step8Props> = ({ formData, projects, users })
                  <div className="flex justify-between">
                      <span className="text-gray-500">Team Size</span>
                      <span className="font-medium dark:text-white flex items-center gap-1">
-                        <Users className="w-3 h-3"/> {1 + (formData.inspection_team?.inspectors?.length || 0)} Members
+                        <Users className="w-3 h-3"/> {1 + (formData.team_member_ids?.length || 0)} Members
                      </span>
                  </div>
              </div>
@@ -77,12 +75,6 @@ export const Step8Review: React.FC<Step8Props> = ({ formData, projects, users })
                   <div className="text-2xl font-bold text-red-600 dark:text-red-400">{criticalCount}</div>
                   <div className="text-xs text-red-500 uppercase tracking-wider flex justify-center items-center gap-1">
                       <AlertTriangle className="w-3 h-3"/> Critical
-                  </div>
-              </div>
-              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{evidenceCount}</div>
-                  <div className="text-xs text-purple-500 uppercase tracking-wider flex justify-center items-center gap-1">
-                      <Camera className="w-3 h-3"/> Evidence Files
                   </div>
               </div>
           </div>

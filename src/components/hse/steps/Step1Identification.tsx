@@ -1,22 +1,21 @@
 import React from 'react';
-// FIX: Updated import path
-import { HSEInspection, InspectionType } from '../../../types';
+import { Inspection } from '../../../types';
 import { Shield, Globe, Users, Target, FileText, AlertTriangle } from 'lucide-react';
 
 interface Step1Props {
-  formData: Partial<HSEInspection>;
-  setFormData: (data: Partial<HSEInspection>) => void;
+  formData: Partial<Inspection>;
+  setFormData: (data: Partial<Inspection>) => void;
   projects: any[];
 }
 
 export const Step1Identification: React.FC<Step1Props> = ({ formData, setFormData, projects }) => {
   const inspectionTypes = [
-    { id: 'safety', label: 'Safety', icon: Shield },
-    { id: 'environmental', label: 'Environmental', icon: Globe },
-    { id: 'health', label: 'Health', icon: Users },
-    { id: 'fire', label: 'Fire', icon: AlertTriangle },
-    { id: 'equipment', label: 'Equipment', icon: Target },
-    { id: 'process', label: 'Process', icon: FileText },
+    { id: 'Safety', label: 'Safety', icon: Shield },
+    { id: 'Environmental', label: 'Environmental', icon: Globe },
+    { id: 'Health', label: 'Health', icon: Users },
+    { id: 'Fire', label: 'Fire', icon: AlertTriangle },
+    { id: 'Equipment', label: 'Equipment', icon: Target },
+    { id: 'Quality', label: 'Quality', icon: FileText },
   ];
 
   return (
@@ -28,7 +27,7 @@ export const Step1Identification: React.FC<Step1Props> = ({ formData, setFormDat
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
             <input
               type="text"
-              value={formData.title}
+              value={formData.title || ''}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
               placeholder="e.g. Weekly Site Inspection"
@@ -37,8 +36,8 @@ export const Step1Identification: React.FC<Step1Props> = ({ formData, setFormDat
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project / Site</label>
             <select
-              value={formData.entity_id}
-              onChange={(e) => setFormData({ ...formData, entity_id: e.target.value })}
+              value={formData.project_id || ''}
+              onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
               className="w-full p-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700"
             >
               <option value="">Select Project</option>
@@ -56,7 +55,7 @@ export const Step1Identification: React.FC<Step1Props> = ({ formData, setFormDat
           {inspectionTypes.map(type => (
             <button
               key={type.id}
-              onClick={() => setFormData({ ...formData, type: type.id as InspectionType })}
+              onClick={() => setFormData({ ...formData, type: type.id as any })}
               className={`p-4 rounded-lg border flex flex-col items-center gap-2 transition-all ${
                 formData.type === type.id
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
