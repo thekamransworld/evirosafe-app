@@ -245,19 +245,6 @@ export const FindingForm: React.FC<{
                 </div>
             </div>
 
-            {/* Root Cause Button */}
-            {formData.observation_type !== 'best_practice' && (
-                <div className="flex justify-between items-center">
-                    <Button
-                        variant="secondary"
-                        onClick={() => setShowRootCauseModal(true)}
-                        leftIcon={<Search className="w-4 h-4" />}
-                    >
-                        Root Cause Analysis (5 Whys)
-                    </Button>
-                </div>
-            )}
-
             {/* Action Buttons */}
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
                 <Button variant="secondary" onClick={onCancel}>
@@ -270,199 +257,113 @@ export const FindingForm: React.FC<{
                     Save Finding
                 </Button>
             </div>
-
-            {/* Root Cause Modal */}
-            {showRootCauseModal && (
-                <RootCauseAnalysisModal
-                    finding={formData}
-                    onSave={(analysis) => {
-                        setFormData(p => ({ ...p, root_causes: analysis.systemic_issues }));
-                        setShowRootCauseModal(false);
-                    }}
-                    onClose={() => setShowRootCauseModal(false)}
-                />
-            )}
         </div>
     );
 };
 
-// --- ROOT CAUSE ANALYSIS MODAL ---
-export const RootCauseAnalysisModal: React.FC<{
-  finding: any;
-  onSave: (analysis: {
-    why1: string;
-    why2: string;
-    why3: string;
-    why4: string;
-    why5: string;
-    systemic_issues: string[];
-    recommended_actions: string[];
-  }) => void;
-  onClose: () => void;
-}> = ({ finding, onSave, onClose }) => {
-  const [analysis, setAnalysis] = useState({
-    why1: '',
-    why2: '',
-    why3: '',
-    why4: '',
-    why5: '',
-    systemic_issues: [] as string[],
-    recommended_actions: [] as string[],
-  });
-
-  const [newAction, setNewAction] = useState('');
-
-  const SYSTEMIC_ISSUES = [
-    'Training / Competence',
-    'Procedures / Work Instructions',
-    'Supervision / Leadership',
-    'Communication',
-    'Equipment Design / Maintenance',
-    'Work Environment',
-    'Resource Allocation',
-    'Time Pressure',
-    'Organizational Culture',
-    'Contractor Management',
-  ];
-
-  const handleAddAction = () => {
-    if (newAction.trim()) {
-      setAnalysis(prev => ({
-        ...prev,
-        recommended_actions: [...prev.recommended_actions, newAction.trim()]
-      }));
-      setNewAction('');
-    }
-  };
+// --- OPENING MEETING SECTION ---
+export const OpeningMeetingSection: React.FC<{
+  inspectionId: string;
+  teamMembers: User[];
+  onComplete: (data: OpeningMeetingData) => void;
+  isEditable: boolean;
+  initialData?: OpeningMeetingData;
+}> = ({
+  inspectionId,
+  teamMembers,
+  onComplete,
+  isEditable,
+  initialData
+}) => {
+  const [meetingData, setMeetingData] = useState<OpeningMeetingData>(() => ({
+    conducted_at: new Date().toISOString(),
+    supervisor_present: initialData?.supervisor_present || '',
+    hazards_discussed: initialData?.hazards_discussed || '',
+    emergency_procedures_confirmed: initialData?.emergency_procedures_confirmed || false,
+    permits_verified: initialData?.permits_verified || false,
+    stop_work_authority_confirmed: initialData?.stop_work_authority_confirmed || false,
+    attendees: initialData?.attendees || teamMembers.map(m => m.id),
+    notes: initialData?.notes || '',
+  }));
 
   const handleSubmit = () => {
-    if (!analysis.why1.trim()) {
-      alert('Please complete at least the first "Why"');
+    if (!meetingData.supervisor_present.trim()) {
+      alert('Please enter the supervisor name');
       return;
     }
-    onSave(analysis);
+    onComplete(meetingData);
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b dark:border-gray-800">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Root Cause Analysis (5 Whys)</h2>
-              <p className="text-gray-600 dark:text-gray-400">Dig deep to find the systemic cause</p>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-              <X className="w-6 h-6" />
-            </button>
-          </div>
+    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-6 rounded-2xl border border-blue-200 dark:border-blue-800 shadow-lg">
+      <div className="flex items-center gap-4 mb-6">
+        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-xl">
+          <Users className="w-8 h-8 text-blue-600 dark:text-blue-400" />
         </div>
+        <div>
+          <h2 className="text-2xl font-bold text-blue-900 dark:text-blue-200">Opening Meeting</h2>
+          <p className="text-blue-700 dark:text-blue-300">Phase 1: Setup & Communication</p>
+        </div>
+      </div>
 
-        <div className="p-6 overflow-y-auto space-y-8">
-          {/* Finding Summary */}
-          <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-800">
-            <div className="flex items-center gap-3 mb-2">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <h3 className="font-bold text-red-700 dark:text-red-300">Finding Being Analyzed</h3>
-            </div>
-            <p className="text-gray-800 dark:text-gray-200">{finding.description}</p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Area Supervisor / Lead Present
+            </label>
+            <input
+              type="text"
+              value={meetingData.supervisor_present}
+              onChange={(e) => setMeetingData({...meetingData, supervisor_present: e.target.value})}
+              disabled={!isEditable}
+              className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+              placeholder="Enter supervisor name"
+            />
           </div>
-
-          {/* 5 Whys Analysis */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">The 5 Whys Method</h3>
-            
-            <div className="space-y-4">
-              {[
-                { level: 1, label: 'Why 1: Direct Cause', placeholder: 'What was the immediate cause?' },
-                { level: 2, label: 'Why 2: Underlying Cause', placeholder: 'Why did that happen?' },
-                { level: 3, label: 'Why 3: Process Issue', placeholder: 'Why was the system inadequate?' },
-                { level: 4, label: 'Why 4: Management Issue', placeholder: 'Why did management allow this?' },
-                { level: 5, label: 'Why 5: Root Cause', placeholder: 'What is the fundamental/systemic cause?' },
-              ].map((item, index) => (
-                <div key={index} className={`p-4 border-l-4 ${index === 4 ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-blue-500 bg-blue-50 dark:bg-blue-900/10'} rounded-r-lg`}>
-                  <label className="block text-sm font-bold mb-2">{item.label}</label>
-                  <input
-                    type="text"
-                    value={analysis[`why${index + 1}` as keyof typeof analysis] as string}
-                    onChange={(e) => setAnalysis(prev => ({ ...prev, [`why${index + 1}`]: e.target.value }))}
-                    placeholder={item.placeholder}
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
-                  />
-                </div>
+          
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+              Inspection Team
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {teamMembers.map(member => (
+                <span key={member.id} className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm">
+                  {member.name}
+                </span>
               ))}
             </div>
           </div>
-
-          {/* Systemic Issues */}
-          <div>
-            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Systemic Issues Identified</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {SYSTEMIC_ISSUES.map(issue => (
-                <button
-                  key={issue}
-                  type="button"
-                  onClick={() => {
-                    setAnalysis(prev => ({
-                      ...prev,
-                      systemic_issues: prev.systemic_issues.includes(issue)
-                        ? prev.systemic_issues.filter(i => i !== issue)
-                        : [...prev.systemic_issues, issue]
-                    }));
-                  }}
-                  className={`p-3 border rounded-lg text-sm text-left transition-all ${analysis.systemic_issues.includes(issue)
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                    : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'
-                  }`}
-                >
-                  {issue}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Recommended Actions */}
-          <div>
-            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Recommended Preventive Actions</h3>
-            <div className="flex gap-2 mb-3">
-              <input
-                type="text"
-                value={newAction}
-                onChange={(e) => setNewAction(e.target.value)}
-                placeholder="Enter recommended action..."
-                className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-lg"
-                onKeyPress={(e) => e.key === 'Enter' && handleAddAction()}
-              />
-              <Button onClick={handleAddAction}>Add</Button>
-            </div>
-            
-            {analysis.recommended_actions.length > 0 && (
-              <div className="space-y-2">
-                {analysis.recommended_actions.map((action, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-                    <span className="text-sm">{action}</span>
-                    <button
-                      onClick={() => setAnalysis(prev => ({
-                        ...prev,
-                        recommended_actions: prev.recommended_actions.filter((_, i) => i !== index)
-                      }))}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
-        <div className="p-6 border-t dark:border-gray-800 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white">
-            Save Analysis & Apply to Finding
-          </Button>
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertTriangle className="w-5 h-5 text-orange-500" />
+            <h3 className="font-bold text-gray-900 dark:text-white">Safety Briefing & Hazards</h3>
+          </div>
+          
+          <textarea
+            value={meetingData.hazards_discussed}
+            onChange={(e) => setMeetingData({...meetingData, hazards_discussed: e.target.value})}
+            disabled={!isEditable}
+            rows={4}
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900"
+            placeholder="Discuss known hazards, hot work permits, lockout-tagout status, confined space entries, emergency exits, first aid locations..."
+          />
         </div>
+
+        {/* Action Button */}
+        {isEditable && (
+          <div className="pt-6 border-t border-blue-200 dark:border-blue-800">
+            <Button
+              onClick={handleSubmit}
+              className="w-full md:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-semibold rounded-xl shadow-lg"
+              leftIcon={<Users className="w-5 h-5" />}
+            >
+              Complete Opening Meeting & Start Inspection
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -492,28 +393,6 @@ export const ClosingMeetingSection: React.FC<{
     recommendations: '',
   });
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const critical = findings.filter(f => f.risk_level === 'Critical' || f.risk_level === 'High').length;
-    const medium = findings.filter(f => f.risk_level === 'Medium').length;
-    const low = findings.filter(f => f.risk_level === 'Low').length;
-    const open = findings.filter(f => f.status === 'open').length;
-    const closed = findings.filter(f => f.status === 'closed').length;
-    
-    return { critical, medium, low, total: findings.length, open, closed };
-  }, [findings]);
-
-  // Find top categories
-  const topCategories = useMemo(() => {
-    const categories: Record<string, number> = {};
-    findings.forEach(f => {
-      categories[f.observation_category] = (categories[f.observation_category] || 0) + 1;
-    });
-    return Object.entries(categories)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3);
-  }, [findings]);
-
   const handleSubmit = () => {
     if (!closingData.supervisor_acknowledged) {
       alert('Supervisor acknowledgement is required');
@@ -538,44 +417,6 @@ export const ClosingMeetingSection: React.FC<{
         </div>
       </div>
 
-      {/* Inspection Summary Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-red-600">{stats.critical}</div>
-          <div className="text-sm text-gray-600">Critical/High Findings</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-orange-600">{stats.medium}</div>
-          <div className="text-sm text-gray-600">Medium Findings</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-blue-600">{stats.total}</div>
-          <div className="text-sm text-gray-600">Total Findings</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-green-600">{stats.closed}</div>
-          <div className="text-sm text-gray-600">Closed Actions</div>
-        </div>
-      </div>
-
-      {/* Top Risk Areas */}
-      {topCategories.length > 0 && (
-        <div className="mb-6">
-          <h4 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" /> Top Risk Categories
-          </h4>
-          <div className="space-y-2">
-            {topCategories.map(([category, count]) => (
-              <div key={category} className="flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-lg border">
-                <span className="capitalize">{category.replace('_', ' ')}</span>
-                <span className="font-bold text-red-600">{count} findings</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Meeting Content */}
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
@@ -591,69 +432,6 @@ export const ClosingMeetingSection: React.FC<{
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-            Immediate Actions Agreed (within 24 hours)
-          </label>
-          <textarea
-            value={closingData.immediate_actions_agreed}
-            onChange={(e) => setClosingData({...closingData, immediate_actions_agreed: e.target.value})}
-            disabled={!isEditable}
-            rows={3}
-            className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800"
-            placeholder="What immediate actions will be taken? Who is responsible?"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-            Recommendations for Improvement
-          </label>
-          <textarea
-            value={closingData.recommendations}
-            onChange={(e) => setClosingData({...closingData, recommendations: e.target.value})}
-            disabled={!isEditable}
-            rows={3}
-            className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800"
-            placeholder="Systemic improvements, training needs, process changes..."
-          />
-        </div>
-
-        {/* Follow-up Planning */}
-        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-4 rounded-xl border border-yellow-200 dark:border-yellow-800">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-yellow-600" />
-              <h4 className="font-bold text-yellow-700 dark:text-yellow-300">Follow-up Planning</h4>
-            </div>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={closingData.follow_up_required}
-                onChange={(e) => setClosingData({...closingData, follow_up_required: e.target.checked})}
-                disabled={!isEditable}
-                className="rounded"
-              />
-              <span className="text-sm">Follow-up inspection required</span>
-            </label>
-          </div>
-          
-          {closingData.follow_up_required && (
-            <div className="mt-3">
-              <label className="block text-sm font-medium mb-2">Next inspection date</label>
-              <input
-                type="date"
-                value={closingData.next_inspection_date}
-                onChange={(e) => setClosingData({...closingData, next_inspection_date: e.target.value})}
-                disabled={!isEditable}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg"
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Supervisor Acknowledgement */}
         <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
           <div className="flex items-center gap-3">
             <Users className="w-5 h-5 text-blue-600" />
@@ -676,7 +454,6 @@ export const ClosingMeetingSection: React.FC<{
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="pt-6 border-t border-green-200 dark:border-green-800 flex flex-col sm:flex-row gap-3">
         <Button
           onClick={onGenerateReport}
@@ -718,20 +495,6 @@ export const InspectionReportGenerator: React.FC<{
 }) => {
   const reportRef = useRef<HTMLDivElement>(null);
 
-  // Calculate statistics
-  const stats = {
-    total: findings.length,
-    critical: findings.filter(f => f.risk_level === 'Critical' || f.risk_level === 'High').length,
-    medium: findings.filter(f => f.risk_level === 'Medium').length,
-    low: findings.filter(f => f.risk_level === 'Low').length,
-    open: findings.filter(f => f.status === 'open').length,
-    closed: findings.filter(f => f.status === 'closed').length,
-    byCategory: findings.reduce((acc, f) => {
-      acc[f.observation_category] = (acc[f.observation_category] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
-  };
-
   const generatePDF = async () => {
     if (!reportRef.current) return;
     
@@ -756,7 +519,6 @@ export const InspectionReportGenerator: React.FC<{
 
   return (
     <div className="space-y-6">
-      {/* Report Actions */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border shadow-sm">
         <div className="flex flex-wrap gap-3">
           <Button
@@ -773,145 +535,20 @@ export const InspectionReportGenerator: React.FC<{
           >
             Print Report
           </Button>
-          <Button
-            onClick={() => onEmail?.({
-              subject: `Inspection Report: ${inspection.title}`,
-              body: `Please find attached the inspection report.`,
-              attachments: [{ type: 'report', id: inspection.id }]
-            })}
-            leftIcon={<Mail className="w-4 h-4" />}
-            variant="secondary"
-          >
-            Email Report
-          </Button>
         </div>
       </div>
 
-      {/* Report Preview */}
       <div ref={reportRef} className="bg-white p-8 rounded-xl border shadow-lg">
-        {/* Header */}
         <div className="text-center mb-8 border-b pb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">INSPECTION REPORT</h1>
           <h2 className="text-xl text-gray-700">{inspection.title}</h2>
-          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="font-semibold">Report ID:</span> {inspection.id}
-            </div>
-            <div>
-              <span className="font-semibold">Date:</span> {new Date(inspection.schedule_at || inspection.created_at || '').toLocaleDateString()}
-            </div>
-            <div>
-              <span className="font-semibold">Location:</span> {inspection.location_area || 'N/A'}
-            </div>
-            <div>
-              <span className="font-semibold">Status:</span> {inspection.status}
-            </div>
-          </div>
         </div>
-
-        {/* Executive Summary */}
         <div className="mb-8">
           <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5" /> Executive Summary
           </h3>
           <div className="bg-gray-50 p-4 rounded-lg">
             <p className="text-gray-700">{closingMeeting?.key_findings_summary || 'No summary available'}</p>
-          </div>
-        </div>
-
-        {/* Key Statistics */}
-        <div className="mb-8">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5" /> Inspection Statistics
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-red-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-red-600">{stats.critical}</div>
-              <div className="text-sm text-gray-600">Critical/High Findings</div>
-            </div>
-            <div className="bg-orange-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-orange-600">{stats.medium}</div>
-              <div className="text-sm text-gray-600">Medium Findings</div>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-              <div className="text-sm text-gray-600">Total Findings</div>
-            </div>
-            <div className="bg-green-50 p-4 rounded-lg text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.closed}</div>
-              <div className="text-sm text-gray-600">Closed Actions</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Findings by Category */}
-        <div className="mb-8">
-          <h3 className="text-xl font-bold mb-4">Findings by Category</h3>
-          <div className="space-y-2">
-            {Object.entries(stats.byCategory).map(([category, count]) => (
-              <div key={category} className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                <span className="capitalize">{category.replace('_', ' ')}</span>
-                <span className="font-bold">{count}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Detailed Findings */}
-        <div className="mb-8">
-          <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" /> Detailed Findings
-          </h3>
-          <div className="space-y-4">
-            {findings.map((finding, index) => (
-              <div key={finding.id} className="border-l-4 border-red-500 pl-4 py-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="font-bold">Finding #{index + 1}: {finding.description}</h4>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Category: {finding.observation_category} | 
-                      Risk: <span className="font-bold text-red-600">{finding.risk_level}</span> | 
-                      Status: {finding.status}
-                    </div>
-                  </div>
-                </div>
-                {finding.immediate_controls?.length > 0 && (
-                  <div className="mt-2 text-sm text-green-700">
-                    <span className="font-semibold">Immediate Controls:</span> {finding.immediate_controls.map(c => c.action).join(', ')}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        {closingMeeting?.recommendations && (
-          <div className="mb-8">
-            <h3 className="text-xl font-bold mb-4">Recommendations</h3>
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-gray-700 whitespace-pre-line">{closingMeeting.recommendations}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-12 pt-6 border-t">
-          <div className="grid grid-cols-2 gap-8">
-            <div>
-              <h4 className="font-bold mb-2">Inspection Team</h4>
-              <p className="text-sm text-gray-600">Lead Inspector: {inspection.person_responsible?.name || 'N/A'}</p>
-              <p className="text-sm text-gray-600">Date: {new Date().toLocaleDateString()}</p>
-            </div>
-            <div>
-              <h4 className="font-bold mb-2">Acknowledgement</h4>
-              <p className="text-sm text-gray-600">
-                {closingMeeting?.supervisor_acknowledged 
-                  ? 'Acknowledged by area supervisor'
-                  : 'Pending acknowledgement'}
-              </p>
-              <p className="text-sm text-gray-600">Report Generated: {new Date().toLocaleString()}</p>
-            </div>
           </div>
         </div>
       </div>
@@ -946,7 +583,7 @@ export const FollowUpSection: React.FC<{
 
   const handleVerify = (findingId: string, effective: boolean) => {
     const verification = {
-      verified_by: 'current_user_id', // Replace with actual user
+      verified_by: 'current_user_id',
       verified_at: new Date().toISOString(),
       effective,
       notes: effective ? 'Action verified as effective' : 'Action not effective, requires rework',
@@ -964,25 +601,6 @@ export const FollowUpSection: React.FC<{
         <p className="text-purple-700 dark:text-purple-300">Phase 4: Action Verification</p>
       </div>
 
-      {/* Progress Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-blue-600">{openFindings.length}</div>
-          <div className="text-sm text-gray-600">Pending Verification</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-green-600">{verifiedFindings.length}</div>
-          <div className="text-sm text-gray-600">Verified</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border text-center">
-          <div className="text-3xl font-bold text-orange-600">
-            {findings.length > 0 ? Math.round((verifiedFindings.length / findings.length) * 100) : 0}%
-          </div>
-          <div className="text-sm text-gray-600">Verification Rate</div>
-        </div>
-      </div>
-
-      {/* Open Findings for Verification */}
       {openFindings.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -996,33 +614,14 @@ export const FollowUpSection: React.FC<{
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-bold">{finding.description}</h4>
-                    <div className="text-sm text-gray-600 mt-1">
-                      Assigned to: {finding.responsible_person?.name} | 
-                      Due: {finding.due_date ? new Date(finding.due_date).toLocaleDateString() : 'No date'}
-                    </div>
-                    {finding.immediate_controls?.length > 0 && (
-                      <div className="mt-2 text-sm text-green-700">
-                        <span className="font-semibold">Immediate controls applied:</span> {finding.immediate_controls.map(c => c.action).join(', ')}
-                      </div>
-                    )}
                   </div>
                   
                   <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={verificationDates[finding.id] || ''}
-                      onChange={(e) => setVerificationDates(prev => ({
-                        ...prev,
-                        [finding.id]: e.target.value
-                      }))}
-                      className="p-2 border rounded text-sm"
-                      min={new Date().toISOString().split('T')[0]}
-                    />
                     <Button
                       size="sm"
-                      variant="success"
                       onClick={() => handleVerify(finding.id, true)}
                       leftIcon={<CheckCircle className="w-4 h-4" />}
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
                       Verify Effective
                     </Button>
@@ -1041,72 +640,6 @@ export const FollowUpSection: React.FC<{
           </div>
         </div>
       )}
-
-      {/* Verified Findings */}
-      {verifiedFindings.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-500" />
-            Verified Findings
-          </h3>
-          
-          <div className="space-y-2">
-            {verifiedFindings.map(finding => (
-              <div key={finding.id} className="p-3 bg-green-50 dark:bg-green-900/10 rounded-lg border border-green-200 dark:border-green-800">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">{finding.description}</span>
-                  <span className="text-sm text-green-600">
-                    Verified on {new Date(finding.verification_data!.verified_at).toLocaleDateString()}
-                  </span>
-                </div>
-                {finding.verification_data?.notes && (
-                  <p className="text-sm text-gray-600 mt-1">{finding.verification_data.notes}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Schedule Next Follow-up */}
-      <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-200 dark:border-blue-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Calendar className="w-5 h-5 text-blue-600" />
-            <div>
-              <h4 className="font-bold text-blue-900 dark:text-blue-200">Schedule Next Follow-up</h4>
-              <p className="text-sm text-blue-700 dark:text-blue-300">Set date for verification completion</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-2">
-            <input
-              type="date"
-              value={followUpDate}
-              onChange={(e) => setFollowUpDate(e.target.value)}
-              className="p-2 border rounded"
-              min={new Date().toISOString().split('T')[0]}
-            />
-            <Button
-              onClick={() => onScheduleFollowUp(followUpDate)}
-              disabled={!followUpDate}
-            >
-              Schedule
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Completion Status */}
-      {openFindings.length === 0 && (
-        <div className="bg-green-50 dark:bg-green-900/10 p-6 rounded-xl border border-green-200 dark:border-green-800 text-center">
-          <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-green-900 dark:text-green-200">All Findings Verified!</h3>
-          <p className="text-green-700 dark:text-green-300 mt-2">
-            All corrective actions have been verified as effective. This inspection can now be closed.
-          </p>
-        </div>
-      )}
     </div>
   );
 };
@@ -1121,11 +654,8 @@ export const AiRiskAnalysis: React.FC<{
 
   const analyzeFindings = async () => {
     setIsAnalyzing(true);
-    
     try {
-      // Mock AI analysis for now
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
       const mockAnalysis = {
         primaryCategory: 'People & Behaviors',
         trend: 'Increasing unsafe acts in high-risk areas',
@@ -1136,7 +666,6 @@ export const AiRiskAnalysis: React.FC<{
           'Implement positive reinforcement program'
         ]
       };
-      
       setAnalysis(mockAnalysis);
       onAnalysisComplete(mockAnalysis);
     } catch (error) {
@@ -1178,17 +707,6 @@ export const AiRiskAnalysis: React.FC<{
               <div className="font-bold text-sm">{analysis.priorityArea}</div>
             </div>
           </div>
-          
-          {analysis.recommendations && (
-            <div className="p-3 bg-white dark:bg-gray-800 rounded border">
-              <div className="text-sm font-medium mb-2">AI Recommendations</div>
-              <ul className="text-sm space-y-1 text-gray-600 dark:text-gray-300">
-                {analysis.recommendations.map((rec: string, i: number) => (
-                  <li key={i}>• {rec}</li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )}
     </div>

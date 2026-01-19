@@ -17,7 +17,6 @@ export interface Organization {
   industry: string;
   country: string;
   created_at?: string;
-  // Enhanced Fields
   contact_details?: {
     phone: string;
     email: string;
@@ -526,3 +525,35 @@ export interface CostImpact {
   totalEstimated: number;
   insuranceCoverage: number;
 }
+
+// --- MISSING TYPES ADDED ---
+export interface Witness {
+  name: string;
+  contact: string;
+  statement: string;
+  signature?: string;
+}
+
+export interface Evidence {
+  id: string;
+  type: 'photograph' | 'video_recording' | 'audio_note' | 'document_scan';
+  title: string;
+  description: string;
+  url: string;
+  file_name: string;
+  file_size: number;
+  file_type: string;
+  uploaded_by: string;
+  uploaded_at: Date;
+  gps_coordinates?: { latitude: number; longitude: number; accuracy: number };
+  timestamp: Date;
+  device_info?: any;
+  tags: string[];
+  encrypted: boolean;
+  access_control: string[];
+}
+
+// Aliases for legacy components
+export type HSEInspection = Inspection;
+export type HSEFinding = InspectionFinding;
+export type InspectionType = Inspection['type'];
