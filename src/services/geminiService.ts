@@ -3,7 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Initialize Gemini
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+// --- USE LATEST MODEL ---
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
@@ -133,47 +135,6 @@ export const generateCertificationInsight = async (profile: any) => {
   }
 };
 
-// --- 7. ROOT CAUSE ANALYSIS (NEW) ---
-export const generateRootCauseAnalysis = async (description: string) => {
-    if (!apiKey) return mockRootCause();
-    try {
-        const result = await model.generateContent(`
-            Perform a 5-Whys Root Cause Analysis for this incident: "${description}".
-            Return JSON:
-            {
-                "direct_cause": "Immediate cause",
-                "why_1": "Reason 1",
-                "why_2": "Reason 2",
-                "why_3": "Reason 3",
-                "why_4": "Reason 4",
-                "why_5": "Root Cause",
-                "conclusion": "Systemic failure identified",
-                "root_cause_category": ["Human", "Process"]
-            }
-        `);
-        const response = await result.response;
-        return JSON.parse(cleanJson(response.text()));
-    } catch (e) { return mockRootCause(); }
-};
-
-// --- 8. COST ESTIMATION (NEW) ---
-export const estimateIncidentCosts = async (description: string, severity: string) => {
-    if (!apiKey) return mockCosts();
-    try {
-        const result = await model.generateContent(`
-            Estimate the financial impact of a "${severity}" severity incident: "${description}".
-            Return JSON with estimated USD values (numbers only):
-            {
-                "direct_costs": { "medical": 0, "repair": 0, "compensation": 0, "fines": 0 },
-                "indirect_costs": { "downtime": 0, "legal": 0, "training": 0, "admin": 0 },
-                "total_estimated": 0
-            }
-        `);
-        const response = await result.response;
-        return JSON.parse(cleanJson(response.text()));
-    } catch (e) { return mockCosts(); }
-};
-
 export const generateReportSummary = async (json: string) => {
     if (!apiKey) return "AI Summary unavailable (No API Key).";
     try {
@@ -236,17 +197,4 @@ const mockCourse = (title: string) => ({
 const mockCertInsight = () => ({
   nextLevelRecommendation: "Continue logging safe hours.",
   missingItems: ["Advanced Training"]
-});
-
-const mockRootCause = () => ({
-    direct_cause: "Manual Mock Cause",
-    why_1: "Reason 1", why_2: "Reason 2", why_3: "Reason 3", why_4: "Reason 4", why_5: "Root Cause",
-    conclusion: "System failure",
-    root_cause_category: ["Process"]
-});
-
-const mockCosts = () => ({
-    direct_costs: { medical: 1000, repair: 500, compensation: 0, fines: 0 },
-    indirect_costs: { downtime: 2000, legal: 0, training: 500, admin: 200 },
-    total_estimated: 4200
 });
