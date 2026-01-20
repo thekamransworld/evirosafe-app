@@ -1,10 +1,19 @@
 import emailjs from '@emailjs/browser';
 
-// --- REPLACE THESE WITH YOUR KEYS FROM EMAILJS.COM ---
-const SERVICE_ID = "service_eqrbs0v";       // e.g. service_m9p...
-const TEMPLATE_ID_INVITE = "template_usz6c6u"; // e.g. template_8s...
-const TEMPLATE_ID_DOC = "YOUR_TEMPLATE_ID";    // You can use the same template ID for now
-const PUBLIC_KEY = "YOUR_PUBLIC_KEY";       // e.g. user_Kj8...
+// --- CONFIGURATION ---
+
+// 1. Service ID (From your screenshot)
+const SERVICE_ID = "service_eqrbs0v"; 
+
+// 2. Template ID (From your previous screenshot)
+// You had "uhdeh92" open in the editor previously.
+const TEMPLATE_ID_INVITE = "uhdeh92"; 
+const TEMPLATE_ID_DOC = "uhdeh92"; 
+
+// 3. Public Key (YOU NEED TO PASTE THIS)
+// Go to EmailJS Dashboard -> Account -> Public Key
+const PUBLIC_KEY = "W0kvh4Mc_PKDX4AQf"; 
+
 
 export const sendInviteEmail = async (
   toEmail: string,
@@ -14,20 +23,24 @@ export const sendInviteEmail = async (
   inviterName: string
 ) => {
   try {
+    console.log(`Attempting to send invite to ${toEmail}...`);
+
     const templateParams = {
       to_email: toEmail,
       to_name: toName,
       role: role,
       org_name: orgName,
       inviter_name: inviterName,
-      invite_link: window.location.origin, // This sends the link to your app
+      invite_link: window.location.origin, 
     };
 
-    await emailjs.send(SERVICE_ID, TEMPLATE_ID_INVITE, templateParams, PUBLIC_KEY);
-    console.log("Email sent successfully to:", toEmail);
+    const response = await emailjs.send(SERVICE_ID, TEMPLATE_ID_INVITE, templateParams, PUBLIC_KEY);
+    
+    console.log("✅ Email sent successfully!", response.status, response.text);
     return true;
   } catch (error) {
-    console.error("Failed to send email:", error);
+    console.error("❌ FAILED to send email.", error);
+    alert("Email failed to send. Please check the console for the specific error.");
     throw error;
   }
 };
@@ -39,19 +52,22 @@ export const sendDocumentEmail = async (
   _message: string
 ) => {
   try {
+    console.log(`Attempting to send document to ${toEmail}...`);
+
     const templateParams = {
       to_email: toEmail,
       to_name: "User", 
-      org_name: documentTitle, // Reusing the 'org_name' variable for document title
+      org_name: documentTitle, 
       inviter_name: "EviroSafe System",
       role: "Viewer",
-      invite_link: documentLink, // Reusing 'invite_link' for document link
+      invite_link: documentLink, 
     };
 
     await emailjs.send(SERVICE_ID, TEMPLATE_ID_DOC, templateParams, PUBLIC_KEY);
+    console.log("✅ Document email sent successfully!");
     return true;
   } catch (error) {
-    console.error("Failed to send email:", error);
+    console.error("❌ FAILED to send document email.", error);
     throw error;
   }
 };
