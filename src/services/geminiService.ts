@@ -4,11 +4,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- USE LATEST MODEL ---
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// --- FIX: Use 'gemini-pro' (The most stable/available model) ---
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
+  // Remove markdown code blocks and trim
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
@@ -40,7 +41,7 @@ export const generateSafetyReport = async (prompt: string) => {
     const response = await result.response;
     return JSON.parse(cleanJson(response.text()));
   } catch (error) {
-    console.error("AI Error:", error);
+    console.error("AI Error (Safety Report):", error);
     return mockSafetyReport(prompt);
   }
 };
@@ -72,6 +73,7 @@ export const generateRamsContent = async (activity: string) => {
     const response = await result.response;
     return JSON.parse(cleanJson(response.text()));
   } catch (error) {
+    console.error("AI Error (RAMS):", error);
     return mockRams(activity);
   }
 };
