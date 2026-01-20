@@ -20,6 +20,7 @@ import { useToast } from './components/ui/Toast';
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
+import { logoSrc } from './config'; // Import logoSrc
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -140,7 +141,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-  const handleCreateOrganization = (data: any) => setOrganizations(prev => [...prev, { ...data, id: `org_${Date.now()}`, status: 'active' }]);
+  
+  // --- FIXED: Added default branding to new organizations ---
+  const handleCreateOrganization = (data: any) => {
+      const newOrg: Organization = { 
+          ...data, 
+          id: `org_${Date.now()}`, 
+          status: 'active',
+          branding: {
+              logoUrl: logoSrc,
+              primaryColor: '#00A86B'
+          },
+          secondaryLanguages: ['ar'],
+          timezone: 'GMT+3',
+          primaryLanguage: 'en',
+          slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+          domain: data.name.toLowerCase().replace(/\s+/g, '') + '.com'
+      };
+      setOrganizations(prev => [...prev, newOrg]);
+      // In a real app, you would save this to Firestore here
+      toast.success("Organization created successfully.");
+  };
+
   const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
   const handleSignUp = () => {};
   const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
