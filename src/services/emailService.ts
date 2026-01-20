@@ -1,19 +1,10 @@
 import emailjs from '@emailjs/browser';
 
-// --- CONFIGURATION ---
-
-// 1. Service ID (From your screenshot)
-const SERVICE_ID = "service_eqrbs0v"; 
-
-// 2. Template ID (From your previous screenshot)
-// You had "uhdeh92" open in the editor previously.
-const TEMPLATE_ID_INVITE = "uhdeh92"; 
-const TEMPLATE_ID_DOC = "uhdeh92"; 
-
-// 3. Public Key (YOU NEED TO PASTE THIS)
-// Go to EmailJS Dashboard -> Account -> Public Key
-const PUBLIC_KEY = "W0kvh4Mc_PKDX4AQf"; 
-
+// --- CONFIGURATION FROM YOUR SCREENSHOTS ---
+const SERVICE_ID = "service_eqrbs0v";       // From Email Services screen
+const TEMPLATE_ID_INVITE = "template_usz6c6u"; // From Email Templates screen
+const TEMPLATE_ID_DOC = "template_usz6c6u";    // Using the same template for now
+const PUBLIC_KEY = "W0kvh4Mc_PKDX4AQf";     // From Account screen
 
 export const sendInviteEmail = async (
   toEmail: string,
@@ -40,7 +31,6 @@ export const sendInviteEmail = async (
     return true;
   } catch (error) {
     console.error("❌ FAILED to send email.", error);
-    alert("Email failed to send. Please check the console for the specific error.");
     throw error;
   }
 };
