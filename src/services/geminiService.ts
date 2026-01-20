@@ -4,12 +4,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- USE THE LATEST STABLE MODEL ---
-// gemini-1.5-flash is the current standard (fast & free tier compatible)
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// --- FIX: Use 'gemini-pro' (The most stable/available model) ---
+const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
+  // Remove markdown code blocks and trim
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
