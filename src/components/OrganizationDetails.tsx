@@ -12,17 +12,23 @@ import {
   Plus, Search, UserPlus, ArrowLeft, 
   MoreVertical, Mail, Phone, MapPin, Globe, Users 
 } from 'lucide-react';
+import { sendInviteEmail } from '../services/emailService'; // Import Email Service
+import { useToast } from './ui/Toast'; // Import Toast
 
 // --- Invite User Modal (Local Definition) ---
 interface InviteUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   orgId: string;
+  orgName: string; // Pass org name for email
+  inviterName: string; // Pass inviter name for email
 }
 
-const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, orgId }) => {
+const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, orgId, orgName, inviterName }) => {
     const { handleInviteUser } = useAppContext();
     const { projects } = useDataContext();
+    const toast = useToast();
+    
     const orgProjects = projects.filter(p => p.org_id === orgId);
 
     const [formData, setFormData] = useState({
@@ -32,24 +38,47 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, orgI
         project_id: '',
     });
     const [error, setError] = useState('');
+    const [isSending, setIsSending] = useState(false);
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!formData.name.trim() || !formData.email.trim()) {
             setError('Full Name and Email are required.');
             return;
         }
         
-        handleInviteUser({
-            org_id: orgId,
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-            project_id: formData.project_id
-        });
-        
-        onClose();
-        setFormData({ name: '', email: '', role: 'WORKER', project_id: '' });
+        setIsSending(true);
         setError('');
+
+        try {
+            // 1. Send Email via EmailJS
+            await sendInviteEmail(
+                formData.email,
+                formData.name,
+                formData.role,
+                orgName,
+                inviterName
+            );
+
+            // 2. Update Database / State
+            handleInviteUser({
+                org_id: orgId,
+                name: formData.name,
+                email: formData.email,
+                role: formData.role,
+                project_id: formData.project_id
+            });
+            
+            toast.success(`Invitation sent to ${formData.email}`);
+            onClose();
+            setFormData({ name: '', email: '', role: 'WORKER', project_id: '' });
+
+        } catch (err) {
+            console.error(err);
+            setError("Failed to send email. Check console for details.");
+            toast.error("Email failed to send.");
+        } finally {
+            setIsSending(false);
+        }
     };
 
     if (!isOpen) return null;
@@ -59,7 +88,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, orgI
             <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
                 <div className="p-6 border-b dark:border-dark-border">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite New User</h3>
-                    <p className="text-sm text-gray-500">Add a member to this organization</p>
+                    <p className="text-sm text-gray-500">Add a member to {orgName}</p>
                 </div>
                 <div className="p-6 space-y-4">
                     <FormField label="Full Name">
@@ -81,11 +110,13 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, orgI
                             </select>
                         </FormField>
                     </div>
-                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {error && <p className="text-sm text-red-500 bg-red-50 p-2 rounded">{error}</p>}
                 </div>
                 <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border rounded-b-lg">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Send Invitation</Button>
+                    <Button variant="secondary" onClick={onClose} disabled={isSending}>Cancel</Button>
+                    <Button onClick={handleSubmit} disabled={isSending}>
+                        {isSending ? 'Sending...' : 'Send Invitation'}
+                    </Button>
                 </div>
             </div>
         </div>
@@ -102,7 +133,7 @@ interface OrganizationDetailsProps {
 type Tab = 'Overview' | 'Projects' | 'People' | 'Settings';
 
 export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, onBack }) => {
-  const { usersList, invitedEmails } = useAppContext();
+  const { usersList, invitedEmails, activeUser } = useAppContext();
   const { projects, handleCreateProject } = useDataContext();
   
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
@@ -355,6 +386,8 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
         isOpen={isInviteModalOpen} 
         onClose={() => setIsInviteModalOpen(false)} 
         orgId={org.id}
+        orgName={org.name}
+        inviterName={activeUser?.name || 'Admin'}
       />
     </div>
   );
