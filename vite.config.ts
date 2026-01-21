@@ -7,14 +7,15 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/evirosafe-192.png', 'icons/evirosafe-512.png'],
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'EviroSafe HSE Manager',
+        name: 'EviroSafe HSE Command Center',
         short_name: 'EviroSafe',
-        description: 'Next-Gen HSE Command Center',
-        theme_color: '#020617',
-        background_color: '#020617',
-        display: 'standalone',
+        description: 'Next-Gen HSE Management System',
+        theme_color: '#0f172a', // Matches your dark theme background
+        background_color: '#0f172a',
+        display: 'standalone', // Hides the browser URL bar
+        orientation: 'portrait',
         icons: [
           {
             src: '/icons/evirosafe-192.png',
@@ -25,6 +26,12 @@ export default defineConfig({
             src: '/icons/evirosafe-512.png',
             sizes: '512x512',
             type: 'image/png'
+          },
+          {
+            src: '/icons/evirosafe-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable' // Ensures it looks good on Android round icons
           }
         ]
       },
@@ -38,12 +45,12 @@ export default defineConfig({
     })
   ],
   build: {
-    chunkSizeWarningLimit: 1600, // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1600,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            return 'vendor'; // Split vendor code into separate chunk
+            return 'vendor';
           }
         }
       }
