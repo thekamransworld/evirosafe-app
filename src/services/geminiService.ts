@@ -4,24 +4,31 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use the specific model confirmed in your API test ---
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+// --- FIX: Use 'gemini-1.5-flash' (The most reliable standard model) ---
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
-  // Remove markdown code blocks and trim
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
 // --- 1. GENERIC RESPONSE ---
 export const generateResponse = async (prompt: string) => {
-  if (!apiKey) return "AI not configured. Please add VITE_GEMINI_API_KEY.";
+  console.log("1. Starting AI Request...");
+  if (!apiKey) {
+    console.error("❌ No API Key found in environment variables");
+    return "AI not configured. Please add VITE_GEMINI_API_KEY.";
+  }
+
   try {
+    console.log("2. Sending prompt to Google...");
     const result = await model.generateContent(prompt);
-    return result.response.text();
-  } catch (error) {
-    console.error("AI Error:", error);
-    return "Error generating response. Please check your API Key.";
+    const response = await result.response;
+    console.log("3. Received response from Google");
+    return response.text();
+  } catch (error: any) {
+    console.error("❌ AI Error Details:", error);
+    return `Error: ${error.message || "Unknown AI error"}`;
   }
 };
 
@@ -41,14 +48,18 @@ export const generateSafetyReport = async (prompt: string) => {
     const response = await result.response;
     return JSON.parse(cleanJson(response.text()));
   } catch (error) {
-    console.error("AI Error (Safety Report):", error);
+    console.error("AI Safety Report Error:", error);
     return mockSafetyReport(prompt);
   }
 };
 
 // --- 3. RAMS GENERATION ---
 export const generateRamsContent = async (activity: string) => {
-  if (!apiKey) return mockRams(activity);
+  console.log("Generating RAMS for:", activity);
+  if (!apiKey) {
+      console.warn("No API Key, using mock RAMS");
+      return mockRams(activity);
+  }
 
   try {
     const result = await model.generateContent(`
@@ -71,9 +82,11 @@ export const generateRamsContent = async (activity: string) => {
       }
     `);
     const response = await result.response;
-    return JSON.parse(cleanJson(response.text()));
+    const text = response.text();
+    console.log("AI Raw Response:", text.substring(0, 50) + "...");
+    return JSON.parse(cleanJson(text));
   } catch (error) {
-    console.error("AI Error (RAMS):", error);
+    console.error("AI RAMS Error:", error);
     return mockRams(activity);
   }
 };
