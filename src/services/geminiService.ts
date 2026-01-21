@@ -4,11 +4,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use the model listed in your JSON screenshot ---
+// --- FIX: Use the specific model confirmed in your API test ---
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
+  // Remove markdown code blocks and trim
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
