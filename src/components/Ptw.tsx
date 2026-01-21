@@ -8,7 +8,7 @@ import {
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
   MapPin, User as UserIcon, CheckCircle,
-  Shield
+  Shield, Trash2
 } from 'lucide-react';
 
 const glassStyles = {
@@ -44,7 +44,7 @@ const StatCard: React.FC<{ label: string, value: number, color: string, icon: Re
 );
 
 export const Ptw: React.FC = () => {
-  const { ptwList, projects } = useDataContext();
+  const { ptwList, projects, handleDeletePtw } = useDataContext();
   const { usersList, can } = useAppContext();
   const { setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw } = useModalContext();
   
@@ -183,6 +183,17 @@ export const Ptw: React.FC = () => {
                              </div>
                         </div>
                     </div>
+
+                    {/* Delete Button */}
+                    {can('delete', 'ptw') && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeletePtw(ptw.id); }}
+                            className="absolute top-4 right-4 p-2 bg-red-500/10 text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
+                            title="Delete Permit"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             )
         })}

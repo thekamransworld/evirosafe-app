@@ -5,12 +5,13 @@ import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { useDataContext, useModalContext, useAppContext } from '../contexts';
 import { getRiskLevel } from '../utils/riskUtils';
+import { Trash2 } from 'lucide-react'; // Import Trash Icon
 
-const ReportCard: React.FC<{report: Report, onSelect: (report: Report) => void}> = ({ report, onSelect }) => {
+const ReportCard: React.FC<{report: Report, onSelect: (report: Report) => void, onDelete: (id: string) => void, canDelete: boolean}> = ({ report, onSelect, onDelete, canDelete }) => {
     const risk = getRiskLevel(report.risk_pre_control);
     
     return (
-        <Card onClick={() => onSelect(report)} className="hover:shadow-md hover:border-primary-300 transition-all cursor-pointer">
+        <Card onClick={() => onSelect(report)} className="hover:shadow-md hover:border-primary-300 transition-all cursor-pointer relative group">
             <div className="flex justify-between items-start">
                 <h3 className="font-bold text-md text-text-primary pr-2 truncate">{report.type}</h3>
                 <Badge color={risk.color}>{risk.level} Risk</Badge>
@@ -25,17 +26,23 @@ const ReportCard: React.FC<{report: Report, onSelect: (report: Report) => void}>
                     <CalendarIcon className="w-4 h-4 mr-2" />
                     <span>{new Date(report.occurred_at).toLocaleDateString()}</span>
                 </div>
-                {report.costs?.totalEstimated && (
-                    <div className="flex items-center text-green-600">
-                        <span className="font-bold mr-1">$</span>
-                        <span>{report.costs.totalEstimated.toLocaleString()} Est. Cost</span>
-                    </div>
-                )}
             </div>
+            
+            {/* Delete Button - Only visible on hover if permitted */}
+            {canDelete && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(report.id); }}
+                    className="absolute top-4 right-4 p-2 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                    title="Delete Report"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            )}
         </Card>
     )
 }
 
+// ... (FilterButton component remains same) ...
 const FilterButton: React.FC<{label: string, value: string, currentFilter: string, setFilter: (val: string) => void}> = ({ label, value, currentFilter, setFilter }) => (
     <button
         onClick={() => setFilter(value)}
@@ -55,7 +62,7 @@ const REPORT_CATEGORIES: ReportType[] = [
 ];
 
 export const Reports: React.FC = () => {
-  const { reportList } = useDataContext();
+  const { reportList, handleDeleteReport } = useDataContext();
   const { setSelectedReport, setIsReportCreationModalOpen } = useModalContext();
   const { can } = useAppContext();
 
@@ -104,7 +111,7 @@ export const Reports: React.FC = () => {
                 <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Status</label>
                 <div className="flex flex-wrap gap-2 mt-2">
                     <FilterButton label="All" value="All" currentFilter={statusFilter} setFilter={setStatusFilter as (val: string) => void} />
-                    {['under_review', 'submitted', 'closed', 'draft'].map(s => <FilterButton key={s} label={s.replace('_', ' ')} value={s} currentFilter={statusFilter} setFilter={setStatusFilter as (val: string) => void} />)}
+                    {['under_review', 'submitted', 'closed', 'active'].map(s => <FilterButton key={s} label={s.replace('_', ' ')} value={s} currentFilter={statusFilter} setFilter={setStatusFilter as (val: string) => void} />)}
                 </div>
             </div>
         </div>
@@ -112,7 +119,13 @@ export const Reports: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReports.map(report => (
-            <ReportCard key={report.id} report={report} onSelect={setSelectedReport} />
+            <ReportCard 
+                key={report.id} 
+                report={report} 
+                onSelect={setSelectedReport} 
+                onDelete={handleDeleteReport}
+                canDelete={can('delete', 'reports')}
+            />
         ))}
         {filteredReports.length === 0 && (
             <div className="col-span-full text-center py-12 text-gray-500">
@@ -124,6 +137,7 @@ export const Reports: React.FC = () => {
   );
 };
 
+// Icons
 const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
