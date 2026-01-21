@@ -1,18 +1,18 @@
 import React, { useState, useMemo } from 'react';
-import type { Project, User } from '../types';
-import type { Ptw as PtwDoc } from '../types';
+import type { Project, User, Ptw as PtwDoc } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
-import { useAppContext, useDataContext, useModalContext } from '../contexts';
+import { useAppContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
-  AlertTriangle, Clock, Calendar, 
+  AlertTriangle, Clock, 
   MapPin, User as UserIcon, CheckCircle,
-  Shield, Trash2
+  Shield
 } from 'lucide-react';
 
+// === GEN 4 STYLES ===
 const glassStyles = {
-  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
+  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative cursor-pointer",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
   filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
 };
@@ -31,6 +31,16 @@ const getStatusConfig = (status: PtwDoc['status']) => {
     }
 };
 
+// --- PROPS INTERFACE (This was missing/incorrect) ---
+interface PtwProps {
+  ptws: PtwDoc[];
+  users: User[];
+  projects: Project[];
+  onCreatePtw: () => void;
+  onAddExistingPtw: () => void;
+  onSelectPtw: (ptw: PtwDoc) => void;
+}
+
 const StatCard: React.FC<{ label: string, value: number, color: string, icon: React.ReactNode }> = ({ label, value, color, icon }) => (
     <div className={`${glassStyles.card} p-4 flex items-center justify-between`}>
         <div>
@@ -43,16 +53,13 @@ const StatCard: React.FC<{ label: string, value: number, color: string, icon: Re
     </div>
 );
 
-export const Ptw: React.FC = () => {
-  const { ptwList, projects, handleDeletePtw } = useDataContext();
-  const { usersList, can } = useAppContext();
-  const { setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw } = useModalContext();
-  
+export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, onAddExistingPtw, onSelectPtw }) => {
+  const { can } = useAppContext();
   const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Closed'>('All');
   const [search, setSearch] = useState('');
 
   const filteredPtws = useMemo(() => {
-    return ptwList.filter(p => {
+    return ptws.filter(p => {
         const matchesSearch = !search || 
             p.title.toLowerCase().includes(search.toLowerCase()) || 
             p.payload.permit_no?.toLowerCase().includes(search.toLowerCase());
@@ -63,20 +70,21 @@ export const Ptw: React.FC = () => {
         if (filter === 'Closed') return matchesSearch && (p.status === 'CLOSED' || p.status === 'COMPLETED');
         return matchesSearch;
     });
-  }, [ptwList, filter, search]);
+  }, [ptws, filter, search]);
 
   const stats = useMemo(() => ({
-      total: ptwList.length,
-      active: ptwList.filter(p => p.status === 'ACTIVE').length,
-      pending: ptwList.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
-      highRisk: ptwList.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
-  }), [ptwList]);
+      total: ptws.length,
+      active: ptws.filter(p => p.status === 'ACTIVE').length,
+      pending: ptws.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
+      highRisk: ptws.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
+  }), [ptws]);
 
   const getProjectName = (id: string) => projects.find(p => p.id === id)?.name || 'Unknown Project';
 
   return (
     <div className="min-h-screen bg-transparent text-slate-200 p-6">
       
+      {/* HEADER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -88,8 +96,8 @@ export const Ptw: React.FC = () => {
         
         {can('create', 'ptw') && (
             <div className="flex gap-3">
-                 <Button variant="secondary" onClick={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}>Add Existing</Button>
-                 <Button onClick={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0 shadow-lg shadow-blue-900/20">
+                 <Button variant="secondary" onClick={onAddExistingPtw}>Add Existing</Button>
+                 <Button onClick={onCreatePtw} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0 shadow-lg shadow-blue-900/20">
                     <Plus className="w-5 h-5 mr-2" />
                     New Permit
                 </Button>
@@ -97,6 +105,7 @@ export const Ptw: React.FC = () => {
         )}
       </div>
 
+      {/* STATS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <StatCard label="Active Permits" value={stats.active} color="text-emerald-400" icon={<CheckCircle className="w-6 h-6"/>} />
           <StatCard label="Pending Approval" value={stats.pending} color="text-amber-400" icon={<Clock className="w-6 h-6"/>} />
@@ -104,6 +113,7 @@ export const Ptw: React.FC = () => {
           <StatCard label="Total Permits" value={stats.total} color="text-blue-400" icon={<FileText className="w-6 h-6"/>} />
       </div>
 
+      {/* FILTERS */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
               {['All', 'Active', 'Draft', 'Closed'].map(f => (
@@ -132,6 +142,7 @@ export const Ptw: React.FC = () => {
           </div>
       </div>
 
+      {/* GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPtws.map((ptw) => {
             const statusConfig = getStatusConfig(ptw.status);
@@ -139,8 +150,10 @@ export const Ptw: React.FC = () => {
             const StatusIcon = statusConfig.icon;
             
             return (
-                <div key={ptw.id} onClick={() => setSelectedPtw(ptw)} className={glassStyles.card}>
+                <div key={ptw.id} onClick={() => onSelectPtw(ptw)} className={glassStyles.card}>
+                    {/* Color Strip */}
                     <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: typeDetails.hex }} />
+                    
                     <div className="p-5 pl-7">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -154,10 +167,12 @@ export const Ptw: React.FC = () => {
                                 {statusConfig.label}
                             </div>
                         </div>
+
                         <div className="flex items-center gap-2 mb-4">
                              <span className="text-2xl">{typeDetails.icon}</span>
                              <span className="text-sm font-medium text-slate-300">{ptw.type}</span>
                         </div>
+
                         <div className="space-y-2 text-xs text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
                                 <MapPin className="w-3.5 h-3.5 text-slate-500" />
@@ -172,6 +187,7 @@ export const Ptw: React.FC = () => {
                                 <span>{getProjectName(ptw.project_id)}</span>
                             </div>
                         </div>
+
                         <div className="pt-4 border-t border-white/5 flex items-center justify-between text-xs">
                              <div className="flex items-center gap-1.5 text-slate-500">
                                  <Calendar className="w-3.5 h-3.5" />
@@ -183,20 +199,10 @@ export const Ptw: React.FC = () => {
                              </div>
                         </div>
                     </div>
-
-                    {/* Delete Button */}
-                    {can('delete', 'ptw') && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handleDeletePtw(ptw.id); }}
-                            className="absolute top-4 right-4 p-2 bg-red-500/10 text-red-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
-                            title="Delete Permit"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    )}
                 </div>
             )
         })}
+
         {filteredPtws.length === 0 && (
             <div className="col-span-full py-20 text-center border-2 border-dashed border-white/10 rounded-3xl">
                 <FileText className="w-12 h-12 text-slate-700 mx-auto mb-3" />

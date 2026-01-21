@@ -4,10 +4,15 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { planTypes } from '../config';
-import { useDataContext, useModalContext, useAppContext } from '../contexts';
-import { PlusIcon, CheckCircleIcon } from 'lucide-react'; // Ensure icons are imported
+import { useDataContext, useAppContext } from '../contexts';
+import { Plus, CheckCircle } from 'lucide-react';
 
-// ... (Keep getStatusConfig and PlanCard as they are) ...
+// --- PROPS INTERFACE (This was missing/incorrect) ---
+interface PlansProps {
+  onSelectPlan: (plan: Plan) => void;
+  onNewPlan: () => void;
+}
+
 const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
   switch (status) {
     case 'published': return 'green';
@@ -21,6 +26,7 @@ const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red'
 
 const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ plan, onSelect }) => {
   const safeStatus = plan.status || 'draft';
+  
   return (
     <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
       <div className="flex-grow">
@@ -32,7 +38,7 @@ const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ pl
         <p className="text-sm text-text-secondary dark:text-gray-400">{plan.version}</p>
         {plan.people?.approved_by_client?.signed_at && (
             <div className="mt-3 flex items-center text-green-600 dark:text-green-400">
-                <CheckCircleIcon className="w-5 h-5 mr-2" />
+                <CheckCircle className="w-5 h-5 mr-2" />
                 <span className="text-sm font-semibold">Client Approved</span>
             </div>
         )}
@@ -61,13 +67,9 @@ const FilterButton: React.FC<{ label: string, value: string, currentFilter: stri
     </button>
 )
 
-// FIX: Removed props, using context
-export const Plans: React.FC = () => {
+export const Plans: React.FC<PlansProps> = ({ onSelectPlan, onNewPlan }) => {
   const { planList, projects } = useDataContext();
   const { can } = useAppContext();
-  // FIX: Get modal controls from context
-  const { setIsPlanCreationModalOpen, setSelectedPlan, setSelectedPlanForEdit } = useModalContext();
-
   const [typeFilter, setTypeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState<PlanStatus | 'All'>('All');
   const [projectFilter, setProjectFilter] = useState('All');
@@ -81,21 +83,13 @@ export const Plans: React.FC = () => {
     });
   }, [planList, typeFilter, statusFilter, projectFilter]);
 
-  const handleSelectPlan = (plan: Plan) => {
-      if (plan.status === 'draft') {
-          setSelectedPlanForEdit(plan);
-      } else {
-          setSelectedPlan(plan);
-      }
-  };
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary dark:text-white">HSE Plans Library</h1>
         {can('create', 'plans') && (
-            <Button onClick={() => setIsPlanCreationModalOpen(true)}>
-              <PlusIcon className="w-5 h-5 mr-2" />
+            <Button onClick={onNewPlan}>
+              <Plus className="w-5 h-5 mr-2" />
               New Plan
             </Button>
         )}
@@ -129,7 +123,7 @@ export const Plans: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPlans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onSelect={handleSelectPlan} />
+          <PlanCard key={plan.id} plan={plan} onSelect={onSelectPlan} />
         ))}
         {filteredPlans.length === 0 && (
             <div className="col-span-full text-center py-12 text-gray-500">
