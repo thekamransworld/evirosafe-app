@@ -18,7 +18,7 @@ import { useToast } from './components/ui/Toast';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 import { logoSrc } from './config';
 
@@ -37,7 +37,7 @@ interface AppContextType {
   activeUser: User | null;
   handleUpdateUser: (updatedUser: User) => void;
   organizations: Organization[];
-  setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>; // Added this
+  setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>;
   handleCreateOrganization: (data: any) => void;
   invitedEmails: InvitedUser[];
   handleInviteUser: (userData: any) => void;
@@ -91,22 +91,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Fallback mechanism for activeUser to prevent UI flicker/crashes on reload
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
+    
+    // 1. Try to find in current state (Firebase data)
     const foundInState = usersList.find(u => u.id === activeUserId);
     if (foundInState) return foundInState;
+
+    // 2. Fallback to static data (prevents "missing buttons" on refresh)
     const foundInStatic = initialUsers.find(u => u.id === activeUserId);
     if (foundInStatic) return foundInStatic;
+
     return null;
   }, [activeUserId, usersList]);
 
   const login = (userId: string) => {
+    // Check both lists to ensure valid login even if offline
     const user = usersList.find(u => u.id === userId) || initialUsers.find(u => u.id === userId);
+    
     if (user) {
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
+        
         if (!localStorage.getItem('currentView')) {
             const defaultView = user.preferences?.default_view || 'dashboard';
             setCurrentView(defaultView);
         }
+        
         const userOrg = organizations.find(o => o.id === user.org_id) || initialOrganizations.find(o => o.id === user.org_id);
         if(userOrg) setActiveOrg(userOrg);
     }
@@ -239,6 +248,13 @@ interface DataContextType {
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
+
+  // --- DELETE FUNCTIONS ---
+  handleDeleteReport: (id: string) => void;
+  handleDeleteInspection: (id: string) => void;
+  handleDeletePtw: (id: string) => void;
+  handleDeleteRams: (id: string) => void;
+  handleDeletePlan: (id: string) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -321,6 +337,53 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // --- DELETE FUNCTIONS ---
+    const handleDeleteReport = async (id: string) => {
+        if(!window.confirm("Are you sure you want to delete this report?")) return;
+        try {
+            await deleteDoc(doc(db, 'reports', id));
+            setReportList(prev => prev.filter(i => i.id !== id));
+            toast.success("Report deleted.");
+        } catch(e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeleteInspection = async (id: string) => {
+        if(!window.confirm("Are you sure you want to delete this inspection?")) return;
+        try {
+            await deleteDoc(doc(db, 'inspections', id));
+            setInspectionList(prev => prev.filter(i => i.id !== id));
+            toast.success("Inspection deleted.");
+        } catch(e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeletePtw = async (id: string) => {
+        if(!window.confirm("Are you sure you want to delete this permit?")) return;
+        try {
+            await deleteDoc(doc(db, 'ptws', id));
+            setPtwList(prev => prev.filter(i => i.id !== id));
+            toast.success("Permit deleted.");
+        } catch(e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeleteRams = async (id: string) => {
+        if(!window.confirm("Are you sure you want to delete this RAMS?")) return;
+        try {
+            await deleteDoc(doc(db, 'rams', id));
+            setRamsList(prev => prev.filter(i => i.id !== id));
+            toast.success("RAMS deleted.");
+        } catch(e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeletePlan = async (id: string) => {
+        if(!window.confirm("Are you sure you want to delete this plan?")) return;
+        try {
+            await deleteDoc(doc(db, 'plans', id));
+            setPlanList(prev => prev.filter(i => i.id !== id));
+            toast.success("Plan deleted.");
+        } catch(e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    // --- CREATE HANDLERS ---
     const handleCreateReport = async (reportData: any) => {
         const newReport = { ...reportData, id: `rep_${Date.now()}`, org_id: activeOrg.id, reporter_id: activeUser?.id || 'unknown', status: 'submitted', audit_trail: [], capa: [], acknowledgements: [] };
         setReportList(prev => [newReport, ...prev]);
@@ -361,6 +424,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
     };
 
+    // --- UPDATE HANDLERS ---
     const handleStatusChange = (id: string, status: any) => { setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r)); updateDB('reports', id, { status }); };
     const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => { /* ... implementation ... */ };
     const handleUpdateActionStatus = (origin: any, newStatus: any) => { /* ... implementation ... */ };
@@ -413,7 +477,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate
+        handleCreateChecklistTemplate,
+        handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeleteRams, handleDeletePlan
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
