@@ -3,8 +3,7 @@ import { logoSrc } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppContext, useDataContext } from '../contexts';
 import { NotificationsPanel } from './NotificationsPanel';
-import { Bell } from 'lucide-react';
-import type { Resource } from '../types/rbac';
+import { Bell, X, Menu } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -32,10 +31,6 @@ const icons: Record<string, JSX.Element> = {
   people: <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
   settings: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />,
   certification: <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
-  organizations: <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />,
-  projects: <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />,
-  roles: <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />,
-  housekeeping: <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />,
 };
 
 const NavItem: React.FC<{
@@ -44,12 +39,16 @@ const NavItem: React.FC<{
   currentView: string;
   setCurrentView: (view: string) => void;
   isOpen: boolean;
-}> = ({ label, view, currentView, setCurrentView, isOpen }) => {
+  onClick?: () => void;
+}> = ({ label, view, currentView, setCurrentView, isOpen, onClick }) => {
   const isActive = currentView === view;
 
   return (
     <button
-      onClick={() => setCurrentView(view)}
+      onClick={() => {
+        setCurrentView(view);
+        if (onClick) onClick();
+      }}
       className={`flex items-center w-full rounded-xl transition-all duration-200 group relative overflow-hidden mb-1
         ${isActive
           ? 'bg-cyan-500/20 text-cyan-200 shadow-[0_0_20px_rgba(34,211,238,0.25)]'
@@ -93,156 +92,144 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setOpen,
 }) => {
   const { logout, currentUser } = useAuth();
-  const { can, activeUser } = useAppContext();
-  const { notifications } = useDataContext(); // <--- FIXED: Getting notifications from DataContext
+  const { notifications } = useDataContext();
+  const { activeUser } = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
 
   const unreadCount = notifications.filter(n => n.user_id === activeUser?.id && !n.is_read).length;
 
   const menuItems = [
-    { label: 'Dashboard', view: 'dashboard', resource: 'dashboard' },
-    { label: 'AI Insights', view: 'ai-insights', resource: 'ai-insights' },
-    { label: 'HSE Statistics', view: 'hse-statistics', resource: 'hse-statistics' },
-    { label: 'Site Map', view: 'site-map', resource: 'site-map' },
-    { label: 'My Certificate', view: 'certification', resource: 'certification' },
-    { label: 'Reporting', view: 'reports', resource: 'reports' },
-    { label: 'Action Tracker', view: 'actions', resource: 'actions' },
-    { label: 'Inspections', view: 'inspections', resource: 'inspections' },
-    { label: 'Permit to Work', view: 'ptw', resource: 'ptw' },
-    { label: 'Checklists', view: 'checklists', resource: 'checklists' },
-    { label: 'Plans', view: 'plans', resource: 'plans' },
-    { label: 'RAMS', view: 'rams', resource: 'rams' },
-    { label: 'Signage', view: 'signage', resource: 'signage' },
-    { label: 'Toolbox Talks', view: 'tbt', resource: 'tbt' },
-    { label: 'Training', view: 'training', resource: 'training' },
-    { label: 'Housekeeping', view: 'housekeeping', resource: 'housekeeping' },
-    { label: 'Organizations', view: 'organizations', resource: 'organizations' },
-    { label: 'Projects', view: 'projects', resource: 'projects' },
-    { label: 'People & Access', view: 'people', resource: 'people' },
-    { label: 'Roles & Permissions', view: 'roles', resource: 'roles' },
-    { label: 'Settings & Logs', view: 'settings', resource: 'settings' },
+    { label: 'Dashboard', view: 'dashboard' },
+    { label: 'AI Insights', view: 'ai-insights' },
+    { label: 'HSE Statistics', view: 'hse-statistics' },
+    { label: 'Site Map', view: 'site-map' },
+    { label: 'My Certificate', view: 'certification' },
+    { label: 'Reporting', view: 'reports' },
+    { label: 'Action Tracker', view: 'actions' },
+    { label: 'Inspections', view: 'inspections' },
+    { label: 'Permit to Work', view: 'ptw' },
+    { label: 'Checklists', view: 'checklists' },
+    { label: 'Plans', view: 'plans' },
+    { label: 'RAMS', view: 'rams' },
+    { label: 'Signage', view: 'signage' },
+    { label: 'Toolbox Talks', view: 'tbt' },
+    { label: 'Training', view: 'training' },
+    { label: 'People', view: 'people' },
+    { label: 'Organizations', view: 'organizations' },
+    { label: 'Settings', view: 'settings' },
   ];
 
   return (
     <>
-    <div
-      className={`shrink-0 h-screen flex flex-col transition-all duration-300 z-50
-        border-r border-slate-800/60
-        bg-slate-950/80 backdrop-blur-xl
-        ${isOpen ? 'w-64' : 'w-20'}
-      `}
-    >
-      {/* Header / Logo */}
+      {/* Mobile Overlay */}
+      <div 
+        className={`fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity duration-300 ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setOpen(false)}
+      />
+
+      {/* Sidebar Container */}
       <div
-        className={`flex items-center h-16 border-b border-slate-800/60 shrink-0
-          ${isOpen ? 'px-6' : 'justify-center'}
+        className={`
+          fixed md:relative z-50 h-screen flex flex-col transition-all duration-300
+          border-r border-slate-800/60 bg-slate-950/95 backdrop-blur-xl
+          ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
         `}
       >
-        <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded-lg" />
-        {isOpen && (
-          <span className="ml-3 text-lg font-semibold text-slate-50 tracking-wide">
-            EviroSafe
-          </span>
-        )}
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
-        {menuItems.map((item) => {
-            // Check permission before rendering
-            if (!can('read', item.resource as Resource)) return null;
-            
-            return (
-              <NavItem
-                key={item.view}
-                label={item.label}
-                view={item.view}
-                isOpen={isOpen}
-                currentView={currentView}
-                setCurrentView={setCurrentView}
-              />
-            );
-        })}
-      </nav>
-
-      {/* Notification & Toggle */}
-      <div className="p-2 border-t border-slate-800/60 bg-slate-950/70 flex flex-col gap-2">
-        
-        {/* Notification Button */}
-        <button
-          onClick={() => setShowNotifications(true)}
-          className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors relative"
-        >
-          <Bell className="w-5 h-5" />
-          {isOpen && <span className="ml-3 text-sm">Notifications</span>}
-          {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 md:top-2 md:right-2 flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
-          )}
-        </button>
-
-        <button
-          onClick={() => setOpen(!isOpen)}
-          className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors"
-        >
-          <svg
-            className={`w-5 h-5 transition-transform ${
-              !isOpen ? 'rotate-180' : ''
-            }`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-            />
-          </svg>
-        </button>
-      </div>
-
-      {/* User Footer */}
-      <div
-        className={`p-4 border-t border-slate-800/60 bg-slate-950/80 ${
-          !isOpen && 'flex flex-col items-center'
-        }`}
-      >
-        <div
-          className={`flex items-center gap-3 mb-4 ${
-            isOpen ? 'px-2' : ''
-          }`}
-        >
-          <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0 shadow-md">
-            {currentUser?.email?.charAt(0).toUpperCase() || 'U'}
+        {/* Header / Logo */}
+        <div className={`flex items-center h-16 border-b border-slate-800/60 shrink-0 ${isOpen ? 'px-6 justify-between' : 'justify-center'}`}>
+          <div className="flex items-center">
+            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded-lg" />
+            {isOpen && (
+              <span className="ml-3 text-lg font-semibold text-slate-100 tracking-wide">
+                EviroSafe
+              </span>
+            )}
           </div>
+          {/* Mobile Close Button */}
           {isOpen && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-100 truncate">
-                {currentUser?.email}
-              </p>
-              <p className="text-xs text-slate-500 truncate">
-                  {activeUser?.role?.replace('_', ' ') || 'User'}
-              </p>
-            </div>
+            <button onClick={() => setOpen(false)} className="md:hidden text-slate-400">
+              <X className="w-6 h-6" />
+            </button>
           )}
         </div>
-        <button
-          onClick={() => logout()}
-          className="w-full flex items-center justify-center p-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors font-medium"
-        >
-          Sign Out
-        </button>
-      </div>
-    </div>
 
-    {/* Notification Panel Overlay */}
-    {showNotifications && (
-        <NotificationsPanel onClose={() => setShowNotifications(false)} />
-    )}
+        {/* Navigation */}
+        <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
+          {menuItems.map((item) => (
+            <NavItem
+              key={item.view}
+              label={item.label}
+              view={item.view}
+              isOpen={isOpen}
+              currentView={currentView}
+              setCurrentView={setCurrentView}
+              onClick={() => {
+                // Auto-close on mobile when item clicked
+                if (window.innerWidth < 768) setOpen(false);
+              }}
+            />
+          ))}
+        </nav>
+
+        {/* Notification & Toggle */}
+        <div className="p-2 border-t border-slate-800/60 bg-slate-950/70 flex flex-col gap-2">
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors relative"
+          >
+            <Bell className="w-5 h-5" />
+            {isOpen && <span className="ml-3 text-sm">Notifications</span>}
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 md:top-2 md:right-2 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setOpen(!isOpen)}
+            className="w-full hidden md:flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors"
+          >
+            <svg
+              className={`w-5 h-5 transition-transform ${!isOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* User Footer */}
+        <div className={`p-4 border-t border-slate-800/60 bg-slate-950/80 ${!isOpen && 'flex flex-col items-center'}`}>
+          <div className={`flex items-center gap-3 mb-4 ${isOpen ? 'px-2' : ''}`}>
+            <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0 shadow-md">
+              {currentUser?.email?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            {isOpen && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-100 truncate">{currentUser?.email}</p>
+                <p className="text-xs text-slate-500 truncate">Admin</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => logout()}
+            className="w-full flex items-center justify-center p-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors font-medium"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+
+      {/* Notification Panel Overlay */}
+      {showNotifications && (
+          <NotificationsPanel onClose={() => setShowNotifications(false)} />
+      )}
     </>
   );
 };
