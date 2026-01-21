@@ -1,20 +1,39 @@
 // src/services/storageService.ts
 
-/**
- * MOCK STORAGE SERVICE
- * Used when Firebase Storage bucket is not available (Free Tier limit).
- * Simulates a successful upload and returns a placeholder image.
- */
+// --- CONFIGURATION ---
+const CLOUD_NAME = "dsw9llfdo"; 
+const UPLOAD_PRESET = "evirosafe"; 
+
 export const uploadFileToCloud = async (file: File, folder: string = 'general'): Promise<string> => {
-  console.log(`[Mock Storage] Starting upload for ${file.name} to folder: ${folder}`);
-
-  // 1. Simulate network delay (1.5 seconds) to feel like a real upload
-  await new Promise(resolve => setTimeout(resolve, 1500));
-
-  // 2. Return a generated placeholder image URL
-  // This URL generates an image with the file name on it
-  const mockUrl = `https://placehold.co/600x400/2563eb/ffffff?text=Uploaded:+${encodeURIComponent(file.name)}`;
+  // API Endpoint for your specific cloud name
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
   
-  console.log("[Mock Storage] Upload success:", mockUrl);
-  return mockUrl;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('folder', `evirosafe/${folder}`); // Keeps your cloud organized by feature
+
+  try {
+    console.log(`Uploading ${file.name} to Cloudinary...`);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || `Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log("Upload success:", data.secure_url);
+    
+    return data.secure_url; // This is the permanent URL
+
+  } catch (error) {
+    console.error("Cloudinary Upload Error:", error);
+    // Fallback placeholder so the app doesn't crash if internet is bad
+    return `https://placehold.co/600x400/red/white?text=Upload+Failed`;
+  }
 };
