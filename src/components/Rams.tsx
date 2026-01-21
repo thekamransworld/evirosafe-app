@@ -11,7 +11,7 @@ import {
 
 // === GEN 4 STYLES ===
 const glassStyles = {
-  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
+  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative cursor-pointer",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
   filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
 };
@@ -77,7 +77,7 @@ const RamsCard: React.FC<{ rams: RamsType; onSelect: (rams: RamsType) => void }>
             </div>
              <div className="flex items-center gap-2">
                 <UserIcon className="w-3.5 h-3.5" />
-                <span>{rams.prepared_by.name}</span>
+                <span>{rams.prepared_by?.name || 'Unknown'}</span>
             </div>
         </div>
 
@@ -122,6 +122,11 @@ export const Rams: React.FC<{ onSelectRams: (r: RamsType) => void, onNewRams: ()
     });
   }, [ramsList, statusFilter, search]);
 
+  const handleNewClick = () => {
+      console.log("New RAMS button clicked");
+      onNewRams();
+  };
+
   return (
     <div className="min-h-screen bg-transparent text-slate-200 p-6">
       
@@ -135,7 +140,7 @@ export const Rams: React.FC<{ onSelectRams: (r: RamsType) => void, onNewRams: ()
         </div>
         
         {can('create', 'rams') && (
-            <Button onClick={onNewRams} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-900/20 border-0">
+            <Button onClick={handleNewClick} className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-900/20 border-0">
                 <Plus className="w-5 h-5 mr-2" />
                 New RAMS
             </Button>
