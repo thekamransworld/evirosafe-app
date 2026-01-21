@@ -4,11 +4,12 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
-// --- FIX: Use 'gemini-1.5-flash' (The most reliable standard model) ---
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// --- FIX: Use 'gemini-2.5-flash' (Confirmed available in your account) ---
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // --- HELPER: CLEAN JSON ---
 const cleanJson = (text: string) => {
+  // Remove markdown code blocks and trim
   return text.replace(/```json/g, "").replace(/```/g, "").trim();
 };
 
@@ -21,7 +22,7 @@ export const generateResponse = async (prompt: string) => {
   }
 
   try {
-    console.log("2. Sending prompt to Google...");
+    console.log("2. Sending prompt to Google (gemini-2.5-flash)...");
     const result = await model.generateContent(prompt);
     const response = await result.response;
     console.log("3. Received response from Google");
