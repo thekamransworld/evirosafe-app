@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import React, { useState, useEffect } from 'react';
 import { AppProvider, DataProvider, ModalProvider, useAppContext, useDataContext, useModalContext } from './contexts';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -6,7 +8,6 @@ import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
-import { Header } from './components/layout/Header';
 import { roles as rolesConfig } from './config';
 import { Loader2 } from 'lucide-react';
 import type { User } from './types';
@@ -54,6 +55,7 @@ import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
 
+// --- Auth Sync: Bridge Firebase Auth -> EviroSafe "activeUser" ---
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
   const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
@@ -63,29 +65,64 @@ const AuthSync: React.FC = () => {
       logout();
       return;
     }
+
     const uid = currentUser.uid;
     const email = currentUser.email || `user-${uid.slice(0, 6)}@evirosafe.local`;
+    
+    // FIX: Better name fallback if displayName is missing
     const displayName = currentUser.displayName || email.split('@')[0].replace(/[0-9]/g, '').replace('.', ' ') || 'User';
 
+    // Ensure user exists in local state
     setUsersList(prev => {
       if (prev.some(u => u.id === uid)) return prev;
+
       const existingUser = prev[0];
+      
       const defaultPreferences: User['preferences'] = {
           language: 'en',
           default_view: 'dashboard',
-          units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' }
+          units: { 
+            temperature: 'C', 
+            wind_speed: 'km/h', 
+            height: 'm', 
+            weight: 'kg' 
+          }
       };
-      const template = existingUser ? { ...existingUser, preferences: existingUser.preferences || defaultPreferences } : {
-        id: uid, org_id: activeOrg?.id || 'org1', email, name: displayName, avatar_url: '', role: 'ADMIN', status: 'active', preferences: defaultPreferences
+
+      const template = existingUser ? {
+        ...existingUser,
+        preferences: existingUser.preferences || defaultPreferences
+      } : {
+        id: uid,
+        org_id: activeOrg?.id || 'org1',
+        email,
+        name: displayName,
+        avatar_url: '',
+        role: 'ADMIN',
+        status: 'active',
+        preferences: defaultPreferences
       };
-      const newUser: User = { ...template, id: uid, org_id: activeOrg?.id || template.org_id, email, name: displayName, status: 'active' } as User;
+
+      const newUser: User = {
+        ...template,
+        id: uid,
+        org_id: activeOrg?.id || template.org_id,
+        email,
+        name: displayName,
+        status: 'active'
+      } as User;
+
       return [newUser, ...prev];
     });
+
+    // Force login to set activeUser
     login(uid);
   }, [currentUser, activeOrg?.id]);
+
   return null;
 };
 
+// --- Global Modals Component ---
 const GlobalModals = () => {
   const { activeUser, usersList } = useAppContext();
   const {
@@ -111,21 +148,32 @@ const GlobalModals = () => {
     projects, trainingCourseList, checklistTemplates
   } = useDataContext();
 
-  if (!activeUser) return null;
+  // FIX: Removed the early return null if !activeUser. 
+  // Instead, we pass a fallback object if activeUser is missing to prevent crashes while allowing modals to mount.
+  const safeUser = activeUser || { id: 'guest', name: 'Guest', role: 'WORKER', email: '', org_id: '', avatar_url: '', preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } } } as User;
 
   return (
     <>
       <ReportCreationModal isOpen={isReportCreationModalOpen} onClose={() => setIsReportCreationModalOpen(false)} initialData={reportInitialData} />
-      {selectedReport && <ReportDetailModal report={selectedReport} users={usersList} activeUser={activeUser} onClose={() => setSelectedReport(null)} onStatusChange={handleStatusChange} onCapaActionChange={handleCapaActionChange} onAcknowledgeReport={handleAcknowledgeReport} />}
+      {selectedReport && <ReportDetailModal report={selectedReport} users={usersList} activeUser={safeUser} onClose={() => setSelectedReport(null)} onStatusChange={handleStatusChange} onCapaActionChange={handleCapaActionChange} onAcknowledgeReport={handleAcknowledgeReport} />}
       <PtwCreationModal isOpen={isPtwCreationModalOpen} onClose={() => setIsPtwCreationModalOpen(false)} onSubmit={handleCreatePtw} mode={ptwCreationMode} />
       {selectedPtw && <PtwDetailModal ptw={selectedPtw} onClose={() => setSelectedPtw(null)} onUpdate={handleUpdatePtw} />}
       <PlanCreationModal isOpen={isPlanCreationModalOpen} onClose={() => setIsPlanCreationModalOpen(false)} onSubmit={handleCreatePlan} projects={projects} />
       {selectedPlan && <PlanDetailModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onStatusChange={handlePlanStatusChange} />}
       {selectedPlanForEdit && <PlanEditorModal plan={selectedPlanForEdit} onClose={() => setSelectedPlanForEdit(null)} onSave={handleUpdatePlan} onSubmitForReview={handlePlanStatusChange} />}
-      <RamsCreationModal isOpen={isRamsCreationModalOpen} onClose={() => setIsRamsCreationModalOpen(false)} onSubmit={handleCreateRams} projects={projects} activeUser={activeUser} />
+      
+      {/* RAMS Modal */}
+      <RamsCreationModal 
+        isOpen={isRamsCreationModalOpen} 
+        onClose={() => setIsRamsCreationModalOpen(false)} 
+        onSubmit={handleCreateRams} 
+        projects={projects} 
+        activeUser={safeUser} 
+      />
+      
       {selectedRams && <RamsDetailModal rams={selectedRams} onClose={() => setSelectedRams(null)} onStatusChange={handleRamsStatusChange} />}
       {selectedRamsForEdit && <RamsEditorModal rams={selectedRamsForEdit} onClose={() => setSelectedRamsForEdit(null)} onSave={handleUpdateRams} onSubmitForReview={handleRamsStatusChange} />}
-      <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={activeUser} />
+      <TbtCreationModal isOpen={isTbtCreationModalOpen} onClose={() => setIsTbtCreationModalOpen(false)} onSubmit={handleCreateTbt} projects={projects} activeUser={safeUser} />
       {selectedTbt && <TbtSessionModal session={selectedTbt} onClose={() => setSelectedTbt(null)} onUpdate={handleUpdateTbt} users={usersList} />}
       <TrainingCourseModal isOpen={isCourseModalOpen} onClose={() => setCourseModalOpen(false)} courses={trainingCourseList} onUpdateCourse={handleCreateOrUpdateCourse} />
       {courseForSession && <TrainingSessionModal isOpen={isSessionModalOpen} onClose={() => setSessionModalOpen(false)} onSubmit={handleScheduleSession} course={courseForSession} projects={projects} users={usersList} />}
@@ -136,22 +184,26 @@ const GlobalModals = () => {
   );
 };
 
+// --- Main App Content ---
 const AppContent = () => {
-  const { currentView, setCurrentView, activeOrg, setActiveOrg, activeUser } = useAppContext();
+  const { currentView, setCurrentView } = useAppContext();
   const { currentUser, loading: authLoading } = useAuth();
   const { isLoading: dataLoading } = useDataContext();
 
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+  const {
+    projects, ptwList, trainingCourseList, trainingRecordList, trainingSessionList,
+  } = useDataContext();
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) setSidebarOpen(false);
-      else setSidebarOpen(true);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const {
+    setSelectedPlan, setSelectedPlanForEdit, setIsPlanCreationModalOpen,
+    setSelectedRams, setSelectedRamsForEdit, setIsRamsCreationModalOpen,
+    setCourseModalOpen, setSessionModalOpen, setCourseForSession, setAttendanceModalOpen, setSessionForAttendance,
+    setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw,
+  } = useModalContext();
 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // --- LOADING STATE ---
   if (authLoading || (currentUser && dataLoading)) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-950 text-white flex-col gap-4">
@@ -174,32 +226,50 @@ const AppContent = () => {
         setOpen={setSidebarOpen}
       />
 
-      <main className="flex-1 min-h-screen flex flex-col transition-all duration-300 w-full">
-        <Header 
-            activeOrg={activeOrg} 
-            setActiveOrg={setActiveOrg} 
-            organizations={[activeOrg]} 
-            user={activeUser!} 
-            toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
-        />
-        
+      <main className="flex-1 min-h-screen flex flex-col transition-all duration-300">
         <DemoBanner />
-        
-        <div className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <div className="flex-1 p-8 overflow-y-auto">
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'site-map' && <div className="h-[calc(100vh-8rem)]"><SiteMap /></div>}
           {currentView === 'reports' && <Reports />}
-          {/* FIX: Removed props, using context inside Ptw */}
-          {currentView === 'ptw' && <Ptw />} 
+          {currentView === 'ptw' && (
+            <Ptw
+              ptws={ptwList}
+              users={[]}
+              projects={projects}
+              onCreatePtw={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }}
+              onAddExistingPtw={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}
+              onSelectPtw={setSelectedPtw}
+            />
+          )}
           {currentView === 'inspections' && <Inspections />}
           {currentView === 'actions' && <Actions />}
-          {/* FIX: Removed props, using context inside Plans */}
-          {currentView === 'plans' && <Plans />}
-          {currentView === 'rams' && <Rams onSelectRams={() => {}} onNewRams={() => {}} />}
+          {currentView === 'plans' && (
+            <Plans
+              onSelectPlan={(plan) => plan.status === 'draft' ? setSelectedPlanForEdit(plan) : setSelectedPlan(plan)}
+              onNewPlan={() => setIsPlanCreationModalOpen(true)}
+            />
+          )}
+          {currentView === 'rams' && (
+            <Rams
+              onSelectRams={(rams) => rams.status === 'draft' ? setSelectedRamsForEdit(rams) : setSelectedRams(rams)}
+              onNewRams={() => setIsRamsCreationModalOpen(true)}
+            />
+          )}
           {currentView === 'checklists' && <Checklists />}
           {currentView === 'tbt' && <Tbt />}
-          {/* FIX: Removed props, using context inside Trainings */}
-          {currentView === 'training' && <Trainings />}
+          {currentView === 'training' && (
+            <Trainings
+              courses={trainingCourseList}
+              records={trainingRecordList}
+              sessions={trainingSessionList}
+              users={[]}
+              projects={projects}
+              onManageCourses={() => setCourseModalOpen(true)}
+              onScheduleSession={(course) => { setCourseForSession(course); setSessionModalOpen(true); }}
+              onManageAttendance={(session) => { setSessionForAttendance(session); setAttendanceModalOpen(true); }}
+            />
+          )}
           {currentView === 'people' && <People />}
           {currentView === 'roles' && <Roles roles={rolesConfig} />}
           {currentView === 'organizations' && <Organizations />}
@@ -224,6 +294,7 @@ export default function App() {
         <AppProvider>
           <AuthSync />
           <DataProvider>
+            {/* WRAP WITH PTW WORKFLOW PROVIDER */}
             <PtwWorkflowProvider>
               <ModalProvider>
                 <AppContent />
