@@ -22,6 +22,7 @@ import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/fi
 import { useAuth } from './contexts/AuthContext';
 import { logoSrc } from './config';
 
+// --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
 interface AppContextType {
@@ -36,7 +37,7 @@ interface AppContextType {
   activeUser: User | null;
   handleUpdateUser: (updatedUser: User) => void;
   organizations: Organization[];
-  setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>; // <--- ADDED THIS
+  setOrganizations: React.Dispatch<React.SetStateAction<Organization[]>>; // Added this
   handleCreateOrganization: (data: any) => void;
   invitedEmails: InvitedUser[];
   handleInviteUser: (userData: any) => void;
@@ -58,6 +59,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Persist view in localStorage
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
@@ -86,6 +88,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
+  // Fallback mechanism for activeUser to prevent UI flicker/crashes on reload
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
     const foundInState = usersList.find(u => u.id === activeUserId);
@@ -142,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
   
+  // --- FIXED: Save Organization to Firebase ---
   const handleCreateOrganization = async (data: any) => {
       try {
           const newOrg: Organization = { 
@@ -159,8 +163,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               domain: data.name.toLowerCase().replace(/\s+/g, '') + '.com'
           };
 
+          // 1. Update Local State immediately
           setOrganizations(prev => [...prev, newOrg]);
+          
+          // 2. Save to Firestore
           await setDoc(doc(db, 'organizations', newOrg.id), newOrg);
+          
           toast.success("Organization created and saved.");
       } catch (e) {
           console.error("Error saving organization:", e);
@@ -313,9 +321,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // ... (Keep all handle functions exactly as they were in previous correct version) ...
-    // For brevity, I am including the key ones needed for the fix, assume others are present
-    
     const handleCreateReport = async (reportData: any) => {
         const newReport = { ...reportData, id: `rep_${Date.now()}`, org_id: activeOrg.id, reporter_id: activeUser?.id || 'unknown', status: 'submitted', audit_trail: [], capa: [], acknowledgements: [] };
         setReportList(prev => [newReport, ...prev]);
@@ -415,3 +420,73 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export const useDataContext = () => useContext(DataContext);
+
+// --- MODAL CONTEXT ---
+interface ModalContextType {
+  selectedReport: any; setSelectedReport: any;
+  isReportCreationModalOpen: any; setIsReportCreationModalOpen: any;
+  reportInitialData: any; setReportInitialData: any;
+  isActionCreationModalOpen: any; setIsActionCreationModalOpen: any;
+  openActionCreationModal: any; openActionDetailModal: any;
+  selectedPtw: any; setSelectedPtw: any;
+  isPtwCreationModalOpen: any; setIsPtwCreationModalOpen: any;
+  ptwCreationMode: any; setPtwCreationMode: any;
+  selectedPlan: any; setSelectedPlan: any;
+  selectedPlanForEdit: any; setSelectedPlanForEdit: any;
+  isPlanCreationModalOpen: any; setIsPlanCreationModalOpen: any;
+  selectedRams: any; setSelectedRams: any;
+  selectedRamsForEdit: any; setSelectedRamsForEdit: any;
+  isRamsCreationModalOpen: any; setIsRamsCreationModalOpen: any;
+  selectedTbt: any; setSelectedTbt: any;
+  isTbtCreationModalOpen: any; setIsTbtCreationModalOpen: any;
+  isCourseModalOpen: any; setCourseModalOpen: any;
+  isSessionModalOpen: any; setSessionModalOpen: any;
+  isAttendanceModalOpen: any; setAttendanceModalOpen: any;
+  courseForSession: any; setCourseForSession: any;
+  sessionForAttendance: any; setSessionForAttendance: any;
+  isInspectionCreationModalOpen: any; setIsInspectionCreationModalOpen: any;
+}
+
+const ModalContext = createContext<ModalContextType>(null!);
+
+export const ModalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [isReportCreationModalOpen, setIsReportCreationModalOpen] = useState(false);
+  const [reportInitialData, setReportInitialData] = useState(null);
+  const [isActionCreationModalOpen, setIsActionCreationModalOpen] = useState(false);
+  const [selectedPtw, setSelectedPtw] = useState(null);
+  const [isPtwCreationModalOpen, setIsPtwCreationModalOpen] = useState(false);
+  const [ptwCreationMode, setPtwCreationMode] = useState('new');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedPlanForEdit, setSelectedPlanForEdit] = useState(null);
+  const [isPlanCreationModalOpen, setIsPlanCreationModalOpen] = useState(false);
+  const [selectedRams, setSelectedRams] = useState(null);
+  const [selectedRamsForEdit, setSelectedRamsForEdit] = useState(null);
+  const [isRamsCreationModalOpen, setIsRamsCreationModalOpen] = useState(false);
+  const [selectedTbt, setSelectedTbt] = useState(null);
+  const [isTbtCreationModalOpen, setIsTbtCreationModalOpen] = useState(false);
+  const [isCourseModalOpen, setCourseModalOpen] = useState(false);
+  const [isSessionModalOpen, setSessionModalOpen] = useState(false);
+  const [isAttendanceModalOpen, setAttendanceModalOpen] = useState(false);
+  const [courseForSession, setCourseForSession] = useState(null);
+  const [sessionForAttendance, setSessionForAttendance] = useState(null);
+  const [isInspectionCreationModalOpen, setIsInspectionCreationModalOpen] = useState(false);
+
+  const openActionCreationModal = () => setIsActionCreationModalOpen(true);
+  const openActionDetailModal = () => {};
+
+  const value = {
+    selectedReport, setSelectedReport, isReportCreationModalOpen, setIsReportCreationModalOpen, reportInitialData, setReportInitialData,
+    isActionCreationModalOpen, setIsActionCreationModalOpen, openActionCreationModal, openActionDetailModal,
+    selectedPtw, setSelectedPtw, isPtwCreationModalOpen, setIsPtwCreationModalOpen, ptwCreationMode, setPtwCreationMode,
+    selectedPlan, setSelectedPlan, selectedPlanForEdit, setSelectedPlanForEdit, isPlanCreationModalOpen, setIsPlanCreationModalOpen,
+    selectedRams, setSelectedRams, selectedRamsForEdit, setSelectedRamsForEdit, isRamsCreationModalOpen, setIsRamsCreationModalOpen,
+    selectedTbt, setSelectedTbt, isTbtCreationModalOpen, setIsTbtCreationModalOpen,
+    isCourseModalOpen, setCourseModalOpen, isSessionModalOpen, setSessionModalOpen, isAttendanceModalOpen, setAttendanceModalOpen,
+    courseForSession, setCourseForSession, sessionForAttendance, setSessionForAttendance, isInspectionCreationModalOpen, setIsInspectionCreationModalOpen
+  };
+
+  return <ModalContext.Provider value={value}>{children}</ModalContext.Provider>;
+};
+
+export const useModalContext = () => useContext(ModalContext);
