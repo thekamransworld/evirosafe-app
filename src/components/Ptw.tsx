@@ -3,7 +3,7 @@ import type { Project, User } from '../types';
 import type { Ptw as PtwDoc } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
-import { useAppContext, useModalContext } from '../contexts'; // Import ModalContext directly
+import { useAppContext, useDataContext, useModalContext } from '../contexts';
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
@@ -11,7 +11,6 @@ import {
   Shield
 } from 'lucide-react';
 
-// ... (Keep glassStyles and getStatusConfig as they are) ...
 const glassStyles = {
   card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
@@ -44,24 +43,16 @@ const StatCard: React.FC<{ label: string, value: number, color: string, icon: Re
     </div>
 );
 
-// FIX: Removed props that were passed from App.tsx and used Context directly for reliability
-interface PtwProps {
-  ptws: PtwDoc[];
-  users: User[];
-  projects: Project[];
-  // Removed function props, using context instead
-}
-
-export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects }) => {
-  const { can } = useAppContext();
-  // FIX: Get modal controls directly from context
+export const Ptw: React.FC = () => {
+  const { ptwList, projects } = useDataContext();
+  const { usersList, can } = useAppContext();
   const { setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw } = useModalContext();
   
   const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Closed'>('All');
   const [search, setSearch] = useState('');
 
   const filteredPtws = useMemo(() => {
-    return ptws.filter(p => {
+    return ptwList.filter(p => {
         const matchesSearch = !search || 
             p.title.toLowerCase().includes(search.toLowerCase()) || 
             p.payload.permit_no?.toLowerCase().includes(search.toLowerCase());
@@ -72,14 +63,14 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects }) => {
         if (filter === 'Closed') return matchesSearch && (p.status === 'CLOSED' || p.status === 'COMPLETED');
         return matchesSearch;
     });
-  }, [ptws, filter, search]);
+  }, [ptwList, filter, search]);
 
   const stats = useMemo(() => ({
-      total: ptws.length,
-      active: ptws.filter(p => p.status === 'ACTIVE').length,
-      pending: ptws.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
-      highRisk: ptws.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
-  }), [ptws]);
+      total: ptwList.length,
+      active: ptwList.filter(p => p.status === 'ACTIVE').length,
+      pending: ptwList.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
+      highRisk: ptwList.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
+  }), [ptwList]);
 
   const getProjectName = (id: string) => projects.find(p => p.id === id)?.name || 'Unknown Project';
 
@@ -106,7 +97,6 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects }) => {
         )}
       </div>
 
-      {/* ... (Rest of the component remains the same: Stats, Filters, Grid) ... */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <StatCard label="Active Permits" value={stats.active} color="text-emerald-400" icon={<CheckCircle className="w-6 h-6"/>} />
           <StatCard label="Pending Approval" value={stats.pending} color="text-amber-400" icon={<Clock className="w-6 h-6"/>} />

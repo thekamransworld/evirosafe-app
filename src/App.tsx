@@ -6,13 +6,12 @@ import { LoginScreen } from './components/LoginScreen';
 import { DemoBanner } from './components/DemoBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { Sidebar } from './components/Sidebar';
-import { Header } from './components/layout/Header'; // Import Header
+import { Header } from './components/layout/Header';
 import { roles as rolesConfig } from './config';
 import { Loader2 } from 'lucide-react';
 import type { User } from './types';
 
-// ... (Keep all your existing imports for components/modals here) ...
-// (I am omitting the imports list to save space, keep them as they are in your file)
+// --- Import Feature Components ---
 import { Dashboard } from './components/Dashboard';
 import { Reports } from './components/Reports';
 import { Inspections } from './components/Inspections';
@@ -35,6 +34,7 @@ import { Housekeeping } from './components/Housekeeping';
 import { CertifiedProfile } from './components/CertifiedProfile';
 import { HseStatistics } from './components/HseStatistics';
 
+// --- Import Modals ---
 import { ReportCreationModal } from './components/ReportCreationModal';
 import { ReportDetailModal } from './components/ReportDetailModal';
 import { PtwCreationModal } from './components/PtwCreationModal';
@@ -54,7 +54,6 @@ import { ActionCreationModal } from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal } from './components/InspectionConductModal';
 
-// ... (Keep AuthSync and GlobalModals components as they are) ...
 const AuthSync: React.FC = () => {
   const { currentUser } = useAuth();
   const { usersList, setUsersList, login, logout, activeOrg } = useAppContext();
@@ -137,13 +136,11 @@ const GlobalModals = () => {
   );
 };
 
-// --- Main App Content ---
 const AppContent = () => {
   const { currentView, setCurrentView, activeOrg, setActiveOrg, activeUser } = useAppContext();
   const { currentUser, loading: authLoading } = useAuth();
-  const { isLoading: dataLoading, projects } = useDataContext();
+  const { isLoading: dataLoading } = useDataContext();
 
-  // Initialize sidebar state based on screen width
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
 
   useEffect(() => {
@@ -178,31 +175,31 @@ const AppContent = () => {
       />
 
       <main className="flex-1 min-h-screen flex flex-col transition-all duration-300 w-full">
-        {/* Header for Mobile Menu & Org Switching */}
         <Header 
             activeOrg={activeOrg} 
             setActiveOrg={setActiveOrg} 
-            organizations={[activeOrg]} // Pass available orgs here
+            organizations={[activeOrg]} 
             user={activeUser!} 
             toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         />
         
         <DemoBanner />
         
-        {/* Content Area with Responsive Padding */}
         <div className="flex-1 p-4 md:p-8 overflow-y-auto">
           {currentView === 'dashboard' && <Dashboard />}
           {currentView === 'site-map' && <div className="h-[calc(100vh-8rem)]"><SiteMap /></div>}
           {currentView === 'reports' && <Reports />}
-          {currentView === 'ptw' && <Ptw ptws={[]} users={[]} projects={projects} onCreatePtw={() => {}} onAddExistingPtw={() => {}} onSelectPtw={() => {}} />} 
-          {/* Note: Ptw props are handled by context in the real components, passing empty arrays here as placeholders if needed by TS, but ideally Ptw component should use context directly like others */}
+          {/* FIX: Removed props, using context inside Ptw */}
+          {currentView === 'ptw' && <Ptw />} 
           {currentView === 'inspections' && <Inspections />}
           {currentView === 'actions' && <Actions />}
-          {currentView === 'plans' && <Plans onSelectPlan={() => {}} onNewPlan={() => {}} />}
+          {/* FIX: Removed props, using context inside Plans */}
+          {currentView === 'plans' && <Plans />}
           {currentView === 'rams' && <Rams onSelectRams={() => {}} onNewRams={() => {}} />}
           {currentView === 'checklists' && <Checklists />}
           {currentView === 'tbt' && <Tbt />}
-          {currentView === 'training' && <Trainings courses={[]} records={[]} sessions={[]} users={[]} projects={projects} onManageCourses={() => {}} onScheduleSession={() => {}} onManageAttendance={() => {}} />}
+          {/* FIX: Removed props, using context inside Trainings */}
+          {currentView === 'training' && <Trainings />}
           {currentView === 'people' && <People />}
           {currentView === 'roles' && <Roles roles={rolesConfig} />}
           {currentView === 'organizations' && <Organizations />}
