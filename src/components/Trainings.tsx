@@ -3,16 +3,15 @@ import type { TrainingCourse, TrainingRecord, TrainingSession, User, Project } f
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext, useDataContext, useModalContext } from '../contexts'; // Import ModalContext
+import { useAppContext, useDataContext, useModalContext } from '../contexts';
 import { CompetencyMatrix } from './training/CompetencyMatrix';
-import { TrainingAnalytics } from './training/TrainingAnalytics';
+import { TrainingAnalytics } from './TrainingAnalytics'; // Fixed import path
 import { Plus } from 'lucide-react';
 
-// FIX: Removed props, using context
+// Removed props, using context
 export const Trainings: React.FC = () => {
-  const { trainingCourseList, trainingRecordList, trainingSessionList, projects } = useDataContext();
+  const { trainingCourseList, trainingRecordList, trainingSessionList } = useDataContext();
   const { usersList, can } = useAppContext();
-  // FIX: Get modal controls from context
   const { setCourseModalOpen, setSessionModalOpen, setAttendanceModalOpen, setCourseForSession, setSessionForAttendance } = useModalContext();
   
   const [activeTab, setActiveTab] = useState<'Dashboard' | 'Matrix' | 'Courses' | 'Sessions'>('Dashboard');

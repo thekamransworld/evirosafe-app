@@ -1,7 +1,7 @@
 import React from 'react';
-import { Card } from '../ui/Card';
+import { Card } from './ui/Card'; // Fixed import path
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
-import type { TrainingRecord, TrainingCourse } from '../../types';
+import type { TrainingRecord, TrainingCourse } from '../types'; // Fixed import path
 
 interface TrainingAnalyticsProps {
   records: TrainingRecord[];
