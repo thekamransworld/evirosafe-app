@@ -3,7 +3,13 @@ import { SafetyPulseWidget } from './SafetyPulseWidget';
 import { SafetyPulseModal } from './SafetyPulseModal';
 import { useAppContext, useDataContext, useModalContext } from '../contexts';
 import { SiteMap } from './SiteMap';
-import { Sun, Users, AlertTriangle, ClipboardList, Megaphone } from 'lucide-react';
+import { 
+  Sun as SunIcon, 
+  Users as UsersIcon, 
+  AlertTriangle as AlertIcon, 
+  ClipboardList as ClipboardIcon, 
+  Megaphone as MegaphoneIcon 
+} from 'lucide-react';
 
 // --- Helper Component for Micro-Animations ---
 const AnimatedMetric: React.FC<{ value: string | number; className?: string }> = ({ value, className }) => {
@@ -55,11 +61,11 @@ const DashboardHeader: React.FC<{ riskLevel: string; workforceCount: number; tem
                     <span className={isHighRisk ? 'text-red-400' : 'text-emerald-400'}>RISK: {riskLevel.toUpperCase()}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Sun className="w-3 h-3 text-orange-400" />
+                    <SunIcon className="w-3 h-3 text-orange-400" />
                     <span>HEAT: <AnimatedMetric value={temperature} className="text-orange-400 font-bold" />°C</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Users className="w-3 h-3 text-blue-400" />
+                    <UsersIcon className="w-3 h-3 text-blue-400" />
                     <span>WORKFORCE: <AnimatedMetric value={workforceCount} className="text-blue-400 font-bold" /></span>
                 </div>
                 <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
@@ -171,7 +177,7 @@ const WidgetCard: React.FC<{ title: string; children: React.ReactNode; className
 );
 
 export const Dashboard: React.FC = () => {
-    const { reportList, ptwList, inspectionList } = useDataContext();
+    const { reportList, ptwList, projects } = useDataContext();
     const { usersList } = useAppContext();
     const { setIsReportCreationModalOpen, setIsTbtCreationModalOpen, setSelectedReport, setIsInspectionCreationModalOpen } = useModalContext();
     const { setCurrentView } = useAppContext();
@@ -179,16 +185,41 @@ export const Dashboard: React.FC = () => {
     const [isSafetyPulseModalOpen, setIsSafetyPulseModalOpen] = useState(false);
     const [simulatedTemp, setSimulatedTemp] = useState(38);
 
-    // --- REAL DATA CALCULATIONS ---
     const safePtwList = Array.isArray(ptwList) ? ptwList : [];
     const safeReportList = Array.isArray(reportList) ? reportList : [];
     const safeUsersList = Array.isArray(usersList) ? usersList : [];
-    const safeInspectionList = Array.isArray(inspectionList) ? inspectionList : [];
+    const safeProjects = Array.isArray(projects) ? projects : [];
 
-    const activePermits = useMemo(() => safePtwList.filter(p => p.status === 'ACTIVE').length, [safePtwList]);
-    const pendingReports = useMemo(() => safeReportList.filter(r => r.status === 'under_review' || r.status === 'submitted'), [safeReportList]);
+    // --- EMPTY STATE CHECK ---
+    if (safeProjects.length === 0) {
+        return (
+            <div className="dashboard-bg flex flex-col items-center justify-center min-h-[80vh] text-center">
+                <div className="max-w-lg">
+                    <h1 className="text-4xl font-black text-white mb-4">Welcome to EviroSafe</h1>
+                    <p className="text-slate-400 mb-8 text-lg">
+                        Your command center for HSE management is ready. To get started, you need to set up your first project.
+                    </p>
+                    <div className="p-6 bg-slate-900/50 border border-white/10 rounded-2xl">
+                        <h3 className="text-white font-bold mb-2">Get Started</h3>
+                        <p className="text-sm text-slate-500 mb-6">Create a project to track incidents, permits, and inspections.</p>
+                        <button 
+                            onClick={() => setCurrentView('projects')}
+                            className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20"
+                        >
+                            Go to Projects &rarr;
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const activePermits = safePtwList.filter(p => p.status === 'ACTIVE').length;
+    const pendingReports = safeReportList.filter(r => r.status === 'under_review' || r.status === 'submitted');
     
     const riskAnalysis = useMemo(() => {
+        if (safeReportList.length === 0) return { level: 'Low', summary: 'System initialized. No incidents reported yet.' };
+
         const openIncidents = safeReportList.filter(r => r.status !== 'closed');
         const criticalCount = openIncidents.filter(r => (r.risk_pre_control.severity * r.risk_pre_control.likelihood) >= 15).length;
         const highCount = openIncidents.filter(r => (r.risk_pre_control.severity * r.risk_pre_control.likelihood) >= 9).length;
@@ -206,20 +237,13 @@ export const Dashboard: React.FC = () => {
         positiveObs: safeReportList.filter(r => r.type === 'Positive Observation').length,
     }), [safeReportList]);
 
-    const workforceCount = safeUsersList.length + (activePermits * 4); // Estimate 4 workers per permit
+    const workforceCount = safeUsersList.length + (activePermits * 4);
 
     const recommendations = useMemo(() => {
         if (riskAnalysis.level === 'Critical') return ['Stop work in affected areas', 'Conduct emergency meeting', 'Review all active permits'];
         if (riskAnalysis.level === 'High') return ['Increase inspection frequency', 'Verify all PTW controls', 'Conduct TBT on recent incidents'];
         return ['Maintain housekeeping standards', 'Ensure hydration breaks', 'Routine equipment checks'];
     }, [riskAnalysis.level]);
-
-    // Calculate Compliance Score based on Inspections
-    const complianceScore = useMemo(() => {
-        if (safeInspectionList.length === 0) return 100;
-        const passed = safeInspectionList.filter(i => i.status === 'Closed' || i.status === 'Approved').length;
-        return Math.round((passed / safeInspectionList.length) * 100);
-    }, [safeInspectionList]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -249,17 +273,17 @@ export const Dashboard: React.FC = () => {
                             Quick Actions
                         </h2>
                         <div className="space-y-3">
-                            <QuickAction label="New Incident Report" hotkey="N" icon={<AlertTriangle className="w-5 h-5"/>} onClick={() => setIsReportCreationModalOpen(true)} />
+                            <QuickAction label="New Incident Report" hotkey="N" icon={<AlertIcon/>} onClick={() => setIsReportCreationModalOpen(true)} />
                             <QuickAction 
                                 label="Start Inspection" 
                                 hotkey="I" 
-                                icon={<ClipboardList className="w-5 h-5"/>} 
+                                icon={<ClipboardIcon/>} 
                                 onClick={() => {
                                     setCurrentView('inspections');
                                     setIsInspectionCreationModalOpen(true);
                                 }} 
                             />
-                            <QuickAction label="Conduct Toolbox Talk" hotkey="T" icon={<Megaphone className="w-5 h-5"/>} onClick={() => setIsTbtCreationModalOpen(true)} />
+                            <QuickAction label="Conduct Toolbox Talk" hotkey="T" icon={<MegaphoneIcon/>} onClick={() => setIsTbtCreationModalOpen(true)} />
                         </div>
                     </div>
 
@@ -300,7 +324,7 @@ export const Dashboard: React.FC = () => {
                 <div className="space-y-6 flex flex-col h-96">
                     <WidgetCard title="Environment" className="flex-1 relative overflow-hidden">
                         <div className="absolute -right-6 -top-6 text-orange-500/20 animate-spin-slow">
-                            <Sun className="w-32 h-32" />
+                            <SunIcon className="w-32 h-32" />
                         </div>
                         <div className="relative z-10">
                             <div className="flex items-baseline gap-2">
@@ -335,11 +359,11 @@ export const Dashboard: React.FC = () => {
                         </div>
                         <div className="mt-auto pt-4">
                             <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${complianceScore}%` }}></div>
+                                <div className="h-full bg-emerald-500 w-[85%] rounded-full"></div>
                             </div>
                             <div className="flex justify-between mt-1 text-[10px] text-slate-500">
                                 <span>Compliance</span>
-                                <span>{complianceScore}%</span>
+                                <span>85%</span>
                             </div>
                         </div>
                     </WidgetCard>

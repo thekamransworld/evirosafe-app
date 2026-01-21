@@ -9,7 +9,100 @@ import {
     AlertTriangle, FileText, CheckSquare, ArrowLeft, 
     Plus, Settings, MoreVertical 
 } from 'lucide-react';
-import { ProjectCreationModal } from './ProjectCreationModal'; // Import the new modal
+import { roles } from '../config';
+import { EmptyState } from './ui/EmptyState';
+
+// --- Project Creation/Edit Modal ---
+interface ProjectModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: Omit<Project, 'id' | 'org_id' | 'status'>) => void;
+  users: User[];
+  initialData?: Project;
+}
+
+const ProjectModal: React.FC<ProjectModalProps> = ({ isOpen, onClose, onSubmit, users, initialData }) => {
+    const [formData, setFormData] = useState({
+        name: initialData?.name || '',
+        code: initialData?.code || '',
+        location: initialData?.location || '',
+        start_date: initialData?.start_date || new Date().toISOString().split('T')[0],
+        finish_date: initialData?.finish_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        manager_id: initialData?.manager_id || '',
+        type: initialData?.type || 'Construction'
+    });
+    const [error, setError] = useState('');
+
+    const handleSubmit = () => {
+        if (!formData.name.trim() || !formData.code.trim()) {
+            setError('Project Name and Code are required.');
+            return;
+        }
+        onSubmit(formData);
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                <div className="p-6 border-b dark:border-dark-border">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Create New Project</h3>
+                </div>
+                <div className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Name</label>
+                            <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" placeholder="e.g. Tower A" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Code</label>
+                            <input type="text" value={formData.code} onChange={e => setFormData(p => ({...p, code: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" placeholder="e.g. PRJ-001" />
+                        </div>
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Location</label>
+                            <input type="text" value={formData.location} onChange={e => setFormData(p => ({...p, location: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Type</label>
+                            <select value={formData.type} onChange={e => setFormData(p => ({...p, type: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white">
+                                <option>Construction</option>
+                                <option>Shutdown</option>
+                                <option>Operations</option>
+                                <option>Maintenance</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
+                            <input type="date" value={formData.start_date} onChange={e => setFormData(p => ({...p, start_date: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Finish Date</label>
+                            <input type="date" value={formData.finish_date} onChange={e => setFormData(p => ({...p, finish_date: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Project Manager</label>
+                        <select value={formData.manager_id} onChange={e => setFormData(p => ({...p, manager_id: e.target.value}))} className="mt-1 w-full p-2 border bg-transparent rounded-md dark:border-dark-border dark:text-white">
+                            <option value="">Select Manager</option>
+                            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </select>
+                    </div>
+                    {error && <p className="text-sm text-red-500">{error}</p>}
+                </div>
+                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Create Project</Button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- Project Card Component ---
 const ProjectCard: React.FC<{ 
@@ -18,7 +111,7 @@ const ProjectCard: React.FC<{
     onView: () => void; 
 }> = ({ project, users, onView }) => {
     const getStatusColor = (status: Project['status']): 'green' | 'yellow' | 'gray' => {
-        switch (status) { case 'active': return 'green'; case 'pending': return 'yellow'; case 'archived': return 'gray'; default: return 'gray'; }
+        switch (status) { case 'active': return 'green'; case 'pending': return 'yellow'; case 'archived': return 'gray'; }
     };
 
     const crew = useMemo(() => users.filter(u => u.org_id === project.org_id), [users, project.org_id]);
@@ -87,6 +180,9 @@ export const Projects: React.FC = () => {
   };
 
   if (selectedProject) {
+      // In a real app, you would navigate to a route. Here we just render the detail view.
+      // We need to import ProjectDetails but it's not imported in this file to avoid circular dependency in this snippet.
+      // Assuming ProjectDetails is handled by parent or router.
       return <div>Project Details View Placeholder</div>;
   }
 
@@ -117,19 +213,22 @@ export const Projects: React.FC = () => {
       </div>
       
        {orgProjects.length === 0 && !isLoading && (
-            <div className="text-center py-12 bg-gray-50 dark:bg-white/5 rounded-xl border border-dashed border-gray-300 dark:border-gray-700">
-                <Briefcase className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No projects found</h3>
-                <p className="text-gray-500 dark:text-gray-400 mt-1">Create a project to start managing your HSE operations.</p>
-                {canCreate && <Button className="mt-4" onClick={() => setIsModalOpen(true)}>Create First Project</Button>}
+            <div className="col-span-full">
+                <EmptyState 
+                    title="No Projects Found"
+                    description="Create a project to start managing your HSE operations, permits, and inspections."
+                    actionLabel={canCreate ? "Create First Project" : undefined}
+                    onAction={() => setIsModalOpen(true)}
+                    icon={<Briefcase className="w-10 h-10 text-gray-400" />}
+                />
             </div>
         )}
 
-      <ProjectCreationModal
+      <ProjectModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateSubmit}
-        users={usersList} // Pass all users, filtering happens inside modal
+        users={usersList.filter(u => u.org_id === activeOrg.id)}
       />
     </div>
   );
