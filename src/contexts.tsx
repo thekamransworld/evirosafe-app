@@ -20,7 +20,7 @@ import { useToast } from './components/ui/Toast';
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
-import { logoSrc } from './config'; // Import logoSrc
+import { logoSrc } from './config';
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -58,6 +58,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Persist view in localStorage
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
@@ -86,6 +87,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
+  // Fallback mechanism for activeUser to prevent UI flicker/crashes on reload
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
     const foundInState = usersList.find(u => u.id === activeUserId);
@@ -142,25 +144,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
   
-  // --- FIXED: Added default branding to new organizations ---
-  const handleCreateOrganization = (data: any) => {
-      const newOrg: Organization = { 
-          ...data, 
-          id: `org_${Date.now()}`, 
-          status: 'active',
-          branding: {
-              logoUrl: logoSrc,
-              primaryColor: '#00A86B'
-          },
-          secondaryLanguages: ['ar'],
-          timezone: 'GMT+3',
-          primaryLanguage: 'en',
-          slug: data.name.toLowerCase().replace(/\s+/g, '-'),
-          domain: data.name.toLowerCase().replace(/\s+/g, '') + '.com'
-      };
-      setOrganizations(prev => [...prev, newOrg]);
-      // In a real app, you would save this to Firestore here
-      toast.success("Organization created successfully.");
+  // --- FIXED: Save Organization to Firebase ---
+  const handleCreateOrganization = async (data: any) => {
+      try {
+          const newOrg: Organization = { 
+              ...data, 
+              id: `org_${Date.now()}`, 
+              status: 'active',
+              branding: {
+                  logoUrl: logoSrc,
+                  primaryColor: '#00A86B'
+              },
+              secondaryLanguages: ['ar'],
+              timezone: 'GMT+3',
+              primaryLanguage: 'en',
+              slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+              domain: data.name.toLowerCase().replace(/\s+/g, '') + '.com'
+          };
+
+          // 1. Update Local State immediately
+          setOrganizations(prev => [...prev, newOrg]);
+          
+          // 2. Save to Firestore
+          await setDoc(doc(db, 'organizations', newOrg.id), newOrg);
+          
+          toast.success("Organization created and saved.");
+      } catch (e) {
+          console.error("Error saving organization:", e);
+          toast.error("Failed to save organization to database.");
+      }
   };
 
   const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
@@ -231,7 +243,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { activeOrg, activeUser, setUsersList } = useAppContext();
+    const { activeOrg, activeUser, setUsersList, setOrganizations } = useAppContext(); // Added setOrganizations here
     const { currentUser } = useAuth();
     const toast = useToast();
     
@@ -272,6 +284,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };
 
           await Promise.all([
+            fetchCol('organizations', setOrganizations, initialOrganizations), // Fetch Orgs
             fetchCol('users', setUsersList, initialUsers),
             fetchCol('projects', setProjects, initialProjects),
             fetchCol('reports', setReportList),
@@ -297,7 +310,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       fetchData();
-    }, [currentUser, setUsersList]);
+    }, [currentUser, setUsersList, setOrganizations]);
 
     const updateDB = async (collectionName: string, id: string, data: any) => {
         try {

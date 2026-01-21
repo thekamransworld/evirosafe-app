@@ -3,31 +3,22 @@ import type { TrainingCourse, TrainingRecord, TrainingSession, User, Project } f
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext, useModalContext } from '../contexts'; // Import ModalContext
 import { CompetencyMatrix } from './training/CompetencyMatrix';
 import { TrainingAnalytics } from './training/TrainingAnalytics';
 import { Plus } from 'lucide-react';
 
-interface TrainingsProps {
-  courses: TrainingCourse[];
-  records: TrainingRecord[];
-  sessions: TrainingSession[];
-  users: User[];
-  projects: Project[];
-  onManageCourses: () => void;
-  onScheduleSession: (course: TrainingCourse) => void;
-  onManageAttendance: (session: TrainingSession) => void;
-}
+// FIX: Removed props, using context
+export const Trainings: React.FC = () => {
+  const { trainingCourseList, trainingRecordList, trainingSessionList, projects } = useDataContext();
+  const { usersList, can } = useAppContext();
+  // FIX: Get modal controls from context
+  const { setCourseModalOpen, setSessionModalOpen, setAttendanceModalOpen, setCourseForSession, setSessionForAttendance } = useModalContext();
+  
+  const [activeTab, setActiveTab] = useState<'Dashboard' | 'Matrix' | 'Courses' | 'Sessions'>('Dashboard');
 
-type Tab = 'Dashboard' | 'Matrix' | 'Courses' | 'Sessions';
-
-export const Trainings: React.FC<TrainingsProps> = (props) => {
-  const { courses, records, sessions, users, onManageCourses, onScheduleSession, onManageAttendance } = props;
-  const { can } = useAppContext();
-  const [activeTab, setActiveTab] = useState<Tab>('Dashboard');
-
-  const getCourseTitle = (courseId: string) => courses.find(c => c.id === courseId)?.title || 'Unknown';
-  const getUserName = (userId: string) => users.find(u => u.id === userId)?.name || 'Unknown';
+  const getCourseTitle = (courseId: string) => trainingCourseList.find(c => c.id === courseId)?.title || 'Unknown';
+  const getUserName = (userId: string) => usersList.find(u => u.id === userId)?.name || 'Unknown';
   
   const getSessionStatusColor = (status: TrainingSession['status']): 'green' | 'blue' | 'gray' => {
       switch(status) {
@@ -38,9 +29,9 @@ export const Trainings: React.FC<TrainingsProps> = (props) => {
       }
   };
 
-  const TabButton: React.FC<{ tab: Tab }> = ({ tab }) => (
+  const TabButton: React.FC<{ tab: string }> = ({ tab }) => (
     <button
-      onClick={() => setActiveTab(tab)}
+      onClick={() => setActiveTab(tab as any)}
       className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
         activeTab === tab 
         ? 'border-blue-600 text-blue-600 bg-blue-50 dark:bg-white/5' 
@@ -59,7 +50,7 @@ export const Trainings: React.FC<TrainingsProps> = (props) => {
             <p className="text-slate-500 dark:text-slate-400">Manage workforce skills, certifications, and compliance.</p>
         </div>
          {can('create', 'training') && (
-            <Button onClick={onManageCourses}>
+            <Button onClick={() => setCourseModalOpen(true)}>
                 <Plus className="w-5 h-5 mr-2" />
                 Manage Courses
             </Button>
@@ -75,8 +66,8 @@ export const Trainings: React.FC<TrainingsProps> = (props) => {
         </nav>
       </div>
 
-      {activeTab === 'Dashboard' && <TrainingAnalytics />}
-      {activeTab === 'Matrix' && <CompetencyMatrix users={users} records={records} requirements={[]} />}
+      {activeTab === 'Dashboard' && <TrainingAnalytics records={trainingRecordList} courses={trainingCourseList} />}
+      {activeTab === 'Matrix' && <CompetencyMatrix users={usersList} records={trainingRecordList} requirements={[]} />}
       
       {activeTab === 'Courses' && (
         <Card>
@@ -90,13 +81,13 @@ export const Trainings: React.FC<TrainingsProps> = (props) => {
                         <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
                     </tr></thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {courses.map(course => (
+                        {trainingCourseList.map(course => (
                             <tr key={course.id}>
                                 <td className="px-4 py-3 font-semibold">{course.title}</td>
                                 <td className="px-4 py-3"><Badge color="blue" size="sm">{course.category}</Badge></td>
                                 <td className="px-4 py-3 text-sm text-slate-500">{course.validity_months} months</td>
                                 <td className="px-4 py-3 text-right">
-                                    {can('create', 'training') && <Button size="sm" variant="secondary" onClick={() => onScheduleSession(course)}>Schedule</Button>}
+                                    {can('create', 'training') && <Button size="sm" variant="secondary" onClick={() => { setCourseForSession(course); setSessionModalOpen(true); }}>Schedule</Button>}
                                 </td>
                             </tr>
                         ))}
@@ -119,7 +110,7 @@ export const Trainings: React.FC<TrainingsProps> = (props) => {
                         <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
                     </tr></thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {sessions.map(session => (
+                        {trainingSessionList.map(session => (
                             <tr key={session.id}>
                                 <td className="px-4 py-3 font-semibold">{getCourseTitle(session.course_id)}</td>
                                 <td className="px-4 py-3 text-sm text-slate-500">{new Date(session.scheduled_at).toLocaleDateString()}</td>
@@ -127,7 +118,7 @@ export const Trainings: React.FC<TrainingsProps> = (props) => {
                                 <td className="px-4 py-3"><Badge color={getSessionStatusColor(session.status)}>{session.status}</Badge></td>
                                 <td className="px-4 py-3 text-right">
                                     {can('update', 'training') && (
-                                        <Button size="sm" variant="ghost" onClick={() => onManageAttendance(session)}>
+                                        <Button size="sm" variant="ghost" onClick={() => { setSessionForAttendance(session); setAttendanceModalOpen(true); }}>
                                             {session.status === 'scheduled' ? 'Manage' : 'View'}
                                         </Button>
                                     )}

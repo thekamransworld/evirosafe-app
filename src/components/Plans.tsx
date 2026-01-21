@@ -4,13 +4,10 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { planTypes } from '../config';
-import { useDataContext, useAppContext } from '../contexts';
+import { useDataContext, useModalContext, useAppContext } from '../contexts';
+import { PlusIcon, CheckCircleIcon } from 'lucide-react'; // Ensure icons are imported
 
-interface PlansProps {
-  onSelectPlan: (plan: Plan) => void;
-  onNewPlan: () => void;
-}
-
+// ... (Keep getStatusConfig and PlanCard as they are) ...
 const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
   switch (status) {
     case 'published': return 'green';
@@ -24,7 +21,6 @@ const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red'
 
 const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ plan, onSelect }) => {
   const safeStatus = plan.status || 'draft';
-  
   return (
     <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
       <div className="flex-grow">
@@ -65,9 +61,13 @@ const FilterButton: React.FC<{ label: string, value: string, currentFilter: stri
     </button>
 )
 
-export const Plans: React.FC<PlansProps> = ({ onSelectPlan, onNewPlan }) => {
+// FIX: Removed props, using context
+export const Plans: React.FC = () => {
   const { planList, projects } = useDataContext();
   const { can } = useAppContext();
+  // FIX: Get modal controls from context
+  const { setIsPlanCreationModalOpen, setSelectedPlan, setSelectedPlanForEdit } = useModalContext();
+
   const [typeFilter, setTypeFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState<PlanStatus | 'All'>('All');
   const [projectFilter, setProjectFilter] = useState('All');
@@ -81,12 +81,20 @@ export const Plans: React.FC<PlansProps> = ({ onSelectPlan, onNewPlan }) => {
     });
   }, [planList, typeFilter, statusFilter, projectFilter]);
 
+  const handleSelectPlan = (plan: Plan) => {
+      if (plan.status === 'draft') {
+          setSelectedPlanForEdit(plan);
+      } else {
+          setSelectedPlan(plan);
+      }
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-text-primary dark:text-white">HSE Plans Library</h1>
         {can('create', 'plans') && (
-            <Button onClick={onNewPlan}>
+            <Button onClick={() => setIsPlanCreationModalOpen(true)}>
               <PlusIcon className="w-5 h-5 mr-2" />
               New Plan
             </Button>
@@ -121,7 +129,7 @@ export const Plans: React.FC<PlansProps> = ({ onSelectPlan, onNewPlan }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPlans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onSelect={onSelectPlan} />
+          <PlanCard key={plan.id} plan={plan} onSelect={handleSelectPlan} />
         ))}
         {filteredPlans.length === 0 && (
             <div className="col-span-full text-center py-12 text-gray-500">
@@ -132,12 +140,3 @@ export const Plans: React.FC<PlansProps> = ({ onSelectPlan, onNewPlan }) => {
     </div>
   );
 };
-
-const PlusIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-  </svg>
-);
-const CheckCircleIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-);

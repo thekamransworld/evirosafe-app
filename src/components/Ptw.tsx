@@ -3,40 +3,37 @@ import type { Project, User } from '../types';
 import type { Ptw as PtwDoc } from '../types';
 import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
-import { useAppContext } from '../contexts';
+import { useAppContext, useModalContext } from '../contexts'; // Import ModalContext directly
 import { 
   Plus, Search, FileText, 
   AlertTriangle, Clock, Calendar, 
   MapPin, User as UserIcon, CheckCircle,
-  Shield, ArrowRight
+  Shield
 } from 'lucide-react';
 
-// === GEN 4 STYLES ===
+// ... (Keep glassStyles and getStatusConfig as they are) ...
 const glassStyles = {
-  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative cursor-pointer",
+  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative",
   badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
+  filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
 };
 
 const getStatusConfig = (status: PtwDoc['status']) => {
-    if (['ACTIVE', 'SITE_HANDOVER'].includes(status)) return { label: status, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle };
-    if (['APPROVAL', 'PENDING_APPROVAL', 'ISSUER_SIGNED'].includes(status)) return { label: 'APPROVAL', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Clock };
-    if (['PRE_SCREEN', 'SITE_INSPECTION', 'SUBMITTED', 'ISSUER_REVIEW', 'IV_REVIEW'].includes(status)) return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
-    if (['HOLD', 'SUSPENDED'].includes(status)) return { label: 'ON HOLD', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
-    if (['COMPLETED', 'CLOSED', 'ARCHIVED'].includes(status)) return { label: 'CLOSED', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: CheckCircle };
-    return { label: 'DRAFT', color: 'text-slate-500', bg: 'bg-slate-500/5', border: 'border-slate-500/10', icon: FileText };
+    switch (status) {
+      case 'ACTIVE': return { label: 'ACTIVE', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle };
+      case 'APPROVAL': return { label: 'PENDING APPROVAL', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Clock };
+      case 'PRE_SCREEN':
+      case 'SITE_INSPECTION':
+      case 'SUBMITTED': return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
+      case 'HOLD': return { label: 'ON HOLD', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
+      case 'COMPLETED':
+      case 'CLOSED': return { label: 'CLOSED', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: CheckCircle };
+      default: return { label: 'DRAFT', color: 'text-slate-500', bg: 'bg-slate-500/5', border: 'border-slate-500/10', icon: FileText };
+    }
 };
 
-interface PtwProps {
-  ptws: PtwDoc[];
-  users: User[];
-  projects: Project[];
-  onCreatePtw: () => void;
-  onAddExistingPtw: () => void;
-  onSelectPtw: (ptw: PtwDoc) => void;
-}
-
-const StatCard: React.FC<{ label: string; value: number; color: string; icon: React.ReactNode }> = ({ label, value, color, icon }) => (
-    <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between">
+const StatCard: React.FC<{ label: string, value: number, color: string, icon: React.ReactNode }> = ({ label, value, color, icon }) => (
+    <div className={`${glassStyles.card} p-4 flex items-center justify-between`}>
         <div>
             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
             <p className={`text-2xl font-black ${color} mt-1`}>{value}</p>
@@ -47,8 +44,19 @@ const StatCard: React.FC<{ label: string; value: number; color: string; icon: Re
     </div>
 );
 
-export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, onAddExistingPtw, onSelectPtw }) => {
+// FIX: Removed props that were passed from App.tsx and used Context directly for reliability
+interface PtwProps {
+  ptws: PtwDoc[];
+  users: User[];
+  projects: Project[];
+  // Removed function props, using context instead
+}
+
+export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects }) => {
   const { can } = useAppContext();
+  // FIX: Get modal controls directly from context
+  const { setIsPtwCreationModalOpen, setPtwCreationMode, setSelectedPtw } = useModalContext();
+  
   const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Closed'>('All');
   const [search, setSearch] = useState('');
 
@@ -59,7 +67,7 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
             p.payload.permit_no?.toLowerCase().includes(search.toLowerCase());
         
         if (filter === 'All') return matchesSearch;
-        if (filter === 'Active') return matchesSearch && (p.status === 'ACTIVE' || p.status === 'SITE_HANDOVER');
+        if (filter === 'Active') return matchesSearch && p.status === 'ACTIVE';
         if (filter === 'Draft') return matchesSearch && p.status === 'DRAFT';
         if (filter === 'Closed') return matchesSearch && (p.status === 'CLOSED' || p.status === 'COMPLETED');
         return matchesSearch;
@@ -69,8 +77,8 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
   const stats = useMemo(() => ({
       total: ptws.length,
       active: ptws.filter(p => p.status === 'ACTIVE').length,
-      pending: ptws.filter(p => ['APPROVAL', 'SUBMITTED', 'ISSUER_REVIEW'].includes(p.status)).length,
-      highRisk: ptws.filter(p => ['Hot Work', 'Confined Space Entry', 'Lifting'].includes(p.type)).length
+      pending: ptws.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
+      highRisk: ptws.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
   }), [ptws]);
 
   const getProjectName = (id: string) => projects.find(p => p.id === id)?.name || 'Unknown Project';
@@ -78,7 +86,6 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
   return (
     <div className="min-h-screen bg-transparent text-slate-200 p-6">
       
-      {/* HEADER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div>
             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -90,8 +97,8 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
         
         {can('create', 'ptw') && (
             <div className="flex gap-3">
-                 <Button variant="secondary" onClick={onAddExistingPtw}>Add Existing</Button>
-                 <Button onClick={onCreatePtw} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0 shadow-lg shadow-blue-900/20">
+                 <Button variant="secondary" onClick={() => { setPtwCreationMode('existing'); setIsPtwCreationModalOpen(true); }}>Add Existing</Button>
+                 <Button onClick={() => { setPtwCreationMode('new'); setIsPtwCreationModalOpen(true); }} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0 shadow-lg shadow-blue-900/20">
                     <Plus className="w-5 h-5 mr-2" />
                     New Permit
                 </Button>
@@ -99,7 +106,7 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
         )}
       </div>
 
-      {/* STATS */}
+      {/* ... (Rest of the component remains the same: Stats, Filters, Grid) ... */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <StatCard label="Active Permits" value={stats.active} color="text-emerald-400" icon={<CheckCircle className="w-6 h-6"/>} />
           <StatCard label="Pending Approval" value={stats.pending} color="text-amber-400" icon={<Clock className="w-6 h-6"/>} />
@@ -107,7 +114,6 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
           <StatCard label="Total Permits" value={stats.total} color="text-blue-400" icon={<FileText className="w-6 h-6"/>} />
       </div>
 
-      {/* FILTERS */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
               {['All', 'Active', 'Draft', 'Closed'].map(f => (
@@ -136,7 +142,6 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
           </div>
       </div>
 
-      {/* GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPtws.map((ptw) => {
             const statusConfig = getStatusConfig(ptw.status);
@@ -144,10 +149,8 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
             const StatusIcon = statusConfig.icon;
             
             return (
-                <div key={ptw.id} onClick={() => onSelectPtw(ptw)} className={glassStyles.card}>
-                    {/* Color Strip */}
+                <div key={ptw.id} onClick={() => setSelectedPtw(ptw)} className={glassStyles.card}>
                     <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: typeDetails.hex }} />
-                    
                     <div className="p-5 pl-7">
                         <div className="flex justify-between items-start mb-4">
                             <div>
@@ -156,17 +159,15 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
                                 </span>
                                 <h3 className="font-bold text-slate-100 text-lg line-clamp-1">{ptw.title}</h3>
                             </div>
-                            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1 ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
+                            <div className={`${glassStyles.badge} ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
                                 <StatusIcon className="w-3 h-3" />
                                 {statusConfig.label}
                             </div>
                         </div>
-
                         <div className="flex items-center gap-2 mb-4">
                              <span className="text-2xl">{typeDetails.icon}</span>
                              <span className="text-sm font-medium text-slate-300">{ptw.type}</span>
                         </div>
-
                         <div className="space-y-2 text-xs text-slate-400 mb-4">
                             <div className="flex items-center gap-2">
                                 <MapPin className="w-3.5 h-3.5 text-slate-500" />
@@ -181,7 +182,6 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
                                 <span>{getProjectName(ptw.project_id)}</span>
                             </div>
                         </div>
-
                         <div className="pt-4 border-t border-white/5 flex items-center justify-between text-xs">
                              <div className="flex items-center gap-1.5 text-slate-500">
                                  <Calendar className="w-3.5 h-3.5" />
@@ -196,7 +196,6 @@ export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, on
                 </div>
             )
         })}
-
         {filteredPtws.length === 0 && (
             <div className="col-span-full py-20 text-center border-2 border-dashed border-white/10 rounded-3xl">
                 <FileText className="w-12 h-12 text-slate-700 mx-auto mb-3" />
