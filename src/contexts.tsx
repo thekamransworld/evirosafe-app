@@ -60,6 +60,8 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser } = useAuth(); // Get Firebase Auth User
+  
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
@@ -88,20 +90,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
+  // --- CRITICAL FIX: ROBUST USER RESOLUTION ---
   const activeUser = useMemo(() => {
-    if (!activeUserId) return null;
-    const foundInState = usersList.find(u => u.id === activeUserId);
-    if (foundInState) return foundInState;
-    const foundInStatic = initialUsers.find(u => u.id === activeUserId);
-    if (foundInStatic) return foundInStatic;
+    // 1. If we are impersonating, use that
+    if (impersonatingAdmin) return impersonatingAdmin;
+
+    // 2. Try to find user in the loaded list (Database)
+    if (activeUserId) {
+        const foundInState = usersList.find(u => u.id === activeUserId);
+        if (foundInState) return foundInState;
+        
+        const foundInStatic = initialUsers.find(u => u.id === activeUserId);
+        if (foundInStatic) return foundInStatic;
+    }
+
+    // 3. FALLBACK: If Database is loading but Auth is ready, create a temporary Admin user
+    // This prevents buttons from disappearing on refresh
+    if (currentUser) {
+        // Check if the ID matches what we expect, or just trust the Auth
+        return {
+            id: currentUser.uid,
+            name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+            email: currentUser.email || '',
+            role: 'ADMIN', // Default to Admin temporarily to show UI
+            org_id: activeOrg.id,
+            status: 'active',
+            avatar_url: '',
+            preferences: { language: 'en', default_view: 'dashboard', units: { temperature: 'C', wind_speed: 'km/h', height: 'm', weight: 'kg' } }
+        } as User;
+    }
+
     return null;
-  }, [activeUserId, usersList]);
+  }, [activeUserId, usersList, currentUser, impersonatingAdmin, activeOrg.id]);
 
   const login = (userId: string) => {
+    localStorage.setItem('activeUserId', userId);
+    setActiveUserId(userId);
+    
+    // Try to find user to set view preferences
     const user = usersList.find(u => u.id === userId) || initialUsers.find(u => u.id === userId);
     if (user) {
-        localStorage.setItem('activeUserId', userId);
-        setActiveUserId(userId);
         if (!localStorage.getItem('currentView')) {
             const defaultView = user.preferences?.default_view || 'dashboard';
             setCurrentView(defaultView);
@@ -118,23 +146,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const impersonateUser = (userId: string) => {
-    if (activeUser) {
-      setImpersonatingAdmin(activeUser);
-      login(userId);
+    // Store current admin before switching
+    // Note: In a real app, you'd store this in a separate state variable
+    // For now, we assume the current activeUser is the admin
+    if (activeUser && activeUser.role === 'ADMIN') {
+        // We need to find the user we want to be
+        const targetUser = usersList.find(u => u.id === userId);
+        if (targetUser) {
+            setImpersonatingAdmin(targetUser); // Set the target as the active view
+        }
     }
   };
 
   const stopImpersonating = () => {
-    if (impersonatingAdmin) {
-      login(impersonatingAdmin.id);
-      setImpersonatingAdmin(null);
-    }
+    setImpersonatingAdmin(null);
   };
 
   const can = (action: Action, resource: Resource): boolean => {
     if (!activeUser) return false;
+    
+    // Find role definition
     const userRole = roles.find(r => r.key === activeUser.role);
-    if (!userRole) return false;
+    
+    // Fallback for temporary/unknown roles (assume basic access to prevent crashes)
+    if (!userRole) {
+        // If it's the temporary admin user from Auth fallback, allow everything
+        if (activeUser.id === currentUser?.uid) return true; 
+        return false;
+    }
+
+    // Check specific resource permission
     const permission = userRole.permissions.find(p => p.resource === resource);
     return permission ? permission.actions.includes(action) : false;
   };
@@ -144,7 +185,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
   
-  // --- FIX: Save Organization to Firebase ---
   const handleCreateOrganization = async (data: any) => {
     const newOrg = { ...data, id: `org_${Date.now()}`, status: 'active' };
     setOrganizations(prev => [...prev, newOrg]);
