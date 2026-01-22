@@ -6,13 +6,21 @@ import { Badge } from './ui/Badge';
 import { useDataContext, useModalContext, useAppContext } from '../contexts';
 import { getRiskLevel } from '../utils/riskUtils';
 import { EmptyState } from './ui/EmptyState';
-import { FileText, Plus, MapPin, Calendar } from 'lucide-react';
+import { FileText, Plus, MapPin, Calendar, Trash2 } from 'lucide-react';
 
-const ReportCard: React.FC<{report: Report, onSelect: (report: Report) => void}> = ({ report, onSelect }) => {
+const ReportCard: React.FC<{report: Report, onSelect: (report: Report) => void, onDelete: (id: string) => void}> = ({ report, onSelect, onDelete }) => {
     const risk = getRiskLevel(report.risk_pre_control);
     
     return (
-        <Card onClick={() => onSelect(report)} className="hover:shadow-md hover:border-primary-300 transition-all cursor-pointer">
+        <Card onClick={() => onSelect(report)} className="hover:shadow-md hover:border-primary-300 transition-all cursor-pointer relative group">
+            {/* Delete Button */}
+            <button 
+                onClick={(e) => { e.stopPropagation(); if(confirm('Delete this report?')) onDelete(report.id); }}
+                className="absolute top-4 right-4 p-1.5 bg-white dark:bg-slate-800 text-gray-400 hover:text-red-500 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            >
+                <Trash2 className="w-4 h-4" />
+            </button>
+
             <div className="flex justify-between items-start">
                 <h3 className="font-bold text-md text-text-primary pr-2 truncate">{report.type}</h3>
                 <Badge color={risk.color}>{risk.level} Risk</Badge>
@@ -56,7 +64,7 @@ const REPORT_CATEGORIES: ReportType[] = [
 ];
 
 export const Reports: React.FC = () => {
-  const { reportList } = useDataContext();
+  const { reportList, handleDeleteReport } = useDataContext();
   const { setSelectedReport, setIsReportCreationModalOpen } = useModalContext();
   const { can } = useAppContext();
 
@@ -113,7 +121,12 @@ export const Reports: React.FC = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredReports.map(report => (
-            <ReportCard key={report.id} report={report} onSelect={setSelectedReport} />
+            <ReportCard 
+                key={report.id} 
+                report={report} 
+                onSelect={setSelectedReport} 
+                onDelete={handleDeleteReport} // Pass delete handler
+            />
         ))}
         {filteredReports.length === 0 && (
             <div className="col-span-full">

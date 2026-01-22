@@ -18,7 +18,7 @@ import { useToast } from './components/ui/Toast';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
 // --- NOTIFICATION SERVICE ---
@@ -60,17 +60,14 @@ interface AppContextType {
 const AppContext = createContext<AppContextType>(null!);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load saved view from localStorage to persist navigation on refresh
   const [currentView, setCurrentView] = useState<View>(() => {
     return (localStorage.getItem('currentView') as View) || 'dashboard';
   });
 
-  // Save view whenever it changes
   useEffect(() => {
     localStorage.setItem('currentView', currentView);
   }, [currentView]);
   
-  // Initialize with static data to prevent empty states before Firebase loads
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || initialOrganizations[0]);
   
@@ -91,36 +88,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-  // Fallback to initialUsers if usersList (from Firebase) hasn't loaded yet
   const activeUser = useMemo(() => {
     if (!activeUserId) return null;
-    
-    // 1. Try to find in current state (Firebase data)
     const foundInState = usersList.find(u => u.id === activeUserId);
     if (foundInState) return foundInState;
-
-    // 2. Fallback to static data (prevents "missing buttons" on refresh)
     const foundInStatic = initialUsers.find(u => u.id === activeUserId);
     if (foundInStatic) return foundInStatic;
-
     return null;
   }, [activeUserId, usersList]);
 
   const login = (userId: string) => {
-    // Check both lists to ensure valid login even if offline
     const user = usersList.find(u => u.id === userId) || initialUsers.find(u => u.id === userId);
-    
     if (user) {
         localStorage.setItem('activeUserId', userId);
         setActiveUserId(userId);
-        
-        // Only set view if not already set (respects the localStorage load)
         if (!localStorage.getItem('currentView')) {
             const defaultView = user.preferences?.default_view || 'dashboard';
             setCurrentView(defaultView);
         }
-        
-        // Ensure Org is set
         const userOrg = organizations.find(o => o.id === user.org_id) || initialOrganizations.find(o => o.id === user.org_id);
         if(userOrg) setActiveOrg(userOrg);
     }
@@ -148,12 +133,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const can = (action: Action, resource: Resource): boolean => {
     if (!activeUser) return false;
-    
-    // Find role definition
     const userRole = roles.find(r => r.key === activeUser.role);
-    if (!userRole) return false; // Fail safe
-
-    // Check specific resource permission
+    if (!userRole) return false;
     const permission = userRole.permissions.find(p => p.resource === resource);
     return permission ? permission.actions.includes(action) : false;
   };
@@ -162,7 +143,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
   const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-  const handleCreateOrganization = (data: any) => setOrganizations(prev => [...prev, { ...data, id: `org_${Date.now()}`, status: 'active' }]);
+  
+  // --- FIX: Save Organization to Firebase ---
+  const handleCreateOrganization = async (data: any) => {
+    const newOrg = { ...data, id: `org_${Date.now()}`, status: 'active' };
+    setOrganizations(prev => [...prev, newOrg]);
+    try {
+        await setDoc(doc(db, 'organizations', newOrg.id), newOrg);
+        toast.success("Organization created.");
+    } catch (e) { console.error(e); }
+  };
+
   const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
   const handleSignUp = () => {};
   const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
@@ -226,6 +217,14 @@ interface DataContextType {
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
+
+  // --- DELETE HANDLERS ---
+  handleDeleteReport: (id: string) => void;
+  handleDeleteInspection: (id: string) => void;
+  handleDeletePtw: (id: string) => void;
+  handleDeletePlan: (id: string) => void;
+  handleDeleteRams: (id: string) => void;
+  handleDeleteTbt: (id: string) => void;
 }
 
 const DataContext = createContext<DataContextType>(null!);
@@ -237,7 +236,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const [isLoading, setIsLoading] = useState(true);
     
-    // Initialize with static data to ensure UI paints immediately
     const [projects, setProjects] = useState<Project[]>(initialProjects || []);
     const [reportList, setReportList] = useState<Report[]>([]);
     const [inspectionList, setInspectionList] = useState<Inspection[]>([]);
@@ -308,6 +306,56 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // --- DELETE HANDLERS ---
+    const handleDeleteReport = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'reports', id));
+            setReportList(prev => prev.filter(item => item.id !== id));
+            toast.success("Report deleted.");
+        } catch (e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeleteInspection = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'inspections', id));
+            setInspectionList(prev => prev.filter(item => item.id !== id));
+            toast.success("Inspection deleted.");
+        } catch (e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeletePtw = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'ptws', id));
+            setPtwList(prev => prev.filter(item => item.id !== id));
+            toast.success("Permit deleted.");
+        } catch (e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeletePlan = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'plans', id));
+            setPlanList(prev => prev.filter(item => item.id !== id));
+            toast.success("Plan deleted.");
+        } catch (e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeleteRams = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'rams', id));
+            setRamsList(prev => prev.filter(item => item.id !== id));
+            toast.success("RAMS deleted.");
+        } catch (e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    const handleDeleteTbt = async (id: string) => {
+        try {
+            await deleteDoc(doc(db, 'tbt_sessions', id));
+            setTbtList(prev => prev.filter(item => item.id !== id));
+            toast.success("TBT Session deleted.");
+        } catch (e) { console.error(e); toast.error("Failed to delete."); }
+    };
+
+    // --- CREATE HANDLERS ---
     const handleCreateReport = async (reportData: any) => {
         const newReport = {
             ...reportData,
@@ -322,10 +370,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setReportList(prev => [newReport, ...prev]);
         try { 
             await setDoc(doc(db, 'reports', newReport.id), newReport); 
-            
-            // NOTIFICATION: Notify HSE Managers
             await notifyRole(activeOrg.id, 'HSE_MANAGER', `New ${newReport.type} reported by ${activeUser?.name}`, 'warning');
-            
             toast.success("Report saved."); 
         } catch (e) { console.error(e); }
     };
@@ -342,10 +387,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setInspectionList(prev => [newInspection, ...prev]);
         try { 
             await setDoc(doc(db, 'inspections', newInspection.id), newInspection); 
-            
-            // NOTIFICATION: Notify Supervisors
             await notifyRole(activeOrg.id, 'SUPERVISOR', `New Inspection: ${newInspection.title}`, 'info');
-            
             toast.success("Inspection created."); 
         } catch (e) { console.error(e); }
     };
@@ -365,12 +407,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setStandaloneActions(prev => [newAction as any, ...prev]);
         try { 
             await setDoc(doc(db, 'actions', newAction.id), newAction); 
-            
-            // NOTIFICATION: Notify Owner
             if (data.owner_id) {
                 await sendNotification(data.owner_id, `You have been assigned a new action: ${data.action}`, 'info');
             }
-            
             toast.success("Action created."); 
         } catch (e) { console.error(e); }
     };
@@ -453,7 +492,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (action === 'resume') updatedPtw.status = 'ACTIVE';
         if (action === 'close') updatedPtw.status = 'CLOSED';
 
-        // NOTIFICATION LOGIC
         if (action === 'submit') {
             await notifyRole(activeOrg.id, 'SUPERVISOR', `PTW #${ptw.payload.permit_no || ptw.id} submitted for review`, 'info');
         } else if (action === 'approve_hse') {
@@ -619,7 +657,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate
+        handleCreateChecklistTemplate,
+        handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

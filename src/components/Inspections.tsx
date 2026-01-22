@@ -15,9 +15,8 @@ const ClipboardIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} 
 const InspectionCard: React.FC<{
     inspection: Inspection;
     onConduct: (inspection: Inspection) => void;
-    onDelete: (id: string) => void;
-    canDelete: boolean;
-}> = ({ inspection, onConduct, onDelete, canDelete }) => {
+    onDelete: (id: string) => void; // Add onDelete prop
+}> = ({ inspection, onConduct, onDelete }) => {
     const { usersList } = useAppContext();
     const { projects } = useDataContext();
     const responsible = usersList.find(u => u.id === inspection.person_responsible_id)?.name || 'Unknown';
@@ -40,6 +39,14 @@ const InspectionCard: React.FC<{
 
     return (
         <Card className="hover:border-blue-300 transition-colors relative group">
+            {/* Delete Button */}
+            <button 
+                onClick={(e) => { e.stopPropagation(); if(confirm('Delete this inspection?')) onDelete(inspection.id); }}
+                className="absolute top-4 right-4 p-1.5 bg-white dark:bg-slate-800 text-gray-400 hover:text-red-500 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
+            >
+                <Trash2 className="w-4 h-4" />
+            </button>
+
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
@@ -72,17 +79,6 @@ const InspectionCard: React.FC<{
                     {inspection.status === 'Draft' || inspection.status === 'Scheduled' ? 'Start' : 'Continue'}
                 </Button>
             </div>
-
-            {/* Delete Button */}
-            {canDelete && (
-                <button 
-                    onClick={(e) => { e.stopPropagation(); onDelete(inspection.id); }}
-                    className="absolute top-4 right-4 p-2 bg-red-100 text-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
-                    title="Delete Inspection"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
-            )}
         </Card>
     );
 };
@@ -90,21 +86,13 @@ const InspectionCard: React.FC<{
 export const Inspections: React.FC = () => {
   const { activeOrg, usersList, can } = useAppContext();
   const { inspectionList, setInspectionList, projects, handleUpdateInspection, checklistTemplates, handleCreateInspection, handleDeleteInspection } = useDataContext();
-  
-  // Destructure report modal controls
-  const { 
-    isInspectionCreationModalOpen, 
-    setIsInspectionCreationModalOpen,
-    setIsReportCreationModalOpen,
-    setReportInitialData
-  } = useModalContext();
+  const { isInspectionCreationModalOpen, setIsInspectionCreationModalOpen, setIsReportCreationModalOpen, setReportInitialData } = useModalContext();
 
   const [isConductModalOpen, setConductModalOpen] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
 
   const handleStartConduct = (inspection: Inspection) => {
     let inspectionToConduct = inspection;
-    // Auto-transition status when starting
     if (inspection.status === 'Draft' || inspection.status === 'Scheduled') {
         inspectionToConduct = { ...inspection, status: 'In Progress' };
         handleUpdateInspection(inspectionToConduct);
@@ -114,7 +102,6 @@ export const Inspections: React.FC = () => {
   };
 
   const handleUpdateAndCloseConduct = (inspection: Inspection, action?: 'submit' | 'save' | 'approve' | 'close') => {
-    // Logic to handle status transitions based on action
     let newStatus = inspection.status;
     if (action === 'submit') newStatus = 'Pending Review';
     if (action === 'approve') newStatus = 'Approved';
@@ -129,18 +116,16 @@ export const Inspections: React.FC = () => {
     }
   };
 
-  // Convert Finding to Report Logic
   const handleConvertToReport = (finding: InspectionFinding) => {
     setReportInitialData({
         description: finding.description,
-        type: 'Unsafe Condition', // Default type
+        type: 'Unsafe Condition',
         risk_pre_control: { 
             severity: finding.risk_level === 'High' ? 3 : finding.risk_level === 'Medium' ? 2 : 1, 
             likelihood: 2 
         },
         evidence_urls: finding.evidence_urls
     });
-    // Open report modal (optional: close inspection modal)
     setIsReportCreationModalOpen(true);
   };
 
@@ -165,8 +150,7 @@ export const Inspections: React.FC = () => {
                 key={inspection.id}
                 inspection={inspection}
                 onConduct={handleStartConduct}
-                onDelete={handleDeleteInspection}
-                canDelete={can('delete', 'inspections')}
+                onDelete={handleDeleteInspection} // Pass delete handler
             />
         ))}
          {inspectionList.length === 0 && (
@@ -193,7 +177,7 @@ export const Inspections: React.FC = () => {
             onClose={() => setConductModalOpen(false)}
             inspection={selectedInspection}
             onUpdate={handleUpdateAndCloseConduct}
-            onConvertToReport={handleConvertToReport} // <--- Added this prop
+            onConvertToReport={handleConvertToReport}
             projects={projects}
             users={usersList}
             checklistTemplates={checklistTemplates}
