@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { logoSrc } from '../config';
 import { useAuth } from '../contexts/AuthContext';
-import { ShieldCheck, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, ArrowRight, Loader2, AlertCircle, User } from 'lucide-react';
 
 export const LoginScreen: React.FC = () => {
   const { login, signup } = useAuth();
   
   const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  // Mouse move effect for background
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({
@@ -25,20 +25,41 @@ export const LoginScreen: React.FC = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  // --- PASSWORD VALIDATION ---
+  const validatePassword = (pass: string) => {
+      // At least 8 chars, 1 letter, 1 number, 1 special char
+      const strongRegex = new RegExp("^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#\$%\^&\*])(?=.{8,})");
+      return strongRegex.test(pass);
+  };
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (!isLogin) {
+        if (!name.trim()) {
+            return setError("Full Name is required.");
+        }
+        if (!validatePassword(password)) {
+            return setError("Password must be at least 8 characters and contain letters, numbers, and symbols (!@#$%^&*)");
+        }
+    }
+
     setLoading(true);
 
     try {
       if (isLogin) {
         await login(email, password);
       } else {
-        await signup(email, password);
+        await signup(email, password, name);
       }
     } catch (err: any) {
       console.error(err);
-      setError(err.message.replace('Firebase: ', ''));
+      // Clean up Firebase error messages for the user
+      let msg = err.message.replace('Firebase: ', '').replace(' (auth/user-not-found).', '').replace(' (auth/wrong-password).', '');
+      if (msg.includes('invalid-credential')) msg = "Invalid email or password.";
+      if (msg.includes('email-already-in-use')) msg = "This email is already registered.";
+      setError(msg);
     }
     setLoading(false);
   }
@@ -89,6 +110,26 @@ export const LoginScreen: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            
+            {!isLogin && (
+                <div className="space-y-1.5 animate-fade-in">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Full Name</label>
+                <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
+                    </div>
+                    <input
+                    type="text"
+                    required
+                    className="w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 focus:bg-black/40 transition-all"
+                    placeholder="John Doe"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    />
+                </div>
+                </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Work Email</label>
               <div className="relative group">
@@ -115,13 +156,17 @@ export const LoginScreen: React.FC = () => {
                 <input
                   type="password"
                   required
-                  minLength={6}
                   className="w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-500/50 focus:bg-black/40 transition-all"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
+              {!isLogin && (
+                  <p className="text-[10px] text-slate-500 ml-1">
+                      Must contain letters, numbers & symbols (!@#$%)
+                  </p>
+              )}
             </div>
 
             <button
@@ -136,7 +181,7 @@ export const LoginScreen: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span className="font-bold text-white">{isLogin ? 'Sign In' : 'Create Account'}</span>
+                    <span className="font-bold text-white">{isLogin ? 'Sign In' : 'Activate Account'}</span>
                     <ArrowRight className="w-5 h-5 text-white group-hover:translate-x-1 transition-transform" />
                   </>
                 )}
@@ -147,10 +192,10 @@ export const LoginScreen: React.FC = () => {
           <div className="mt-8 flex items-center justify-between text-sm">
             <button 
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="text-slate-400 hover:text-white transition-colors"
             >
-              {isLogin ? "Need an account?" : "Already have one?"} <span className="text-cyan-400 font-bold ml-1">{isLogin ? 'Sign Up' : 'Log In'}</span>
+              {isLogin ? "Have an invite?" : "Already active?"} <span className="text-cyan-400 font-bold ml-1">{isLogin ? 'Activate Account' : 'Log In'}</span>
             </button>
             <button className="text-slate-500 hover:text-slate-300 transition-colors">
               Forgot Password?
