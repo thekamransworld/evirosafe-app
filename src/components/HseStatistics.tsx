@@ -56,6 +56,7 @@ export const HseStatistics: React.FC = () => {
   // State
   const [activeTab, setActiveTab] = useState<MetricCategory>('Core & Workforce');
   const [selectedPeriod, setSelectedPeriod] = useState<HsePeriod>('monthly');
+  const [selectedMonth, setSelectedMonth] = useState<string>('2024-12');
   const [showTargets, setShowTargets] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
@@ -122,6 +123,7 @@ export const HseStatistics: React.FC = () => {
 
   // --- METRICS DEFINITION (Connected to Real Data) ---
   const [metrics, setMetrics] = useState<HseMetric[]>([]);
+  const [newMetric, setNewMetric] = useState<Partial<HseMetric>>({});
 
   useEffect(() => {
       setMetrics([
@@ -179,6 +181,92 @@ export const HseStatistics: React.FC = () => {
     setIsExporting(false);
   };
 
+  const exportToExcel = () => {
+    setIsExporting(true);
+    try {
+      const worksheetData = [
+        ['HSE STATISTICS REPORT', '', '', '', ''],
+        ['Generated', new Date().toLocaleString(), '', '', ''],
+        ['Period', selectedPeriod, 'Month', selectedMonth.split('-')[1], 'Year', selectedMonth.split('-')[0]],
+        ['', '', '', '', ''],
+        ['METRIC', 'PREVIOUS', 'CURRENT', 'TARGET', 'UNIT', 'TREND', 'STATUS']
+      ];
+      metrics.forEach(metric => {
+        worksheetData.push([
+          metric.label,
+          metric.prev.toString(),
+          metric.curr.toString(),
+          metric.target?.toString() || '-',
+          metric.unit,
+          metric.trend || 'stable',
+          metric.status
+        ]);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+      XLSX.utils.book_append_sheet(wb, ws, 'HSE Statistics');
+      XLSX.writeFile(wb, `HSE_Statistics_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch (error) {
+      console.error('Excel export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    // In a real app, this would re-fetch data from the API
+    // For now, we just trigger a re-render by updating a timestamp or similar
+    console.log("Refreshing data...");
+  };
+
+  const handleAddMetric = () => {
+    if (newMetric.label && newMetric.category) {
+      const metric: HseMetric = {
+        id: `metric_${Date.now()}`,
+        label: newMetric.label,
+        description: newMetric.description || '',
+        prev: 0,
+        curr: 0,
+        target: newMetric.target || null,
+        unit: newMetric.unit || 'Count',
+        category: newMetric.category as MetricCategory,
+        status: 'pending',
+        lastUpdated: new Date().toISOString().split('T')[0]
+      };
+      
+      setMetrics(prev => [...prev, metric]);
+      setNewMetric({});
+    }
+  };
+
+  const handleDeleteMetric = (id: string) => {
+    setMetrics(prev => prev.filter(m => m.id !== id));
+  };
+
+  const handleInputChange = (id: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setMetrics(prev => prev.map(m => 
+      m.id === id ? { 
+        ...m, 
+        curr: numValue,
+        trend: numValue > m.prev ? 'declining' : numValue < m.prev ? 'improving' : 'stable',
+        lastUpdated: new Date().toISOString().split('T')[0]
+      } : m
+    ));
+  };
+
+  // Define tabs with explicit type to fix TS error
+  const tabs: { id: MetricCategory; icon: React.ReactNode }[] = [
+    { id: 'Core & Workforce', icon: <Shield className="w-4 h-4" /> },
+    { id: 'Compliance', icon: <Activity className="w-4 h-4" /> },
+    { id: 'Environment', icon: <Leaf className="w-4 h-4" /> },
+    { id: 'Health', icon: <Heart className="w-4 h-4" /> },
+    { id: 'Process', icon: <Settings className="w-4 h-4" /> },
+    { id: 'Behavioral', icon: <Users className="w-4 h-4" /> },
+    { id: 'Financial', icon: <DollarSign className="w-4 h-4" /> },
+    { id: 'Performance', icon: <BarChart3 className="w-4 h-4" /> },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0B1120] text-slate-200 p-6">
       <div className="bg-[#0B1120] p-8">
@@ -218,16 +306,12 @@ export const HseStatistics: React.FC = () => {
         {/* Navigation Tabs */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-8 overflow-x-auto sticky top-0 z-10 bg-[#0B1120] pt-2">
           <div className="flex gap-1">
-            {[
-              { id: 'Core & Workforce', icon: <Shield className="w-4 h-4" /> },
-              { id: 'Compliance', icon: <Activity className="w-4 h-4" /> },
-              { id: 'Environment', icon: <Leaf className="w-4 h-4" /> },
-            ].map(tab => (
+            {tabs.map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab as MetricCategory)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-all rounded-t-lg border-b-2 ${
-                  activeTab === tab
+                  activeTab === tab.id
                     ? 'border-sky-500 text-sky-400 bg-slate-800/50'
                     : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-slate-800/30'
                 }`}
@@ -245,7 +329,8 @@ export const HseStatistics: React.FC = () => {
           {/* Data Table (2/3 width) */}
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
-              <div className="relative">
+              <div className="flex items-center gap-4">
+                <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input
                     type="text"
@@ -254,15 +339,41 @@ export const HseStatistics: React.FC = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm w-64 focus:outline-none focus:border-sky-500"
                   />
+                </div>
+                <button 
+                  onClick={() => setShowTargets(!showTargets)}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-slate-400 text-sm rounded-lg border border-slate-700 hover:bg-slate-700 hover:text-white"
+                >
+                  {showTargets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showTargets ? 'Hide Targets' : 'Show Targets'}
+                </button>
               </div>
-              <button 
+              
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handleRefresh}
+                  className="flex items-center gap-2 px-3 py-2 bg-slate-800 text-slate-400 text-sm rounded-lg border border-slate-700 hover:bg-slate-700 hover:text-white"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
+                <button 
+                  onClick={exportToExcel}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-900/50 text-emerald-300 text-sm rounded-lg border border-emerald-700/50 hover:bg-emerald-900 disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  {isExporting ? 'Exporting...' : 'Export Excel'}
+                </button>
+                <button 
                   onClick={exportToPDF}
                   disabled={isExporting}
                   className="flex items-center gap-2 px-3 py-2 bg-red-900/50 text-red-300 text-sm rounded-lg border border-red-700/50 hover:bg-red-900 disabled:opacity-50"
                 >
                   <FileText className="w-4 h-4" />
                   {isExporting ? 'Generating...' : 'Export PDF'}
-              </button>
+                </button>
+              </div>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
@@ -271,10 +382,14 @@ export const HseStatistics: React.FC = () => {
                   <thead className="text-xs text-slate-500 uppercase bg-slate-950/50 border-b border-slate-800">
                     <tr>
                       <th className="px-6 py-3 font-bold">Metric</th>
+                      <th className="px-6 py-3 font-bold text-center">Previous</th>
                       <th className="px-6 py-3 font-bold text-center">Current</th>
-                      <th className="px-6 py-3 font-bold text-center">Target</th>
+                      {showTargets && (
+                        <th className="px-6 py-3 font-bold text-center">Target</th>
+                      )}
                       <th className="px-6 py-3 font-bold text-center">Unit</th>
-                      <th className="px-6 py-3 font-bold text-center">Status</th>
+                      <th className="px-6 py-3 font-bold text-center">Trend</th>
+                      <th className="px-6 py-3 font-bold text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
@@ -286,20 +401,113 @@ export const HseStatistics: React.FC = () => {
                             <div className="text-xs text-slate-500 mt-1">{metric.description}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-center font-bold text-white">
-                          {metric.curr}
+                        <td className="px-6 py-4 text-center">
+                          <span className="px-3 py-1 rounded-full bg-slate-800 text-slate-400 font-mono text-xs border border-slate-700">
+                            {metric.prev}
+                          </span>
                         </td>
-                        <td className="px-6 py-4 text-center text-amber-400">
-                          {metric.target !== null ? metric.target : '-'}
+                        <td className="px-6 py-4 text-center">
+                          <input 
+                            type="number" 
+                            value={metric.curr}
+                            onChange={(e) => handleInputChange(metric.id, e.target.value)}
+                            className="w-24 bg-slate-950 border border-slate-700 text-white text-center rounded-lg py-1.5 px-2 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-bold transition-all"
+                          />
                         </td>
+                        {showTargets && (
+                          <td className="px-6 py-4 text-center">
+                            {metric.target !== null ? (
+                              <span className="px-3 py-1 rounded-full bg-amber-900/30 text-amber-400 font-mono text-xs border border-amber-700/50">
+                                {metric.target}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-6 py-4 text-center text-slate-400 text-xs">
                           {metric.unit}
                         </td>
                         <td className="px-6 py-4 text-center">
-                           <span className="px-2 py-1 rounded-full bg-emerald-900/30 text-emerald-400 text-xs border border-emerald-700/50">Live</span>
+                          {metric.trend === 'improving' && (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-900/30 text-emerald-400 text-xs border border-emerald-700/50">
+                              <TrendingDown className="w-3 h-3" />
+                              Improving
+                            </div>
+                          )}
+                          {metric.trend === 'declining' && (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-900/30 text-red-400 text-xs border border-red-700/50">
+                              <TrendingUp className="w-3 h-3" />
+                              Declining
+                            </div>
+                          )}
+                          {metric.trend === 'stable' && (
+                            <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-slate-400 text-xs border border-slate-700">
+                              <Activity className="w-3 h-3" />
+                              Stable
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => handleDeleteMetric(metric.id)}
+                            className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     ))}
+                    
+                    {/* Add Metric Row */}
+                    <tr className="bg-slate-950/30 border-t border-slate-800">
+                      <td colSpan={showTargets ? 7 : 6} className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="text"
+                            placeholder="New metric label"
+                            value={newMetric.label || ''}
+                            onChange={(e) => setNewMetric({...newMetric, label: e.target.value})}
+                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm flex-1"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Description"
+                            value={newMetric.description || ''}
+                            onChange={(e) => setNewMetric({...newMetric, description: e.target.value})}
+                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm flex-1"
+                          />
+                          <input
+                            type="number"
+                            placeholder="Target"
+                            value={newMetric.target || ''}
+                            onChange={(e) => setNewMetric({...newMetric, target: parseFloat(e.target.value)})}
+                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm w-32"
+                          />
+                          <select
+                            value={newMetric.category || ''}
+                            onChange={(e) => setNewMetric({...newMetric, category: e.target.value as MetricCategory})}
+                            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
+                          >
+                            <option value="">Select Category</option>
+                            <option value="Core & Workforce">Core & Workforce</option>
+                            <option value="Compliance">Compliance</option>
+                            <option value="Environment">Environment</option>
+                            <option value="Health">Health</option>
+                            <option value="Process">Process</option>
+                            <option value="Behavioral">Behavioral</option>
+                            <option value="Financial">Financial</option>
+                            <option value="Performance">Performance</option>
+                          </select>
+                          <button
+                            onClick={handleAddMetric}
+                            className="px-4 py-2 bg-emerald-900/50 text-emerald-300 rounded-lg border border-emerald-700/50 hover:bg-emerald-900"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
