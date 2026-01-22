@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { 
   ResponsiveContainer, ComposedChart, Line, Area, XAxis, YAxis, 
-  CartesianGrid, Tooltip, Legend, Bar, Pie, Cell, Radar, RadarChart,
+  CartesianGrid, Tooltip, Legend, Bar, Pie, PieChart, Cell, Radar, RadarChart,
   PolarGrid, PolarAngleAxis, PolarRadiusAxis, Scatter,
   ScatterChart, ZAxis, ReferenceLine
 } from 'recharts';
@@ -25,8 +25,6 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useAppContext, useDataContext } from '../contexts';
 import type { Report, Inspection } from '../types';
-import { FixedSizeList as List } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
 
 // --- Types ---
 type MetricCategory = 'Core & Workforce' | 'Compliance' | 'Environment' | 'Health' | 'Process' | 'Behavioral' | 'Financial' | 'Performance';
@@ -106,19 +104,6 @@ const useDebounce = (value: string, delay: number) => {
   }, [value, delay]);
 
   return debouncedValue;
-};
-
-const useVisibilityChange = (callback: (isVisible: boolean) => void) => {
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      callback(document.visibilityState === 'visible');
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [callback]);
 };
 
 export const HseStatistics: React.FC = () => {
@@ -241,10 +226,10 @@ export const HseStatistics: React.FC = () => {
     const monthlyTrend = Array.from({ length: 12 }, (_, i) => {
       const date = new Date();
       date.setMonth(date.getMonth() - (11 - i));
-      const monthKey = date.toISOString().slice(0, 7);
       
       const monthReports = incidents.filter(r => {
-        const reportDate = new Date(r.date);
+        // FIX: Use occurred_at instead of date
+        const reportDate = new Date(r.occurred_at);
         return reportDate.getMonth() === date.getMonth() && 
                reportDate.getFullYear() === date.getFullYear();
       });
@@ -258,7 +243,8 @@ export const HseStatistics: React.FC = () => {
         firstAid: monthReports.filter(r => r.type === 'First Aid Case (FAC)').length,
         envIncidents: monthReports.filter(r => r.type === 'Environmental Incident').length,
         inspections: inspectionList.filter(i => {
-          const inspDate = new Date(i.date);
+          // FIX: Use schedule_at instead of date
+          const inspDate = new Date(i.schedule_at);
           return inspDate.getMonth() === date.getMonth() && 
                  inspDate.getFullYear() === date.getFullYear();
         }).length,
@@ -487,10 +473,10 @@ export const HseStatistics: React.FC = () => {
 
   // --- ENHANCED EXPORT FUNCTIONS ---
   const exportTemplates = {
-    'standard': { includeCharts: true, includeMetrics: true, includeSummary: true },
-    'executive': { includeCharts: true, includeSummary: true, rawData: false },
-    'detailed': { includeAllData: true, rawData: true, includeCharts: true },
-    'compliance': { includeMetrics: true, includeStandards: true, includeGaps: true },
+    'standard': { includeCharts: true, includeMetrics: true, includeSummary: true, includeAllData: false, rawData: false, includeStandards: false, includeGaps: false },
+    'executive': { includeCharts: true, includeSummary: true, rawData: false, includeMetrics: false, includeAllData: false, includeStandards: false, includeGaps: false },
+    'detailed': { includeAllData: true, rawData: true, includeCharts: true, includeMetrics: true, includeSummary: true, includeStandards: false, includeGaps: false },
+    'compliance': { includeMetrics: true, includeStandards: true, includeGaps: true, includeCharts: false, includeSummary: false, includeAllData: false, rawData: false },
   };
 
   const exportToPDF = useCallback((template: ExportTemplate = 'standard') => {
