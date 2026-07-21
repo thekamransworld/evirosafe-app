@@ -21,7 +21,7 @@ export const ChecklistLibraryModal: React.FC<ChecklistLibraryModalProps> = ({ is
 
   const filteredTemplates = useMemo(() => {
     return MASTER_CHECKLIST_LIBRARY.filter(t => {
-      const matchesSearch = t.title.en.toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = (t.title?.en || '').toLowerCase().includes(search.toLowerCase());
       const matchesCategory = categoryFilter === 'All' || t.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });

@@ -33,7 +33,7 @@ export const ChecklistDetailModal: React.FC<ChecklistDetailModalProps> = ({ temp
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Checklist Preview</h2>
             <div className="flex items-center space-x-2">
                <div className="flex items-center space-x-2">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{activeOrg.primaryLanguage.toUpperCase()}</span>
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{(activeOrg.primaryLanguage || 'en').toUpperCase()}</span>
                     <button onClick={() => setDisplayLang(lang => lang === activeOrg.primaryLanguage ? (activeOrg.secondaryLanguages[0] || 'en') : activeOrg.primaryLanguage)} className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none ${displayLang !== activeOrg.primaryLanguage ? 'bg-primary-600' : 'bg-gray-300'}`}>
                         <span className={`inline-block w-5 h-5 transform bg-white rounded-full transition-transform ease-in-out duration-200 ${displayLang !== activeOrg.primaryLanguage ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>

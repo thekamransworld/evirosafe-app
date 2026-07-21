@@ -35,7 +35,7 @@ export const AuditTrail: React.FC<AuditTrailProps> = ({ logs, users }) => {
                     <div className="min-w-0 flex-1 pt-1.5">
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         <span className="font-medium text-gray-900 dark:text-gray-100">{user?.name || 'System'}</span>
-                        {' '}{log.action.toLowerCase()}{log.details && <span className="italic"> {log.details}</span>}
+                        {' '}{(log.action ?? '').toLowerCase()}{log.details && <span className="italic"> {log.details}</span>}
                       </p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-500">
                         {new Date(log.timestamp).toLocaleString()}

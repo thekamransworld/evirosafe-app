@@ -12,6 +12,7 @@ import { FormField } from './ui/FormField';
 import { useDataContext, useAppContext } from '../contexts';
 import { uploadFileToCloud } from '../services/storageService';
 import { generateSafetyReport } from '../services/geminiService';
+import { useToast } from './ui/Toast';
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ const GpsIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns=
 const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.624l-.259 1.035L16.38 20.624a3.375 3.375 0 00-2.455-2.455l-1.036-.259.259-1.035a3.375 3.375 0 002.456-2.456l.259-1.035.259 1.035a3.375 3.375 0 00-2.456 2.456z" /></svg>;
 
 export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen, onClose, initialData }) => {
+  const { info } = useToast();
   const { projects, handleCreateReport } = useDataContext();
   const { activeUser } = useAppContext();
   
@@ -265,18 +267,18 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                 <div className="flex items-start gap-4">
                     <div className="bg-white dark:bg-black p-2 rounded-full shadow-sm text-blue-600"><SparklesIcon className="w-6 h-6" /></div>
                     <div className="flex-1">
-                        <label className="block text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">AI Form Assistant</label>
+                        <label className="block text-sm font-bold text-blue-900 dark:text-blue-100 mb-1">AI Form Assistant <span className="ml-1 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span></label>
                         <div className="flex gap-2">
                             <input 
                                 type="text" 
                                 value={aiPrompt} 
                                 onChange={(e) => setAiPrompt(e.target.value)} 
-                                onKeyDown={(e) => e.key === 'Enter' && handleQuickAiReport()}
-                                placeholder={`Describe the ${formData.type.toLowerCase()}...`} 
+                                onKeyDown={(e) => e.key === 'Enter' && info('AI features are coming soon.')}
+                                placeholder={`Describe the ${(formData.type ?? '').toLowerCase()}...`} 
                                 className="flex-1 p-2 text-sm border border-blue-200 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-black/30 dark:text-white"
                             />
-                            <Button onClick={handleQuickAiReport} disabled={isAiLoading || !aiPrompt.trim()}>
-                                {isAiLoading ? 'Analyzing...' : 'Auto-Fill'}
+                            <Button onClick={() => info('AI features are coming soon.')}>
+                                Auto-Fill
                             </Button>
                         </div>
                     </div>

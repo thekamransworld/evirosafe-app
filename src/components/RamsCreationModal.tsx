@@ -3,6 +3,7 @@ import type { Project, User } from '../types';
 import { Button } from './ui/Button';
 import { generateRamsContent } from '../services/geminiService';
 import { Sparkles, X } from 'lucide-react';
+import { useToast } from './ui/Toast';
 
 // Define the shape of the AI response
 type AiContent = { 
@@ -36,6 +37,7 @@ const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
 );
 
 export const RamsCreationModal: React.FC<RamsCreationModalProps> = ({ isOpen, onClose, onSubmit, projects = [], activeUser }) => {
+  const { info } = useToast();
   const [formData, setFormData] = useState({
     activity: '',
     location: '',
@@ -176,11 +178,10 @@ export const RamsCreationModal: React.FC<RamsCreationModalProps> = ({ isOpen, on
                         placeholder="Example: Installation of heavy steel beams at 15m height using a 50-ton mobile crane. Ground conditions are sandy."
                     />
                     <Button 
-                        onClick={handleGenerate} 
-                        disabled={isGenerating}
+                        onClick={() => info('AI features are coming soon.')} 
                         className="w-full mt-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20"
                     >
-                        {isGenerating ? 'Analyzing Risks & Generating Steps...' : 'Generate Comprehensive RAMS'}
+                        Generate Comprehensive RAMS <span className="ml-2 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span>
                     </Button>
                 </div>
             </div>

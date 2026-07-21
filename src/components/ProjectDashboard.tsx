@@ -80,7 +80,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack 
               <div>
                 <div className="flex items-center gap-4 mb-2">
                   <h1 className="text-3xl font-bold text-white">{project.name}</h1>
-                  <Badge color={project.status === 'active' ? 'green' : 'yellow'}>{project.status.toUpperCase()}</Badge>
+                  <Badge color={project.status === 'active' ? 'green' : 'yellow'}>{(project.status || '').toUpperCase()}</Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-4 text-slate-300 text-sm">
                   <span className="font-mono bg-white/10 px-3 py-1 rounded-lg text-xs">{project.code || 'PRJ-001'}</span>

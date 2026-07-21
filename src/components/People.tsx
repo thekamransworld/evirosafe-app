@@ -1,206 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { User } from '../types';
-import { Card } from './ui/Card';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
-import { useAppContext, useDataContext } from '../contexts';
-import { roles as rolesData } from '../config';
-import { FormField } from './ui/FormField';
-import { UserPlus, RefreshCw, MoreVertical } from 'lucide-react';
+import { useAppContext } from '../contexts';
+import { AddUserModal } from './AddUserModal';
+import { Search, Users, Shield, UserCheck, User as UserIcon, Mail, Phone, Plus, MoreHorizontal } from 'lucide-react';
 
-// --- Invite User Modal ---
-const InviteUserModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, onClose }) => {
-    const { activeOrg, handleInviteUser } = useAppContext();
-    const { projects } = useDataContext();
-    const orgProjects = projects.filter(p => p.org_id === activeOrg.id);
-
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        role: 'WORKER' as User['role'],
-        project_id: '',
-    });
-    const [error, setError] = useState('');
-
-    const handleSubmit = () => {
-        if (!formData.name.trim() || !formData.email.trim()) {
-            setError('Full Name and Email are required.');
-            return;
-        }
-        
-        handleInviteUser({
-            org_id: activeOrg.id,
-            name: formData.name,
-            email: formData.email,
-            role: formData.role,
-            project_id: formData.project_id
-        });
-        
-        onClose();
-        setFormData({ name: '', email: '', role: 'WORKER', project_id: '' });
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite New User</h3>
-                    <p className="text-sm text-gray-500">to {activeOrg.name}</p>
-                </div>
-                <div className="p-6 space-y-4">
-                    <FormField label="Full Name"><input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" /></FormField>
-                    <FormField label="Email Address"><input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" /></FormField>
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Role">
-                            <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value as User['role']}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                                {rolesData.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                            </select>
-                        </FormField>
-                        <FormField label="Assign Project">
-                            <select value={formData.project_id} onChange={e => setFormData(p => ({...p, project_id: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                                <option value="">No Project (Org Level)</option>
-                                {orgProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </FormField>
-                    </div>
-                    {error && <p className="text-sm text-red-500">{error}</p>}
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Send Invitation</Button>
-                </div>
-            </div>
-        </div>
-    );
+const ROLE_CFG: Record<string, { label: string; color: string; bg: string }> = {
+  ADMIN:       { label: 'Admin',       color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
+  ORG_ADMIN:   { label: 'Org Admin',   color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+  HSE_MANAGER: { label: 'HSE Manager', color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+  SUPERVISOR:  { label: 'Supervisor',  color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+  WORKER:      { label: 'Worker',      color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
 };
+const getRole = (r: string) => ROLE_CFG[r] || { label: r, color: '#6b7280', bg: 'rgba(107,114,128,0.1)' };
 
-// --- Reassign Project Modal ---
-const ReassignModal: React.FC<{ isOpen: boolean, onClose: () => void, user: User | null }> = ({ isOpen, onClose, user }) => {
-    const { activeOrg, handleUpdateUser } = useAppContext();
-    const { projects } = useDataContext();
-    const orgProjects = projects.filter(p => p.org_id === activeOrg.id);
-    const [selectedProject, setSelectedProject] = useState('');
+const ROLE_COLORS = ['#ef4444','#f59e0b','#10b981','#3b82f6','#8b5cf6','#06b6d4'];
+const avatarColor = (name: string) => ROLE_COLORS[name.charCodeAt(0) % ROLE_COLORS.length];
 
-    const handleReassign = () => {
-        if (user) {
-            const updatedUser = { ...user, project_id: selectedProject }; 
-            handleUpdateUser(updatedUser);
-        }
-        onClose();
-    };
+const UserCard: React.FC<{ user: User }> = ({ user }) => {
+  const roleCfg = getRole(user.role);
+  const color   = avatarColor(user.name || 'U');
 
-    if (!isOpen || !user) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Reassign Project</h3>
-                    <p className="text-sm text-gray-500">Move {user.name} to a new project.</p>
-                </div>
-                <div className="p-6">
-                    <FormField label="Select New Project">
-                        <select value={selectedProject} onChange={e => setSelectedProject(e.target.value)} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                            <option value="">Unassigned</option>
-                            {orgProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </FormField>
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border">
-                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleReassign}>Confirm Reassignment</Button>
-                </div>
-            </div>
+  return (
+    <div className="giq-card p-4 flex items-center gap-4">
+      {user.avatar_url ? (
+        <img src={user.avatar_url} alt={user.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+      ) : (
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+          style={{ background: color }}>
+          {user.name?.charAt(0) || 'U'}
         </div>
-    );
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{user.name}</p>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+            style={{ background: roleCfg.bg, color: roleCfg.color }}>{roleCfg.label}</span>
+        </div>
+        <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{user.email}</p>
+        {(user as any).department && (
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{(user as any).department}</p>
+        )}
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="w-2 h-2 rounded-full" style={{ background: user.status === 'active' ? '#10b981' : '#9ca3af' }} />
+      </div>
+    </div>
+  );
 };
 
 export const People: React.FC = () => {
-  const { usersList, activeOrg, can, activeUser, impersonateUser, invitedEmails } = useAppContext();
-  const { projects } = useDataContext();
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [reassignUser, setReassignUser] = useState<User | null>(null);
+  const { usersList, activeUser } = useAppContext();
+  const [search, setSearch]       = useState('');
+  const [roleFilter, setRole]     = useState('All');
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  const getProjectName = (projectId?: string) => {
-      if (!projectId) return 'Unassigned';
-      return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
-  };
+  const filtered = useMemo(() => usersList.filter(u => {
+    const rm = roleFilter === 'All' || u.role === roleFilter;
+    const se = !search || (u.name ?? '').toLowerCase().includes(search.toLowerCase()) || (u.email ?? '').toLowerCase().includes(search.toLowerCase());
+    return rm && se;
+  }), [usersList, roleFilter, search]);
 
-  const allPersonnel = [
-    ...usersList.filter(u => u.org_id === activeOrg.id),
-    ...invitedEmails.filter(i => i.org_id === activeOrg.id).map(i => ({
-        id: i.email, name: i.name, email: i.email, role: i.role, status: 'invited' as const, org_id: i.org_id, avatar_url: '', project_id: (i as any).project_id
-    }))
-  ].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const stats = useMemo(() => ({
+    total:    usersList.length,
+    active:   usersList.filter(u => u.status === 'active').length,
+    managers: usersList.filter(u => u.role === 'HSE_MANAGER').length,
+    admins:   usersList.filter(u => ['ADMIN','ORG_ADMIN'].includes(u.role)).length,
+  }), [usersList]);
+
+  const roles = ['All', 'ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR', 'WORKER'];
 
   return (
-    <div>
-        <div className="flex justify-between items-center mb-6">
-            <h1 className="text-3xl font-bold text-text-primary dark:text-white">People & Access</h1>
-            {can('create', 'people') && (
-                <Button onClick={() => setIsInviteModalOpen(true)}>
-                    <UserPlus className="w-5 h-5 mr-2" />
-                    Invite User
-                </Button>
-            )}
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="giq-page-title">People</h1>
+          <p className="giq-page-subtitle mt-1">User directory and role management</p>
         </div>
-      
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-border">
-            <thead className="bg-gray-50 dark:bg-white/5">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Project</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-dark-border">
-              {allPersonnel.map((user: any) => (
-                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-white/5">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-bold">
-                        {user.avatar_url ? <img src={user.avatar_url} className="h-10 w-10 rounded-full"/> : (user.name || '?').charAt(0)}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                     <Badge color="blue">{(user.role || 'Unknown').replace(/_/g, ' ')}</Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {getProjectName(user.project_id)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge color={user.status === 'active' ? 'green' : 'yellow'}>{user.status}</Badge>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3">
-                    {can('update', 'people') && user.status !== 'invited' && (
-                        <button onClick={() => setReassignUser(user)} className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300" title="Reassign Project">
-                            <RefreshCw className="w-4 h-4" />
-                        </button>
-                    )}
-                    {activeUser?.role === 'ADMIN' && user.status !== 'invited' && (
-                        <Button variant="ghost" size="sm" onClick={() => impersonateUser(user.id)}>View As</Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+        {(activeUser?.role === 'ADMIN' || activeUser?.role === 'ORG_ADMIN') && (
+          <button className="giq-btn-primary" onClick={() => setShowAddModal(true)}><Plus className="w-4 h-4" />Add User</button>
+        )}
+      </div>
 
-      <InviteUserModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} />
-      <ReassignModal isOpen={!!reassignUser} onClose={() => setReassignUser(null)} user={reassignUser} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Users',   value: stats.total,    color: '#3b82f6', icon: Users },
+          { label: 'Active',        value: stats.active,   color: '#10b981', icon: UserCheck },
+          { label: 'HSE Managers',  value: stats.managers, color: '#10b981', icon: Shield },
+          { label: 'Admins',        value: stats.admins,   color: '#ef4444', icon: UserIcon },
+        ].map(s => (
+          <div key={s.label} className="giq-card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${s.color}15` }}>
+              <s.icon className="w-4 h-4" style={{ color: s.color }} />
+            </div>
+            <div>
+              <p className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{s.value}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email..." className="pl-9" style={{ paddingLeft: '2.25rem' }} />
+        </div>
+        <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}>
+          {roles.map(r => (
+            <button key={r} onClick={() => setRole(r)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={roleFilter === r ? { background: '#10b981', color: 'white' } : { color: 'var(--text-secondary)' }}>
+              {r === 'All' ? 'All' : getRole(r).label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {filtered.map(u => <UserCard key={u.id} user={u} />)}
+        {filtered.length === 0 && (
+          <div className="col-span-2 giq-card py-16 text-center">
+            <Users className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+            <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>No users found</p>
+          </div>
+        )}
+      </div>
+
+      {showAddModal && (
+        <AddUserModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} />
+      )}
     </div>
   );
 };

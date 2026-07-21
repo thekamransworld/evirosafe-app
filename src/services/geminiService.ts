@@ -1,7 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Initialize Gemini
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+// AI features are intentionally paused (product decision, not a missing-key bug) —
+// flip AI_FEATURES_ENABLED back to true once the server-side proxy work is done.
+const AI_FEATURES_ENABLED = false;
+const apiKey = AI_FEATURES_ENABLED ? ((import.meta as any).env.VITE_GEMINI_API_KEY || "") : "";
 const genAI = new GoogleGenerativeAI(apiKey);
 
 // --- FIX: Use 'gemini-2.5-flash' (Confirmed available in your account) ---
@@ -15,10 +18,8 @@ const cleanJson = (text: string) => {
 
 // --- 1. GENERIC RESPONSE ---
 export const generateResponse = async (prompt: string) => {
-  console.log("1. Starting AI Request...");
   if (!apiKey) {
-    console.error("❌ No API Key found in environment variables");
-    return "AI not configured. Please add VITE_GEMINI_API_KEY.";
+    return "AI features are coming soon.";
   }
 
   try {
@@ -152,7 +153,7 @@ export const generateCertificationInsight = async (profile: any) => {
 };
 
 export const generateReportSummary = async (json: string) => {
-    if (!apiKey) return "AI Summary unavailable (No API Key).";
+    if (!apiKey) return "AI summary coming soon.";
     try {
         const result = await model.generateContent(`Summarize this incident report in 2 sentences: ${json}`);
         return result.response.text();
@@ -160,7 +161,7 @@ export const generateReportSummary = async (json: string) => {
 };
 
 export const translateText = async (text: string, lang: string) => {
-    if (!apiKey) return `[Mock Translate]: ${text}`;
+    if (!apiKey) return text;
     try {
         const result = await model.generateContent(`Translate this to ${lang}: "${text}"`);
         return result.response.text();
@@ -214,3 +215,6 @@ const mockCertInsight = () => ({
   nextLevelRecommendation: "Continue logging safe hours.",
   missingItems: ["Advanced Training"]
 });
+export const generateHseInsights = async (prompt: string, context: string): Promise<string> => {
+  return generateResponse(`${prompt}\n\nContext data:\n${context}`);
+};

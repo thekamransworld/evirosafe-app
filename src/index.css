@@ -1,51 +1,184 @@
+/* ─── Google Fonts ───────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─── GuardIQ Design Tokens ──────────────────────────────────────────────── */
 :root {
-  /* WHITE MODE VARIABLES */
-  --bg-primary: #ffffff;
-  --text-primary: #0f172a; /* Dark Slate */
-  --text-secondary: #64748b; /* Slate 500 */
-  --border-color: #e2e8f0; /* Slate 200 */
+  /* Light mode */
+  --bg-page:          #f5f5f6;
+  --bg-surface:       #ffffff;
+  --bg-card:          #ffffff;
+  --bg-elevated:      #fafafa;
+  --bg-input:         #ffffff;
+
+  --text-primary:     #18181b;
+  --text-secondary:   #52525b;
+  --text-muted:       #a1a1aa;
+  --text-placeholder: #d4d4d8;
+
+  --border-default:   #e4e4e7;
+  --border-strong:    #d4d4d8;
+  --border-focus:     #10b981;
+
+  --accent:           #10b981;
+  --accent-dark:      #059669;
+  --accent-light:     #d1fae5;
+  --accent-text:      #065f46;
+
+  --shadow-card:      0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-card-hover:0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.06);
+  --shadow-modal:     0 20px 60px rgba(0,0,0,0.15);
+
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+
+  --sidebar-width: 260px;
+  --header-height: 64px;
 }
 
-.dark:root {
-  /* BLACK MODE VARIABLES */
-  --bg-primary: #020617; /* Slate 950 */
-  --text-primary: #f1f5f9; /* Slate 100 */
-  --text-secondary: #94a3b8; /* Slate 400 */
-  --border-color: rgba(255, 255, 255, 0.08);
+.dark {
+  /* Charcoal dark mode */
+  --bg-page:          #0f1014;
+  --bg-surface:       #16181d;
+  --bg-card:          #1e2128;
+  --bg-elevated:      #262b34;
+  --bg-input:         #16181d;
+
+  --text-primary:     #f4f4f5;
+  --text-secondary:   #a1a1aa;
+  --text-muted:       #71717a;
+  --text-placeholder: #3f3f46;
+
+  --border-default:   rgba(255,255,255,0.07);
+  --border-strong:    rgba(255,255,255,0.12);
+  --border-focus:     #10b981;
+
+  --accent:           #10b981;
+  --accent-dark:      #059669;
+  --accent-light:     rgba(16,185,129,0.12);
+  --accent-text:      #34d399;
+
+  --shadow-card:      0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-card-hover:0 4px 12px rgba(0,0,0,0.5);
+  --shadow-modal:     0 20px 60px rgba(0,0,0,0.6);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-  @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
   overflow-x: hidden;
   min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Glass Card - Adaptive */
-.glass-card {
-  @apply bg-white border border-slate-200 shadow-lg;
-  @apply dark:bg-slate-900/80 dark:border-white/10 dark:shadow-2xl;
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border-radius: 20px;
-  transition: all 0.3s ease;
+/* ─── GuardIQ Card System (Stripe-style) ─────────────────────────────────── */
+.giq-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.glass-card:hover {
-  @apply border-blue-500/30 dark:border-sky-500/40;
-  transform: translateY(-2px);
+.giq-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
 }
 
-/* Header - Adaptive */
-.glass-header {
-  @apply bg-white/90 border-b border-slate-200 dark:bg-slate-950/80 dark:border-white/10;
-  backdrop-filter: blur(12px);
+.giq-card-flat {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
 }
 
-/* Inputs - Adaptive */
+.giq-surface {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+/* ─── GuardIQ Stat Cards ─────────────────────────────────────────────────── */
+.giq-stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-card);
+  transition: all 0.2s ease;
+}
+
+.giq-stat:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+/* ─── GuardIQ Badge ──────────────────────────────────────────────────────── */
+.giq-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ─── GuardIQ Button ─────────────────────────────────────────────────────── */
+.giq-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.giq-btn-primary:hover  { background: var(--accent-dark); }
+.giq-btn-primary:active { transform: scale(0.98); }
+
+.giq-btn-secondary {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.giq-btn-secondary:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* ─── Inputs ─────────────────────────────────────────────────────────────── */
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -57,33 +190,247 @@ input[type="tel"],
 input[type="search"],
 textarea,
 select {
-  @apply bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400;
-  @apply dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500;
-  @apply rounded-xl shadow-sm transition-all duration-200;
+  background: var(--bg-input);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  outline: none;
+  width: 100%;
 }
 
-input:focus, textarea:focus, select:focus {
-  @apply outline-none border-blue-500 ring-2 ring-blue-500/20;
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
 }
 
-input:disabled, textarea:disabled, select:disabled {
-  @apply opacity-50 cursor-not-allowed bg-gray-100 dark:bg-slate-800;
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-::-webkit-scrollbar-track {
-  @apply bg-slate-100 dark:bg-slate-900;
+/* ─── Sidebar (GuardIQ) ──────────────────────────────────────────────────── */
+.giq-sidebar {
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-default);
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.25s ease;
 }
 
+.dark .giq-sidebar {
+  background: #13151a;
+  border-right-color: rgba(255,255,255,0.06);
+}
+
+.giq-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.giq-nav-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.dark .giq-nav-item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.giq-nav-item.active {
+  background: var(--accent-light);
+  color: var(--accent-text);
+}
+
+.dark .giq-nav-item.active {
+  background: rgba(16,185,129,0.12);
+  color: #34d399;
+}
+
+/* ─── Section label ──────────────────────────────────────────────────────── */
+.giq-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 12px 4px;
+}
+
+/* ─── Page header ────────────────────────────────────────────────────────── */
+.giq-page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.giq-page-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+/* ─── Table ──────────────────────────────────────────────────────────────── */
+.giq-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.giq-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.giq-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.giq-table tr:last-child td { border-bottom: none; }
+
+.giq-table tr:hover td {
+  background: var(--bg-elevated);
+}
+
+/* ─── Status dots ────────────────────────────────────────────────────────── */
+.giq-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ─── Divider ────────────────────────────────────────────────────────────── */
+.giq-divider {
+  border: none;
+  border-top: 1px solid var(--border-default);
+  margin: 0;
+}
+
+/* ─── Modal overlay ──────────────────────────────────────────────────────── */
+.giq-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+}
+
+.dark .giq-overlay {
+  background: rgba(0,0,0,0.7);
+}
+
+.giq-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.2s ease-out;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-600;
+/* ─── Loading skeleton ───────────────────────────────────────────────────── */
+.giq-skeleton {
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--border-default) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Accent highlight ───────────────────────────────────────────────────── */
+.giq-accent-border {
+  border-left: 3px solid var(--accent);
+}
+
+/* ─── Prose / markdown ───────────────────────────────────────────────────── */
+.giq-prose {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.giq-prose h2, .giq-prose h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 1.2em;
+  margin-bottom: 0.4em;
+}
+
+.giq-prose ul, .giq-prose ol {
+  padding-left: 1.2em;
+  margin: 0.4em 0;
+}
+
+.giq-prose li { margin: 0.2em 0; }
+
+/* ─── Theme transition ───────────────────────────────────────────────────── */
+* {
+  transition-property: background-color, border-color, color;
+  transition-duration: 0.15s;
+  transition-timing-function: ease;
+}
+
+/* Don't animate transforms or opacity globally */
+.no-transition { transition: none !important; }
+
+/* ─── Mobile PWA safe area ───────────────────────────────────────────────── */
+@supports (padding: max(0px)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

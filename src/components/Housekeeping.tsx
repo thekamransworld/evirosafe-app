@@ -3,7 +3,7 @@ import type { ChecklistTemplate, ChecklistRun } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext, useDataContext } from '../contexts';
+import { useAppContext, useDataContext, useModalContext } from '../contexts';
 import { ChecklistRunModal } from './ChecklistRunModal';
 import { ChecklistDetailModal } from './ChecklistDetailModal';
 import { ChecklistLibraryModal } from './ChecklistLibraryModal';
@@ -19,6 +19,7 @@ const StatCard: React.FC<{ title: string; value: string | number; change?: strin
 export const Housekeeping: React.FC = () => {
     const { activeOrg, activeUser, language, usersList } = useAppContext();
     const { checklistRunList, setChecklistRunList, projects, checklistTemplates, handleCreateChecklistTemplate } = useDataContext();
+    const { setIsInspectionCreationModalOpen } = useModalContext();
 
     const [isRunModalOpen, setRunModalOpen] = useState(false);
     const [isDetailModalOpen, setDetailModalOpen] = useState(false);
@@ -73,7 +74,7 @@ export const Housekeeping: React.FC = () => {
                     <Button variant="secondary" onClick={() => setIsLibraryOpen(true)}>
                         Import Checklist
                     </Button>
-                    <Button onClick={() => {}}>
+                    <Button onClick={() => setIsInspectionCreationModalOpen(true)}>
                         <PlusIcon className="w-5 h-5 mr-2" />
                         New Inspection
                     </Button>

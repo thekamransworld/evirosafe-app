@@ -126,9 +126,9 @@ export const Actions: React.FC = () => {
       const ownerOk = ownerFilter === 'All' || a.owner_id === ownerFilter;
       const searchOk =
         q.length === 0 ||
-        a.action.toLowerCase().includes(q) ||
-        a.source.description.toLowerCase().includes(q) ||
-        a.source.id.toLowerCase().includes(q);
+        a.action?.toLowerCase().includes(q) ||
+        (a.source?.description ?? '').toLowerCase().includes(q) ||
+        (a.source?.id ?? '').toLowerCase().includes(q);
 
       return projectOk && statusOk && ownerOk && searchOk;
     });

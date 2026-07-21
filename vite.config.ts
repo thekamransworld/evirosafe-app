@@ -12,46 +12,49 @@ export default defineConfig({
         name: 'EviroSafe HSE Command Center',
         short_name: 'EviroSafe',
         description: 'Next-Gen HSE Management System',
-        theme_color: '#0f172a', // Matches your dark theme background
+        theme_color: '#0f172a',
         background_color: '#0f172a',
-        display: 'standalone', // Hides the browser URL bar
+        display: 'standalone',
         orientation: 'portrait',
         icons: [
-          {
-            src: '/icons/evirosafe-192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/evirosafe-512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: '/icons/evirosafe-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable' // Ensures it looks good on Android round icons
-          }
+          { src: '/icons/evirosafe-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icons/evirosafe-512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/icons/evirosafe-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB limit
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
-      devOptions: {
-        enabled: true
-      }
+      devOptions: { enabled: true }
     })
   ],
   build: {
-    chunkSizeWarningLimit: 1600,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
+        manualChunks: {
+          // Core React runtime
+          'react-core':    ['react', 'react-dom'],
+
+          // Charts — largest single dependency, split out
+          'recharts':      ['recharts'],
+
+          // PDF / spreadsheet exports — rarely loaded
+          'export-libs':   ['jspdf', 'jspdf-autotable', 'xlsx'],
+
+          // Firebase — auth only, split from data
+          'firebase-app':  ['firebase/app', 'firebase/auth'],
+          'firebase-db':   ['firebase/firestore', 'firebase/storage'],
+
+          // Google AI
+          'google-ai':     ['@google/generative-ai'],
+
+          // Icons
+          'lucide':        ['lucide-react'],
         }
       }
     }

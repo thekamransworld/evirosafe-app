@@ -6,122 +6,11 @@ import { Badge } from './ui/Badge';
 import { useAppContext, useDataContext } from '../contexts';
 import { ProjectCreationModal } from './ProjectCreationModal';
 import { ProjectDetails } from './ProjectDetails';
-import { FormField } from './ui/FormField';
-import { roles as rolesData } from '../config';
+import { AddUserModal } from './AddUserModal';
 import { 
   Plus, Search, UserPlus, ArrowLeft, 
   MoreVertical, Mail, Phone, MapPin, Globe, Users 
 } from 'lucide-react';
-import { sendInviteEmail } from '../services/emailService'; // Import Email Service
-import { useToast } from './ui/Toast'; // Import Toast
-
-// --- Invite User Modal (Local Definition) ---
-interface InviteUserModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  orgId: string;
-  orgName: string; // Pass org name for email
-  inviterName: string; // Pass inviter name for email
-}
-
-const InviteUserModal: React.FC<InviteUserModalProps> = ({ isOpen, onClose, orgId, orgName, inviterName }) => {
-    const { handleInviteUser } = useAppContext();
-    const { projects } = useDataContext();
-    const toast = useToast();
-    
-    const orgProjects = projects.filter(p => p.org_id === orgId);
-
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        role: 'WORKER' as User['role'],
-        project_id: '',
-    });
-    const [error, setError] = useState('');
-    const [isSending, setIsSending] = useState(false);
-
-    const handleSubmit = async () => {
-        if (!formData.name.trim() || !formData.email.trim()) {
-            setError('Full Name and Email are required.');
-            return;
-        }
-        
-        setIsSending(true);
-        setError('');
-
-        try {
-            // 1. Send Email via EmailJS
-            await sendInviteEmail(
-                formData.email,
-                formData.name,
-                formData.role,
-                orgName,
-                inviterName
-            );
-
-            // 2. Update Database / State
-            handleInviteUser({
-                org_id: orgId,
-                name: formData.name,
-                email: formData.email,
-                role: formData.role,
-                project_id: formData.project_id
-            });
-            
-            toast.success(`Invitation sent to ${formData.email}`);
-            onClose();
-            setFormData({ name: '', email: '', role: 'WORKER', project_id: '' });
-
-        } catch (err) {
-            console.error(err);
-            setError("Failed to send email. Check console for details.");
-            toast.error("Email failed to send.");
-        } finally {
-            setIsSending(false);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-                <div className="p-6 border-b dark:border-dark-border">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Invite New User</h3>
-                    <p className="text-sm text-gray-500">Add a member to {orgName}</p>
-                </div>
-                <div className="p-6 space-y-4">
-                    <FormField label="Full Name">
-                        <input type="text" value={formData.name} onChange={e => setFormData(p => ({...p, name: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="John Doe" />
-                    </FormField>
-                    <FormField label="Email Address">
-                        <input type="email" value={formData.email} onChange={e => setFormData(p => ({...p, email: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="john@example.com" />
-                    </FormField>
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Role">
-                            <select value={formData.role} onChange={e => setFormData(p => ({...p, role: e.target.value as User['role']}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                                {rolesData.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
-                            </select>
-                        </FormField>
-                        <FormField label="Assign Project">
-                            <select value={formData.project_id} onChange={e => setFormData(p => ({...p, project_id: e.target.value}))} className="w-full p-2 border rounded-md dark:bg-dark-background dark:border-dark-border dark:text-white">
-                                <option value="">No Project (Org Level)</option>
-                                {orgProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </FormField>
-                    </div>
-                    {error && <p className="text-sm text-red-500 bg-red-50 p-2 rounded">{error}</p>}
-                </div>
-                <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end space-x-2 border-t dark:border-dark-border rounded-b-lg">
-                    <Button variant="secondary" onClick={onClose} disabled={isSending}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={isSending}>
-                        {isSending ? 'Sending...' : 'Send Invitation'}
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // --- Main Component ---
 
@@ -163,8 +52,8 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
 
   const filteredUsers = useMemo(() => {
       return orgUsers.filter(u => 
-        u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        u.email.toLowerCase().includes(searchQuery.toLowerCase())
+        (u.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (u.email || '').toLowerCase().includes(searchQuery.toLowerCase())
       );
   }, [orgUsers, searchQuery]);
 
@@ -212,7 +101,7 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
                         <span className="flex items-center gap-1"><BuildingIcon className="w-3 h-3" /> {org.industry}</span>
                         <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {org.country}</span>
                         <span className="flex items-center gap-1"><Globe className="w-3 h-3" /> {org.domain}</span>
-                        <Badge color={org.status === 'active' ? 'green' : 'gray'} className="bg-white/20 text-white border-none">{org.status.toUpperCase()}</Badge>
+                        <Badge color={org.status === 'active' ? 'green' : 'gray'} className="bg-white/20 text-white border-none">{(org.status || 'active').toUpperCase()}</Badge>
                     </div>
                 </div>
             </div>
@@ -382,12 +271,11 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
         users={orgUsers}
       />
       
-      <InviteUserModal 
-        isOpen={isInviteModalOpen} 
-        onClose={() => setIsInviteModalOpen(false)} 
-        orgId={org.id}
-        orgName={org.name}
-        inviterName={activeUser?.name || 'Admin'}
+      <AddUserModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        targetOrgId={org.id}
+        targetOrgName={org.name}
       />
     </div>
   );

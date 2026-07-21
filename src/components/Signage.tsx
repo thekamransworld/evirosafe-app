@@ -103,7 +103,7 @@ export const Signage: React.FC = () => {
 
   const filteredSigns = useMemo(() => {
     return SIGN_LIBRARY.filter(sign => {
-      const matchesSearch = sign.title.toLowerCase().includes(searchTerm.toLowerCase()) || sign.code.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (sign.title ?? '').toLowerCase().includes(searchTerm.toLowerCase()) || (sign.code ?? '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = categoryFilter === 'All' || sign.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });

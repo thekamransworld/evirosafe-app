@@ -18,6 +18,7 @@ import { FormField } from './ui/FormField';
 // FIX: Ensure this import matches the exported interface in ptwAiService.ts
 import { analyzePtwRisk, checkSimopsConflicts, AiRiskAnalysisResult } from '../services/ptwAiService';
 import { Sparkles, AlertTriangle } from 'lucide-react';
+import { useToast } from './ui/Toast';
 
 // Icons
 const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>;
@@ -41,6 +42,7 @@ interface PtwCreationModalProps {
 }
 
 export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onClose, onSubmit, mode }) => {
+    const { info } = useToast();
     const { projects, ptwList } = useDataContext();
     const { activeUser } = useAppContext();
 
@@ -90,36 +92,20 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
         setEvidenceFiles(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleAiAnalysis = async () => {
-        if (!selectedType || !formData.work_description || !formData.work_location) {
-            setError("Please fill in Location and Description first.");
+    const handleCheckConflicts = () => {
+        if (!formData.work_location || !formData.starts_at || !formData.ends_at) {
+            setError("Please fill in Location and the start/end times first.");
             return;
         }
-        
-        setIsAnalyzing(true);
         setError('');
-        
-        try {
-            // 1. Check Conflicts
-            const activePermits = ptwList.filter(p => p.status === 'ACTIVE');
-            const foundConflicts = checkSimopsConflicts(
-                formData.work_location, 
-                formData.starts_at, 
-                formData.ends_at, 
-                activePermits
-            );
-            setConflicts(foundConflicts);
-
-            // 2. AI Risk Analysis
-            const analysis = await analyzePtwRisk(selectedType, formData.work_description, formData.work_location);
-            setAiAnalysis(analysis);
-
-        } catch (e) {
-            console.error(e);
-            setError("Analysis failed.");
-        } finally {
-            setIsAnalyzing(false);
-        }
+        const activePermits = ptwList.filter(p => p.status === 'ACTIVE');
+        const foundConflicts = checkSimopsConflicts(
+            formData.work_location, 
+            formData.starts_at, 
+            formData.ends_at, 
+            activePermits
+        );
+        setConflicts(foundConflicts);
     };
 
     const resetForm = () => {
@@ -297,11 +283,16 @@ export const PtwCreationModal: React.FC<PtwCreationModalProps> = ({ isOpen, onCl
                              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
                                 <div className="flex justify-between items-center mb-3">
                                     <h3 className="font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
-                                        <Sparkles className="w-5 h-5" /> AI Risk & Conflict Analysis
+                                        <Sparkles className="w-5 h-5" /> Risk & Conflict Analysis
                                     </h3>
-                                    <Button size="sm" onClick={handleAiAnalysis} disabled={isAnalyzing}>
-                                        {isAnalyzing ? 'Analyzing...' : 'Analyze Permit'}
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" onClick={handleCheckConflicts}>
+                                            Check Conflicts
+                                        </Button>
+                                        <Button size="sm" onClick={() => info('AI features are coming soon.')}>
+                                            AI Risk Analysis <span className="ml-1.5 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span>
+                                        </Button>
+                                    </div>
                                 </div>
                                 
                                 {conflicts.length > 0 && (

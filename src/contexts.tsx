@@ -24,6 +24,9 @@ import { useAuth } from './contexts/AuthContext';
 // --- NOTIFICATION SERVICE ---
 import { sendNotification, notifyRole } from './services/notificationService';
 
+// --- EMAIL SERVICE ---
+import { sendInviteEmail } from './services/emailService';
+
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
 
@@ -41,7 +44,7 @@ interface AppContextType {
   organizations: Organization[];
   handleCreateOrganization: (data: any) => void;
   invitedEmails: InvitedUser[];
-  handleInviteUser: (userData: any) => void;
+  handleInviteUser: (userData: { org_id?: string; name: string; email: string; role: User['role']; project_id?: string; department?: string }) => Promise<void>;
   handleSignUp: (email: string) => void;
   handleApproveUser: (userId: string) => void;
   language: string;
@@ -72,6 +75,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   const [organizations, setOrganizations] = useState<Organization[]>(initialOrganizations || []);
   const [activeOrg, setActiveOrg] = useState<Organization>(organizations[0] || initialOrganizations[0]);
+
+  // Organizations were previously only ever written to Firestore, never read back —
+  // meaning an org created in one session never showed up again after a reload or for
+  // anyone else. This brings it in line with every other collection's fetch pattern.
+  useEffect(() => {
+    if (!currentUser) return;
+    (async () => {
+      try {
+        const snap = await getDocs(collection(db, 'organizations'));
+        const data = snap.docs.map(d => d.data()) as Organization[];
+        if (data.length > 0) setOrganizations(data);
+      } catch (e) {
+        console.error('Error fetching organizations:', e);
+      }
+    })();
+  }, [currentUser]);
   
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
@@ -104,15 +123,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (foundInStatic) return foundInStatic;
     }
 
-    // 3. FALLBACK: If Database is loading but Auth is ready, create a temporary Admin user
-    // This prevents buttons from disappearing on refresh
+    // 3. FALLBACK: If Database is loading but Auth is ready, show a minimal, low-privilege
+    // placeholder rather than nothing — this is display-only now. It intentionally does NOT
+    // grant elevated access (see the can() fix above): if this is a genuine loading flicker,
+    // the real record replaces it within a render or two; if no matching record ever shows up,
+    // this user correctly ends up with no real permissions instead of silently becoming an admin.
     if (currentUser) {
-        // Check if the ID matches what we expect, or just trust the Auth
         return {
             id: currentUser.uid,
             name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
             email: currentUser.email || '',
-            role: 'ADMIN', // Default to Admin temporarily to show UI
+            role: 'WORKER',
             org_id: activeOrg.id,
             status: 'active',
             avatar_url: '',
@@ -168,10 +189,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Find role definition
     const userRole = roles.find(r => r.key === activeUser.role);
     
-    // Fallback for temporary/unknown roles (assume basic access to prevent crashes)
+    // Fallback for temporary/unknown roles: no permissions until a real role resolves.
+    // (Previously this granted every permission to the not-yet-resolved fallback user —
+    // that was the actual privilege-escalation bug, not just the displayed role label.)
     if (!userRole) {
-        // If it's the temporary admin user from Auth fallback, allow everything
-        if (activeUser.id === currentUser?.uid) return true; 
         return false;
     }
 
@@ -194,7 +215,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) { console.error(e); }
   };
 
-  const handleInviteUser = (userData: any) => { setInvitedEmails(prev => [...prev, userData]); toast.success("Invited"); };
+  const handleInviteUser = async (userData: { org_id?: string; name: string; email: string; role: User['role']; project_id?: string; department?: string }) => {
+    const newUserId = `user_${Date.now()}`;
+    const newUser: User = {
+      id: newUserId,
+      org_id: userData.org_id || activeOrg?.id || '',
+      email: userData.email,
+      name: userData.name,
+      avatar_url: '',
+      role: userData.role,
+      status: 'invited',
+      ...(userData.project_id ? { project_ids: [userData.project_id] } : {}),
+    } as User;
+
+    setUsersList(prev => [...prev, newUser]);
+    setInvitedEmails(prev => [...prev, userData as InvitedUser]);
+
+    try {
+      await setDoc(doc(db, 'users', newUserId), newUser);
+      toast.success(`${userData.name} invited. They can sign up with ${userData.email}.`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to save invited user.');
+      setUsersList(prev => prev.filter(u => u.id !== newUserId));
+      return;
+    }
+
+    try {
+      await sendInviteEmail(
+        userData.email,
+        userData.name,
+        userData.role,
+        activeOrg?.name || 'your organization',
+        activeUser?.name || 'Your admin'
+      );
+    } catch (e) {
+      console.error('Invite email failed to send:', e);
+      toast.error(`${userData.name} was invited, but the notification email failed to send. Let them know to activate manually.`);
+    }
+  };
   const handleSignUp = () => {};
   const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
   const t = (key: string, fallback: string = key) => translations[language]?.[key] || translations['en']?.[key] || fallback;
@@ -235,9 +294,11 @@ interface DataContextType {
   setPtwList: React.Dispatch<React.SetStateAction<Ptw[]>>;
   
   handleCreateProject: (data: any) => void;
+  handleUpdateProject: (projectId: string, updates: Partial<Project>) => void;
   handleCreateReport: (data: any) => void;
   handleStatusChange: (id: string, status: any) => void;
   handleCapaActionChange: (id: string, index: number, status: any) => void;
+  handleAddCapaAction: (reportId: string, action: Omit<CapaAction, 'status'>) => void;
   handleAcknowledgeReport: (id: string) => void;
   handleUpdateInspection: (data: any, action?: any) => void;
   handleCreatePtw: (data: any) => void;
@@ -472,8 +533,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const handleUpdateProject = async (projectId: string, updates: Partial<Project>) => {
+        setProjects(prev => prev.map(p => p.id === projectId ? { ...p, ...updates } : p));
+        try {
+            await updateDB('projects', projectId, updates);
+            toast.success("Project updated.");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to update project");
+        }
+    };
+
     const handleCreatePtw = async (data: any) => {
-        const newPtw = { ...data, id: `ptw_${Date.now()}`, status: 'DRAFT' };
+        // The Guided Permit wizard doesn't collect a dedicated "title" field, so
+        // without this fallback newPtw.title is undefined and the PTW list crashes
+        // as soon as it's searched (p.title.toLowerCase() on undefined).
+        const newPtw = { ...data, title: data.title || data.description || 'Untitled Permit', id: `ptw_${Date.now()}`, status: 'DRAFT' };
         setPtwList(prev => [newPtw, ...prev]);
         try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
     };
@@ -498,6 +573,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
                 updateDB('reports', reportId, { capa: newCapa });
             }
+        }
+    };
+
+    const handleAddCapaAction = (reportId: string, action: Omit<CapaAction, 'status'>) => {
+        const report = reportList.find(r => r.id === reportId);
+        if (report) {
+            const newCapaAction: CapaAction = { ...action, status: 'Open' };
+            const newCapa = [...(report.capa || []), newCapaAction];
+            setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
+            updateDB('reports', reportId, { capa: newCapa });
+            toast.success("CAPA action added.");
         }
     };
 
@@ -692,7 +778,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
         actionItems,
         setInspectionList, setChecklistRunList, setPtwList,
-        handleCreateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAcknowledgeReport,
+        handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,

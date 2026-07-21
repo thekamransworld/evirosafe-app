@@ -1,9 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { logoSrc } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppContext, useDataContext } from '../contexts';
 import { NotificationsPanel } from './NotificationsPanel';
-import { Bell, X, Menu } from 'lucide-react';
+import {
+  LayoutDashboard, Sparkles, BarChart3, Map, Award,
+  FileWarning, CheckSquare, ClipboardCheck, ShieldCheck, ListChecks,
+  ClipboardList, HardHat, Megaphone, GraduationCap, Clock3, ClipboardX,
+  FlaskConical, Gauge, Grid3x3, Eye, Search as SearchIcon,
+  Siren, Leaf, Users2, PackageCheck, FolderOpen, Activity,
+  Handshake, FileText, Download, Lock, Bell, Signpost,
+  Wrench, UsersRound, Building2, Settings2, Search, X, ChevronDown,
+  LogOut, ChevronsLeft, ChevronsRight,
+} from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
@@ -12,223 +21,336 @@ interface SidebarProps {
   setOpen: (isOpen: boolean) => void;
 }
 
-// --- Icons Data ---
-const icons: Record<string, JSX.Element> = {
-  dashboard: <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
-  'ai-insights': <path d="M13 10V3L4 14h7v7l9-11h-7z" />,
-  'hse-statistics': <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
-  'site-map': <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />,
-  reports: <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zM14 9V3.5L18.5 9H14z" />,
-  actions: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />,
-  inspections: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
-  ptw: <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
-  checklists: <path d="M5 13l4 4L19 7" />,
-  plans: <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />,
-  rams: <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />,
-  signage: <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />,
-  tbt: <path d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />,
-  training: <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />,
-  people: <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
-  settings: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />,
-  certification: <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+// ─────────────────────────────────────────────────────────────────────────────
+// Icon map — lucide-react, matching the rest of the app instead of hand-rolled SVGs
+// ─────────────────────────────────────────────────────────────────────────────
+const ICONS: Record<string, React.ElementType> = {
+  dashboard: LayoutDashboard, 'ai-insights': Sparkles, 'hse-statistics': BarChart3,
+  'site-map': Map, certification: Award,
+  reports: FileWarning, actions: CheckSquare, inspections: ClipboardCheck,
+  'audit-inspection': ShieldCheck, ptw: ListChecks, checklists: ClipboardList,
+  plans: ClipboardList, rams: HardHat, tbt: Megaphone, training: GraduationCap,
+  'man-hours': Clock3, 'corrective-actions': ClipboardX, 'chemical-register': FlaskConical,
+  kpi: Gauge, 'risk-matrix': Grid3x3, bbs: Eye, rca: SearchIcon,
+  emergency: Siren, environment: Leaf, contractors: Users2, ppe: PackageCheck,
+  documents: FolderOpen, fatigue: Activity, meetings: Handshake,
+  compliance: FileText, 'audit-log': FileText, exports: Download, privacy: Lock,
+  notifications: Bell, signage: Signpost, housekeeping: Wrench,
+  people: UsersRound, organizations: Building2, settings: Settings2,
 };
 
+interface MenuItem { label: string; view: string; roles?: string[] }
+interface MenuSection { id: string; label: string; items: MenuItem[] }
+
+const MENU_SECTIONS: MenuSection[] = [
+  { id: 'core', label: 'Overview', items: [
+    { label: 'Dashboard',      view: 'dashboard' },
+    { label: 'AI Insights',    view: 'ai-insights' },
+    { label: 'HSE Statistics', view: 'hse-statistics' },
+    { label: 'Site Map',       view: 'site-map' },
+    { label: 'My Certificate', view: 'certification' },
+  ]},
+  { id: 'operations', label: 'Operations', items: [
+    { label: 'Incident Reports',   view: 'reports' },
+    { label: 'Action Tracker',     view: 'actions' },
+    { label: 'Inspections',        view: 'inspections' },
+    { label: 'Audit & Inspection', view: 'audit-inspection', roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR','INSPECTOR'] },
+    { label: 'Permit to Work',     view: 'ptw' },
+    { label: 'Checklists',         view: 'checklists' },
+    { label: 'Plans',              view: 'plans' },
+    { label: 'RAMS',               view: 'rams' },
+    { label: 'Toolbox Talks',      view: 'tbt' },
+    { label: 'Training',           view: 'training' },
+    { label: 'Man-Hours Log',      view: 'man-hours',          roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Corrective Actions', view: 'corrective-actions', roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Chemical Register',  view: 'chemical-register',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+  ]},
+  { id: 'analytics', label: 'Analytics', items: [
+    { label: 'KPI Dashboard',       view: 'kpi',          roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Risk Matrix',         view: 'risk-matrix',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Safety Observations', view: 'bbs' },
+    { label: 'RCA (Investigation)', view: 'rca',          roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
+  ]},
+  { id: 'advanced', label: 'Advanced Modules', items: [
+    { label: 'Emergency Response', view: 'emergency',    roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Environmental',      view: 'environment',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Contractors',        view: 'contractors',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'PPE Inventory',      view: 'ppe',          roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Document Control',   view: 'documents' },
+    { label: 'Fatigue & FFD',      view: 'fatigue',      roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Safety Meetings',    view: 'meetings',     roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+  ]},
+  { id: 'compliance', label: 'Compliance', items: [
+    { label: 'Compliance Register', view: 'compliance',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
+    { label: 'Audit Log',           view: 'audit-log',   roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
+    { label: 'Data Export',         view: 'exports',     roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
+    { label: 'Data & Privacy',      view: 'privacy',     roles: ['ADMIN','ORG_ADMIN'] },
+  ]},
+  { id: 'system', label: 'System', items: [
+    { label: 'Notifications',   view: 'notifications' },
+    { label: 'Signage Library', view: 'signage' },
+    { label: 'Housekeeping',    view: 'housekeeping',  roles: ['ADMIN','ORG_ADMIN'] },
+    { label: 'People',          view: 'people',        roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
+    { label: 'Organizations',   view: 'organizations', roles: ['ADMIN','ORG_ADMIN'] },
+    { label: 'Settings',        view: 'settings',      roles: ['ADMIN','ORG_ADMIN'] },
+  ]},
+];
+
+// Sections open by default on first visit — keeps the initial view scannable
+// instead of dumping all 40 items on screen at once. User's manual
+// expand/collapse choices are remembered for the rest of the session.
+const DEFAULT_OPEN: Record<string, boolean> = {
+  core: true, operations: true, analytics: false,
+  advanced: false, compliance: false, system: false,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nav item
+// ─────────────────────────────────────────────────────────────────────────────
 const NavItem: React.FC<{
-  label: string;
-  view: string;
-  currentView: string;
-  setCurrentView: (view: string) => void;
-  isOpen: boolean;
-  onClick?: () => void;
-}> = ({ label, view, currentView, setCurrentView, isOpen, onClick }) => {
+  label: string; view: string; currentView: string;
+  setCurrentView: (view: string) => void; isOpen: boolean; badge?: number;
+}> = ({ label, view, currentView, setCurrentView, isOpen, badge }) => {
   const isActive = currentView === view;
+  const Icon = ICONS[view] || LayoutDashboard;
 
   return (
     <button
-      onClick={() => {
-        setCurrentView(view);
-        if (onClick) onClick();
-      }}
-      className={`flex items-center w-full rounded-xl transition-all duration-200 group relative overflow-hidden mb-1
-        ${isActive
-          ? 'bg-cyan-500/20 text-cyan-200 shadow-[0_0_20px_rgba(34,211,238,0.25)]'
-          : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-50'}
-        ${isOpen ? 'px-4 py-2.5 mx-2 w-auto' : 'h-10 w-10 justify-center mx-auto'}
-      `}
+      onClick={() => setCurrentView(view)}
+      className={`giq-nav-item w-full ${isActive ? 'active' : ''}`}
+      style={{ justifyContent: isOpen ? 'flex-start' : 'center', margin: '0 8px', width: isOpen ? 'calc(100% - 16px)' : 32 }}
+      title={!isOpen ? label : undefined}
     >
-      {isActive && (
-        <div className="absolute left-0 top-1 bottom-1 w-1 rounded-r-full bg-cyan-400" />
-      )}
-      <div
-        className={`w-5 h-5 shrink-0 relative z-10 ${
-          isActive
-            ? 'text-cyan-300'
-            : 'text-slate-500 group-hover:text-slate-200'
-        }`}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          {icons[view] || icons.dashboard}
-        </svg>
-      </div>
-      {isOpen && (
-        <span className="ml-3 text-sm font-medium tracking-wide truncate relative z-10">
-          {label}
+      <Icon size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
+      {isOpen && <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
+      {isOpen && badge !== undefined && badge > 0 && (
+        <span style={{
+          background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700,
+          borderRadius: 99, minWidth: 18, height: 18, display: 'flex',
+          alignItems: 'center', justifyContent: 'center', padding: '0 5px', flexShrink: 0,
+        }}>
+          {badge > 9 ? '9+' : badge}
         </span>
       )}
     </button>
   );
 };
 
-export const Sidebar: React.FC<SidebarProps> = ({
-  currentView,
-  setCurrentView,
-  isOpen,
-  setOpen,
-}) => {
-  const { logout, currentUser } = useAuth();
-  const { notifications } = useDataContext();
-  const { activeUser } = useAppContext();
+// ─────────────────────────────────────────────────────────────────────────────
+// Collapsible section header
+// ─────────────────────────────────────────────────────────────────────────────
+const SectionHeader: React.FC<{
+  label: string; isOpen: boolean; isExpanded: boolean; onToggle: () => void;
+}> = ({ label, isOpen, isExpanded, onToggle }) => {
+  if (!isOpen) return <div style={{ margin: '10px auto', width: 20, borderTop: '1px solid var(--border-default)' }} />;
+  return (
+    <button onClick={onToggle} className="giq-section-label" style={{
+      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      background: 'none', border: 'none', cursor: 'pointer',
+    }}>
+      <span>{label}</span>
+      <ChevronDown size={12} style={{ transition: 'transform 0.15s', transform: isExpanded ? 'none' : 'rotate(-90deg)' }} />
+    </button>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Sidebar
+// ─────────────────────────────────────────────────────────────────────────────
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, setOpen }) => {
+  const { logout, currentUser }   = useAuth();
+  const { notifications }         = useDataContext();
+  const { activeUser }            = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [search, setSearch]       = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
 
-  const unreadCount = notifications.filter(n => n.user_id === activeUser?.id && !n.is_read).length;
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(DEFAULT_OPEN);
+  const toggleSection = (id: string) => setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const menuItems = [
-    { label: 'Dashboard', view: 'dashboard' },
-    { label: 'AI Insights', view: 'ai-insights' },
-    { label: 'HSE Statistics', view: 'hse-statistics' },
-    { label: 'Site Map', view: 'site-map' },
-    { label: 'My Certificate', view: 'certification' },
-    { label: 'Reporting', view: 'reports' },
-    { label: 'Action Tracker', view: 'actions' },
-    { label: 'Inspections', view: 'inspections' },
-    { label: 'Permit to Work', view: 'ptw' },
-    { label: 'Checklists', view: 'checklists' },
-    { label: 'Plans', view: 'plans' },
-    { label: 'RAMS', view: 'rams' },
-    { label: 'Signage', view: 'signage' },
-    { label: 'Toolbox Talks', view: 'tbt' },
-    { label: 'Training', view: 'training' },
-    { label: 'People', view: 'people' },
-    { label: 'Organizations', view: 'organizations' },
-    { label: 'Settings', view: 'settings' },
-  ];
+  const unreadCount = notifications.filter(
+    (n) => n.user_id === activeUser?.id && !n.is_read,
+  ).length;
+
+  // Case-insensitive + trimmed role comparison — prevents items silently
+  // disappearing due to casing differences between Firestore and this list.
+  const userRole = (activeUser?.role ?? '').toUpperCase().trim();
+  const canSee = (item: MenuItem) => !item.roles || item.roles.map(r => r.toUpperCase()).includes(userRole);
+
+  // Keyboard shortcut: "/" focuses the sidebar search, matching common app conventions.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  // When actively searching, auto-expand every section that has a match
+  // so results aren't hidden behind a collapsed header.
+  const isSearching = search.trim().length > 0;
+  const matchesSearch = (item: MenuItem) => item.label.toLowerCase().includes(search.trim().toLowerCase());
 
   return (
     <>
-      {/* Mobile Overlay */}
-      <div 
-        className={`fixed inset-0 bg-black/60 z-40 md:hidden transition-opacity duration-300 ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={() => setOpen(false)}
-      />
-
-      {/* Sidebar Container */}
       <div
-        className={`
-          fixed md:relative z-50 h-screen flex flex-col transition-all duration-300
-          border-r border-slate-800/60 bg-slate-950/95 backdrop-blur-xl
-          ${isOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full md:w-20 md:translate-x-0'}
-        `}
+        className="giq-sidebar"
+        style={{
+          width: isOpen ? 'var(--sidebar-width)' : 64,
+          // App.tsx already lays this component out as a normal flex child
+          // (sibling to the main content area) — override .giq-sidebar's
+          // `position: fixed` so it stays in-flow instead of floating over
+          // the page content.
+          position: 'relative',
+          top: 'auto',
+          left: 'auto',
+          flexShrink: 0,
+        }}
       >
-        {/* Header / Logo */}
-        <div className={`flex items-center h-16 border-b border-slate-800/60 shrink-0 ${isOpen ? 'px-6 justify-between' : 'justify-center'}`}>
-          <div className="flex items-center">
-            <img src={logoSrc} alt="Logo" className="w-8 h-8 rounded-lg" />
-            {isOpen && (
-              <span className="ml-3 text-lg font-semibold text-slate-100 tracking-wide">
-                EviroSafe
-              </span>
-            )}
-          </div>
-          {/* Mobile Close Button */}
+
+        {/* ── Header / Logo ─────────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', height: 60, flexShrink: 0,
+          padding: isOpen ? '0 16px' : '0', justifyContent: isOpen ? 'flex-start' : 'center',
+          borderBottom: '1px solid var(--border-default)',
+        }}>
+          <img src={logoSrc} alt="Logo" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }} />
           {isOpen && (
-            <button onClick={() => setOpen(false)} className="md:hidden text-slate-400">
-              <X className="w-6 h-6" />
-            </button>
+            <span style={{ marginLeft: 10, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+              EviroSafe
+            </span>
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 space-y-0.5">
-          {menuItems.map((item) => (
-            <NavItem
-              key={item.view}
-              label={item.label}
-              view={item.view}
-              isOpen={isOpen}
-              currentView={currentView}
-              setCurrentView={setCurrentView}
-              onClick={() => {
-                // Auto-close on mobile when item clicked
-                if (window.innerWidth < 768) setOpen(false);
-              }}
-            />
-          ))}
+        {/* ── Search ─────────────────────────────────────────────────────── */}
+        {isOpen && (
+          <div style={{ padding: '10px 12px 4px', flexShrink: 0 }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search modules…"
+                style={{
+                  width: '100%', padding: '7px 28px', fontSize: 12.5, borderRadius: 8,
+                  background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
+                  color: 'var(--text-primary)', outline: 'none',
+                }}
+              />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Navigation ────────────────────────────────────────────────── */}
+        <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '4px 0 8px' }}>
+          {MENU_SECTIONS.map((section) => {
+            const visibleItems = section.items.filter(canSee).filter((item) => !isSearching || matchesSearch(item));
+            if (visibleItems.length === 0) return null;
+
+            const isExpanded = isSearching ? true : (expandedSections[section.id] ?? true);
+
+            return (
+              <div key={section.id}>
+                <SectionHeader
+                  label={section.label}
+                  isOpen={isOpen}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleSection(section.id)}
+                />
+                {isExpanded && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginBottom: 4 }}>
+                    {visibleItems.map((item) => (
+                      <NavItem
+                        key={item.view}
+                        label={item.label}
+                        view={item.view}
+                        isOpen={isOpen}
+                        currentView={currentView}
+                        setCurrentView={setCurrentView}
+                        badge={item.view === 'notifications' ? unreadCount : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {isSearching && MENU_SECTIONS.every(s => s.items.filter(canSee).filter(matchesSearch).length === 0) && (
+            <p style={{ padding: '20px 16px', fontSize: 12.5, color: 'var(--text-muted)', textAlign: 'center' }}>
+              No modules match "{search}"
+            </p>
+          )}
         </nav>
 
-        {/* Notification & Toggle */}
-        <div className="p-2 border-t border-slate-800/60 bg-slate-950/70 flex flex-col gap-2">
+        {/* ── Notification bell + collapse toggle ───────────────────────── */}
+        <div style={{ padding: 8, borderTop: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
           <button
             onClick={() => setShowNotifications(true)}
-            className="w-full flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors relative"
+            className="giq-nav-item"
+            style={{ justifyContent: isOpen ? 'flex-start' : 'center', position: 'relative', width: '100%' }}
           >
-            <Bell className="w-5 h-5" />
-            {isOpen && <span className="ml-3 text-sm">Notifications</span>}
+            <Bell size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
+            {isOpen && <span style={{ flex: 1, textAlign: 'left' }}>Notifications</span>}
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 md:top-2 md:right-2 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-              </span>
+              <span style={{
+                position: 'absolute', top: 6, right: isOpen ? 10 : 4,
+                width: 8, height: 8, borderRadius: '50%', background: '#ef4444',
+              }} />
             )}
           </button>
 
           <button
             onClick={() => setOpen(!isOpen)}
-            className="w-full hidden md:flex items-center justify-center p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/70 transition-colors"
+            className="giq-nav-item"
+            style={{ justifyContent: isOpen ? 'flex-start' : 'center', width: '100%' }}
           >
-            <svg
-              className={`w-5 h-5 transition-transform ${!isOpen ? 'rotate-180' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
+            {isOpen ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
+            {isOpen && <span style={{ flex: 1, textAlign: 'left' }}>Collapse</span>}
           </button>
         </div>
 
-        {/* User Footer */}
-        <div className={`p-4 border-t border-slate-800/60 bg-slate-950/80 ${!isOpen && 'flex flex-col items-center'}`}>
-          <div className={`flex items-center gap-3 mb-4 ${isOpen ? 'px-2' : ''}`}>
-            <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center text-slate-900 font-bold text-xs shrink-0 shadow-md">
-              {currentUser?.email?.charAt(0).toUpperCase() || 'U'}
-            </div>
-            {isOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-100 truncate">{currentUser?.email}</p>
-                <p className="text-xs text-slate-500 truncate">Admin</p>
-              </div>
-            )}
+        {/* ── User footer ────────────────────────────────────────────────── */}
+        <div style={{
+          padding: isOpen ? '12px 14px' : '10px 0', borderTop: '1px solid var(--border-default)',
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
+          justifyContent: isOpen ? 'flex-start' : 'center',
+        }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+            background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {currentUser?.email?.charAt(0).toUpperCase() || 'U'}
           </div>
-          <button
-            onClick={() => logout()}
-            className="w-full flex items-center justify-center p-2 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors font-medium"
-          >
-            Sign Out
-          </button>
+          {isOpen && (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser?.email}
+              </p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                {(activeUser?.role ?? 'User').replace(/_/g, ' ')}
+              </p>
+            </div>
+          )}
+          {isOpen && (
+            <button onClick={() => logout()} title="Sign out" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, flexShrink: 0 }}>
+              <LogOut size={15} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Notification Panel Overlay */}
       {showNotifications && (
-          <NotificationsPanel onClose={() => setShowNotifications(false)} />
+        <NotificationsPanel onClose={() => setShowNotifications(false)} />
       )}
     </>
   );

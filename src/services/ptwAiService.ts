@@ -2,7 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { PtwType } from '../types';
 
 // Initialize Gemini
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY || "";
+// AI features are intentionally paused (product decision, not a missing-key bug) —
+// flip AI_FEATURES_ENABLED back to true once the server-side proxy work is done.
+const AI_FEATURES_ENABLED = false;
+const apiKey = AI_FEATURES_ENABLED ? ((import.meta as any).env.VITE_GEMINI_API_KEY || "") : "";
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
@@ -69,15 +72,16 @@ export const checkSimopsConflicts = (
 
   activePermits.forEach(ptw => {
     // 1. Check Location Overlap (Simple string match for demo)
-    if (ptw.payload.work.location.toLowerCase().includes(currentLocation.toLowerCase()) || 
-        currentLocation.toLowerCase().includes(ptw.payload.work.location.toLowerCase())) {
+    const ptwLocation = ptw.payload?.work?.location ?? '';
+    if (ptwLocation && (ptwLocation.toLowerCase().includes(currentLocation.toLowerCase()) || 
+        currentLocation.toLowerCase().includes(ptwLocation.toLowerCase()))) {
       
       // 2. Check Time Overlap
       const ptwStart = new Date(ptw.payload.work.coverage.start_date + 'T' + ptw.payload.work.coverage.start_time).getTime();
       const ptwEnd = new Date(ptw.payload.work.coverage.end_date + 'T' + ptw.payload.work.coverage.end_time).getTime();
 
       if ((start >= ptwStart && start <= ptwEnd) || (end >= ptwStart && end <= ptwEnd)) {
-        conflicts.push(`Conflict with Active Permit #${ptw.payload.permit_no} (${ptw.type}) at ${ptw.payload.work.location}`);
+        conflicts.push(`Conflict with Active Permit #${ptw.payload?.permit_no} (${ptw.type}) at ${ptw.payload?.work?.location}`);
       }
     }
   });

@@ -61,7 +61,7 @@ export const HousekeepingRunDetailModal: React.FC<HousekeepingRunDetailModalProp
                     <p className="text-xs text-gray-500 uppercase font-bold">Status</p>
                     <div className="mt-1">
                         <Badge color={run.status === 'completed' ? 'green' : 'yellow'}>
-                            {run.status.toUpperCase()}
+                            {(run.status || '').toUpperCase()}
                         </Badge>
                     </div>
                 </div>
@@ -86,7 +86,7 @@ export const HousekeepingRunDetailModal: React.FC<HousekeepingRunDetailModalProp
                                     )}
                                 </div>
                                 <div className={`px-3 py-1 rounded-full text-xs font-bold border ${getResultColor(result.result)}`}>
-                                    {result.result.toUpperCase()}
+                                    {(result.result || '').toUpperCase()}
                                 </div>
                             </div>
                         );

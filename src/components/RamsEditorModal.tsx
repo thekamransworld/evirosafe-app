@@ -14,6 +14,7 @@ import {
   formatDate 
 } from '../utils/ramsUtils';
 import { Loader2, Globe, Plus, Trash2, X, Paperclip } from 'lucide-react';
+import { useToast } from './ui/Toast';
 
 interface RamsEditorModalProps {
   rams: RamsType;
@@ -39,10 +40,13 @@ const RightRailSection: React.FC<{ title: string; children: React.ReactNode; cla
 );
 
 const StepSummary: React.FC<{ step: RamsStep; onClick: () => void }> = ({ step, onClick }) => {
-  const riskBefore = step.risk_before.severity * step.risk_before.likelihood;
-  const riskAfter = step.risk_after.severity * step.risk_after.likelihood;
+  const riskBefore    = step.risk_before.severity * step.risk_before.likelihood;
+  const riskAfter     = step.risk_after.severity  * step.risk_after.likelihood;
   const riskReduction = riskBefore - riskAfter;
   
+  // Fixed: was using 13/7 thresholds inline. Now uses getRiskColor from ramsUtils (15/8/4).
+  const badgeColor = getRiskColor(riskAfter);
+
   return (
     <div 
       className="p-3 border dark:border-dark-border rounded-lg bg-white dark:bg-dark-card hover:shadow-md transition-shadow cursor-pointer"
@@ -52,8 +56,8 @@ const StepSummary: React.FC<{ step: RamsStep; onClick: () => void }> = ({ step, 
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-bold text-primary-600 dark:text-primary-400">Step {step.step_no}</span>
-            <Badge color={riskAfter >= 13 ? 'red' : riskAfter >= 7 ? 'yellow' : 'green'}>
-              Risk: {riskAfter}
+            <Badge color={badgeColor}>
+              {getRiskLevel(riskAfter)} — {riskAfter}
             </Badge>
           </div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">{step.description}</p>
@@ -79,31 +83,25 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
   onSubmitForReview,
   onDelete 
 }) => {
-  const [editedRams, setEditedRams] = useState<RamsType>(JSON.parse(JSON.stringify(rams)));
-  const [activeSection, setActiveSection] = useState<EditorSection>('Overview');
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [editingStep, setEditingStep] = useState<RamsStep | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const { info } = useToast();
+  const [editedRams, setEditedRams]             = useState<RamsType>(JSON.parse(JSON.stringify(rams)));
+  const [activeSection, setActiveSection]       = useState<EditorSection>('Overview');
+  const [isTranslating, setIsTranslating]       = useState(false);
+  const [editingStep, setEditingStep]           = useState<RamsStep | null>(null);
+  const [isSaving, setIsSaving]                 = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showStepModal, setShowStepModal] = useState(false);
-  const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showStepModal, setShowStepModal]       = useState(false);
+  const [autoSaveTimer, setAutoSaveTimer]       = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (autoSaveTimer) {
-      clearTimeout(autoSaveTimer);
-    }
-    
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
     const timer = setTimeout(() => {
       if (!isSaving && JSON.stringify(editedRams) !== JSON.stringify(rams)) {
         handleAutoSave();
       }
     }, 5000);
-
     setAutoSaveTimer(timer);
-    
-    return () => {
-      if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    };
+    return () => { if (autoSaveTimer) clearTimeout(autoSaveTimer); };
   }, [editedRams]);
 
   const handleAutoSave = async () => {
@@ -122,7 +120,7 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
     setEditedRams(prev => ({
       ...prev,
       overall_risk_before: risks.before,
-      overall_risk_after: risks.after,
+      overall_risk_after:  risks.after,
     }));
   }, [editedRams.method_statement.sequence_of_operations]);
 
@@ -144,10 +142,7 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
       const translatedText = await translateText(textToTranslate, 'Arabic');
       setEditedRams(prev => ({
         ...prev, 
-        method_statement: { 
-          ...prev.method_statement, 
-          overview: translatedText 
-        }
+        method_statement: { ...prev.method_statement, overview: translatedText }
       }));
     } catch (error) {
       console.error("Translation failed:", error);
@@ -173,12 +168,12 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
 
   const handleAddStep = () => {
     const newStep: RamsStep = {
-      step_no: editedRams.method_statement.sequence_of_operations.length + 1,
+      step_no:     editedRams.method_statement.sequence_of_operations.length + 1,
       description: `New Step ${editedRams.method_statement.sequence_of_operations.length + 1}`,
-      hazards: [],
-      controls: [],
+      hazards:     [],
+      controls:    [],
       risk_before: { severity: 3, likelihood: 3 },
-      risk_after: { severity: 1, likelihood: 1 }
+      risk_after:  { severity: 1, likelihood: 1 }
     };
     setEditingStep(newStep);
     setShowStepModal(true);
@@ -202,34 +197,18 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
       case 'Competence':
       case 'Emergency':
         const keyMap = { 
-          'Overview': 'overview', 
+          'Overview':   'overview', 
           'Competence': 'competence', 
-          'Emergency': 'emergency_arrangements' 
+          'Emergency':  'emergency_arrangements' 
         };
         const currentKey = keyMap[activeSection] as 'overview' | 'competence' | 'emergency_arrangements';
-        
         return (
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{activeSection}</h2>
               {activeSection === 'Overview' && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleTranslate} 
-                  disabled={isTranslating}
-                  className="flex items-center gap-2"
-                >
-                  {isTranslating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Translating...
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-4 h-4" />
-                      Translate to Arabic
-                    </>
-                  )}
+                <Button variant="outline" onClick={() => info('AI features are coming soon.')} className="flex items-center gap-2">
+                  <Globe className="w-4 h-4" />Translate to Arabic <span className="ml-1 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span>
                 </Button>
               )}
             </div>
@@ -239,10 +218,7 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
                   value={editedRams.method_statement[currentKey]}
                   onChange={(e) => setEditedRams(prev => ({
                     ...prev, 
-                    method_statement: { 
-                      ...prev.method_statement, 
-                      [currentKey]: e.target.value 
-                    }
+                    method_statement: { ...prev.method_statement, [currentKey]: e.target.value }
                   }))}
                   className="w-full h-[50vh] p-4 border rounded-lg bg-white dark:bg-dark-card dark:border-dark-border font-mono text-gray-900 dark:text-white"
                   placeholder={`Describe the ${activeSection.toLowerCase()}...`}
@@ -267,29 +243,21 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Sequence of Operations</h2>
               <Button onClick={handleAddStep}>
-                <Plus className="w-5 h-5 mr-2" />
-                Add Step
+                <Plus className="w-5 h-5 mr-2" />Add Step
               </Button>
             </div>
-            
             <div className="space-y-3 mb-6">
               {editedRams.method_statement.sequence_of_operations.map(step => (
                 <StepSummary 
                   key={step.step_no} 
                   step={step} 
-                  onClick={() => {
-                    setEditingStep(step);
-                    setShowStepModal(true);
-                  }}
+                  onClick={() => { setEditingStep(step); setShowStepModal(true); }}
                 />
               ))}
-              
               {editedRams.method_statement.sequence_of_operations.length === 0 && (
                 <div className="text-center py-12 border-2 border-dashed rounded-lg border-gray-300 dark:border-gray-700">
                   <p className="text-gray-500 dark:text-gray-400 mb-4">No steps defined yet</p>
-                  <Button onClick={handleAddStep}>
-                    Add First Step
-                  </Button>
+                  <Button onClick={handleAddStep}>Add First Step</Button>
                 </div>
               )}
             </div>
@@ -310,7 +278,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
                   className="w-full p-2 border rounded bg-white dark:bg-dark-background dark:border-dark-border dark:text-white"
                 />
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Valid From</label>
@@ -324,7 +291,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
                     className="w-full p-2 border rounded bg-white dark:bg-dark-background dark:border-dark-border dark:text-white"
                   />
                 </div>
-                
                 <div>
                   <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Valid Until</label>
                   <input
@@ -338,7 +304,6 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
                   />
                 </div>
               </div>
-              
               <div>
                 <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">Linked PTW Types</label>
                 <div className="flex flex-wrap gap-2">
@@ -366,8 +331,7 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
           </div>
         );
         
-      default: 
-        return null;
+      default: return null;
     }
   };
 
@@ -388,13 +352,8 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
             </div>
             <div className="flex items-center gap-4">
               {onDelete && (
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)} className="text-red-600 hover:text-red-800 hover:bg-red-50 dark:hover:bg-red-900/20">
+                  <Trash2 className="w-4 h-4 mr-2" />Delete
                 </Button>
               )}
               <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
@@ -506,22 +465,14 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
                         <Paperclip className="w-4 h-4 mr-2 text-gray-400 flex-shrink-0"/>
                         <span className="truncate text-sm text-gray-700 dark:text-gray-300">{att.name}</span>
                       </div>
-                      <a 
-                        href={att.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:text-primary-800 text-xs font-medium"
-                      >
-                        View
-                      </a>
+                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-800 text-xs font-medium">View</a>
                     </div>
                   ))}
                   {editedRams.attachments.length === 0 && (
                     <p className="text-xs text-gray-500 italic text-center py-2">No attachments</p>
                   )}
                   <Button variant="outline" size="sm" className="w-full mt-2 border-dashed">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Attachment
+                    <Plus className="w-4 h-4 mr-2" />Add Attachment
                   </Button>
                 </div>
               </RightRailSection>
@@ -544,20 +495,8 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" onClick={onClose}>Cancel</Button>
-              <Button 
-                variant="outline" 
-                onClick={() => onSave(editedRams)}
-                disabled={isSaving}
-              >
-                Save Draft
-              </Button>
-              <Button 
-                onClick={handleSaveAndSubmit} 
-                disabled={isSaving}
-                className="ml-2"
-              >
-                Save & Submit for Review
-              </Button>
+              <Button variant="outline" onClick={() => onSave(editedRams)} disabled={isSaving}>Save Draft</Button>
+              <Button onClick={handleSaveAndSubmit} disabled={isSaving} className="ml-2">Save & Submit for Review</Button>
             </div>
           </footer>
         </div>
@@ -567,15 +506,8 @@ export const RamsEditorModal: React.FC<RamsEditorModalProps> = ({
         <RamsStepEditor
           step={editingStep}
           onSave={handleUpdateStep}
-          onClose={() => {
-            setShowStepModal(false);
-            setEditingStep(null);
-          }}
-          onDelete={() => {
-            handleDeleteStep(editingStep.step_no);
-            setShowStepModal(false);
-            setEditingStep(null);
-          }}
+          onClose={() => { setShowStepModal(false); setEditingStep(null); }}
+          onDelete={() => { handleDeleteStep(editingStep.step_no); setShowStepModal(false); setEditingStep(null); }}
         />
       )}
 

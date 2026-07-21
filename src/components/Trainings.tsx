@@ -1,144 +1,229 @@
-import React, { useState } from 'react';
-import type { TrainingCourse, TrainingRecord, TrainingSession, User, Project } from '../types';
-import { Card } from './ui/Card';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
+import React, { useState, useMemo } from 'react';
+import type { TrainingCourse, TrainingRecord, TrainingSession, Project, User } from '../types';
 import { useAppContext } from '../contexts';
-import { CompetencyMatrix } from './training/CompetencyMatrix';
-import { TrainingAnalytics } from './training/TrainingAnalytics';
-import { Plus } from 'lucide-react';
+import { Plus, BookOpen, Award, Clock, Users, ChevronRight, Calendar, AlertTriangle, CheckCircle, Search } from 'lucide-react';
 
-// --- PROPS INTERFACE (This was missing/incorrect) ---
 interface TrainingsProps {
-  courses: TrainingCourse[];
-  records: TrainingRecord[];
-  sessions: TrainingSession[];
-  users: User[];
-  projects: Project[];
-  onManageCourses: () => void;
-  onScheduleSession: (course: TrainingCourse) => void;
-  onManageAttendance: (session: TrainingSession) => void;
+  courses:               TrainingCourse[];
+  records:               TrainingRecord[];
+  sessions:              TrainingSession[];
+  users:                 User[];
+  projects:              Project[];
+  onManageCourses:       () => void;
+  onScheduleSession:     (course: TrainingCourse) => void;
+  onManageAttendance:    (session: TrainingSession) => void;
 }
 
-type Tab = 'Dashboard' | 'Matrix' | 'Courses' | 'Sessions';
+const SESSION_STATUS: Record<string, { label: string; color: string; bg: string }> = {
+  scheduled: { label: 'Scheduled', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+  completed: { label: 'Completed', color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+  cancelled: { label: 'Cancelled', color: '#6b7280', bg: 'rgba(107,114,128,0.08)' },
+};
 
-export const Trainings: React.FC<TrainingsProps> = (props) => {
-  const { courses, records, sessions, users, onManageCourses, onScheduleSession, onManageAttendance } = props;
+const daysLeft = (d: string | null | undefined) => {
+  if (!d) return null;
+  return Math.ceil((new Date(d).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+};
+
+export const Trainings: React.FC<TrainingsProps> = ({
+  courses, records, sessions, users, projects, onManageCourses, onScheduleSession, onManageAttendance,
+}) => {
   const { can } = useAppContext();
-  const [activeTab, setActiveTab] = useState<Tab>('Dashboard');
+  const [tab, setTab]       = useState<'courses' | 'sessions' | 'records'>('courses');
+  const [search, setSearch] = useState('');
 
-  const getCourseTitle = (courseId: string) => courses.find(c => c.id === courseId)?.title || 'Unknown';
-  const getUserName = (userId: string) => users.find(u => u.id === userId)?.name || 'Unknown';
-  
-  const getSessionStatusColor = (status: TrainingSession['status']): 'green' | 'blue' | 'gray' => {
-      switch(status) {
-          case 'completed': return 'green';
-          case 'scheduled': return 'blue';
-          case 'cancelled': return 'gray';
-          default: return 'gray';
-      }
-  };
+  const stats = useMemo(() => ({
+    courses:    courses.length,
+    sessions:   sessions.filter(s => s.status === 'scheduled').length,
+    expiring:   records.filter(r => { const d = daysLeft(r.expires_at); return d !== null && d >= 0 && d <= 30; }).length,
+    expired:    records.filter(r => { const d = daysLeft(r.expires_at); return d !== null && d < 0; }).length,
+  }), [courses, sessions, records]);
 
-  const TabButton: React.FC<{ tab: Tab }> = ({ tab }) => (
-    <button
-      onClick={() => setActiveTab(tab)}
-      className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
-        activeTab === tab 
-        ? 'border-blue-600 text-blue-600 bg-blue-50 dark:bg-white/5' 
-        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-white/5'
-      }`}
-    >
-      {tab}
-    </button>
-  );
+  const filteredCourses  = useMemo(() => courses.filter(c => !search || (c.title ?? '').toLowerCase().includes(search.toLowerCase())), [courses, search]);
+  const filteredSessions = useMemo(() => {
+    return sessions.filter(s => {
+      if (!search) return true;
+      const course = courses.find(c => c.id === s.course_id);
+      return (course?.title ?? '').toLowerCase().includes(search.toLowerCase());
+    });
+  }, [sessions, search, courses]);
+  const filteredRecords  = useMemo(() => records.filter(r => {
+    if (!search) return true;
+    const u = users.find(u => u.id === r.user_id);
+    return (u?.name ?? '').toLowerCase().includes(search.toLowerCase());
+  }), [records, search, users]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-start justify-between">
         <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Training & Competency</h1>
-            <p className="text-slate-500 dark:text-slate-400">Manage workforce skills, certifications, and compliance.</p>
+          <h1 className="giq-page-title">Training</h1>
+          <p className="giq-page-subtitle mt-1">Courses, sessions and competency records</p>
         </div>
-         {can('create', 'training') && (
-            <Button onClick={onManageCourses}>
-                <Plus className="w-5 h-5 mr-2" />
-                Manage Courses
-            </Button>
-         )}
-      </div>
-      
-      <div className="border-b border-slate-200 dark:border-slate-800">
-        <nav className="-mb-px flex space-x-1">
-            <TabButton tab="Dashboard" />
-            <TabButton tab="Matrix" />
-            <TabButton tab="Courses" />
-            <TabButton tab="Sessions" />
-        </nav>
+        {can('create', 'reports') && (
+          <button onClick={onManageCourses} className="giq-btn-primary">
+            <Plus className="w-4 h-4" />Manage Courses
+          </button>
+        )}
       </div>
 
-      {activeTab === 'Dashboard' && <TrainingAnalytics />}
-      {activeTab === 'Matrix' && <CompetencyMatrix users={users} records={records} requirements={[]} />}
-      
-      {activeTab === 'Courses' && (
-        <Card>
-            <div className="p-6">
-                <h3 className="text-lg font-bold mb-4">Course Library</h3>
-                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                    <thead className="bg-slate-50 dark:bg-slate-800/50"><tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Title</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Category</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Validity</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {courses.map(course => (
-                            <tr key={course.id}>
-                                <td className="px-4 py-3 font-semibold">{course.title}</td>
-                                <td className="px-4 py-3"><Badge color="blue" size="sm">{course.category}</Badge></td>
-                                <td className="px-4 py-3 text-sm text-slate-500">{course.validity_months} months</td>
-                                <td className="px-4 py-3 text-right">
-                                    {can('create', 'training') && <Button size="sm" variant="secondary" onClick={() => onScheduleSession(course)}>Schedule</Button>}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Courses',        value: stats.courses,  color: '#3b82f6', icon: BookOpen },
+          { label: 'Upcoming Sessions',value: stats.sessions,color: '#8b5cf6', icon: Calendar },
+          { label: 'Expiring ≤30d',  value: stats.expiring, color: '#f59e0b', icon: Clock },
+          { label: 'Expired',        value: stats.expired,  color: '#ef4444', icon: AlertTriangle },
+        ].map(s => (
+          <div key={s.label} className="giq-card p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${s.color}15` }}>
+              <s.icon className="w-4 h-4" style={{ color: s.color }} />
             </div>
-        </Card>
+            <div>
+              <p className="text-xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{s.value}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="pl-9" style={{ paddingLeft: '2.25rem' }} />
+        </div>
+        <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}>
+          {(['courses','sessions','records'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
+              style={tab === t ? { background: '#10b981', color: 'white' } : { color: 'var(--text-secondary)' }}>
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Courses */}
+      {tab === 'courses' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCourses.map(course => (
+            <div key={course.id} className="giq-card p-5 flex flex-col gap-3">
+              <div className="flex items-start justify-between">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.1)' }}>
+                  <BookOpen className="w-4 h-4" style={{ color: '#3b82f6' }} />
+                </div>
+                {course.validity_months > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+                    {course.validity_months}mo validity
+                  </span>
+                )}
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{course.title}</h3>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{course.category}</p>
+              </div>
+              <div className="pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-default)' }}>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {sessions.filter(s => s.course_id === course.id).length} sessions
+                </span>
+                {can('create', 'reports') && (
+                  <button onClick={() => onScheduleSession(course)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+                    Schedule
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {filteredCourses.length === 0 && (
+            <div className="col-span-3 giq-card py-12 text-center">
+              <BookOpen className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+              <p style={{ color: 'var(--text-secondary)' }}>No courses found</p>
+            </div>
+          )}
+        </div>
       )}
 
-      {activeTab === 'Sessions' && (
-        <Card>
-           <div className="p-6">
-               <h3 className="text-lg font-bold mb-4">Training Sessions</h3>
-               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                    <thead className="bg-slate-50 dark:bg-slate-800/50"><tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Course</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Trainer</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-slate-500 uppercase">Actions</th>
-                    </tr></thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                        {sessions.map(session => (
-                            <tr key={session.id}>
-                                <td className="px-4 py-3 font-semibold">{getCourseTitle(session.course_id)}</td>
-                                <td className="px-4 py-3 text-sm text-slate-500">{new Date(session.scheduled_at).toLocaleDateString()}</td>
-                                <td className="px-4 py-3 text-sm text-slate-500">{getUserName(session.trainer_id)}</td>
-                                <td className="px-4 py-3"><Badge color={getSessionStatusColor(session.status)}>{session.status}</Badge></td>
-                                <td className="px-4 py-3 text-right">
-                                    {can('update', 'training') && (
-                                        <Button size="sm" variant="ghost" onClick={() => onManageAttendance(session)}>
-                                            {session.status === 'scheduled' ? 'Manage' : 'View'}
-                                        </Button>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-           </div>
-        </Card>
+      {/* Sessions */}
+      {tab === 'sessions' && (
+        <div className="space-y-3">
+          {filteredSessions.map(session => {
+            const sCfg = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled;
+            const enrolled = session.attendance?.length || 0;
+            const sessCourse = courses.find(c => c.id === session.course_id);
+            return (
+              <div key={session.id} className="giq-card p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: sCfg.bg }}>
+                  <Calendar className="w-5 h-5" style={{ color: sCfg.color }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: sCfg.bg, color: sCfg.color }}>{sCfg.label}</span>
+                  </div>
+                  <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{sessCourse?.title || 'Training Session'}</p>
+                  <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{session.scheduled_at ? new Date(session.scheduled_at).toLocaleDateString() : 'TBD'}</span>
+                    <span className="flex items-center gap-1"><Users className="w-3 h-3" />{enrolled} enrolled</span>
+                  </div>
+                </div>
+                {can('create', 'reports') && session.status !== 'cancelled' && (
+                  <button onClick={() => onManageAttendance(session)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
+                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+                    Attendance
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {filteredSessions.length === 0 && (
+            <div className="giq-card py-12 text-center">
+              <Calendar className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+              <p style={{ color: 'var(--text-secondary)' }}>No sessions found</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Records */}
+      {tab === 'records' && (
+        <div className="space-y-2">
+          {filteredRecords.map(record => {
+            const days     = daysLeft(record.expires_at);
+            const isExpired = days !== null && days < 0;
+            const isExpiring = days !== null && days >= 0 && days <= 30;
+            const recUser  = users.find(u => u.id === record.user_id);
+            const recCourse = courses.find(c => c.id === record.course_id);
+            return (
+              <div key={record.id} className="giq-card p-4 flex items-center gap-4">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                  style={{ background: '#10b981' }}>
+                  {(recUser?.name || 'U').charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{recUser?.name || 'Unknown'}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{recCourse?.title || record.course_id}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  {isExpired ? (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Expired</span>
+                  ) : isExpiring ? (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>{days}d left</span>
+                  ) : (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>Current</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {filteredRecords.length === 0 && (
+            <div className="giq-card py-12 text-center">
+              <Award className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+              <p style={{ color: 'var(--text-secondary)' }}>No training records found</p>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

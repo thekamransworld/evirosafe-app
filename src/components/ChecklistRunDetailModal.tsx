@@ -140,7 +140,7 @@ export const ChecklistRunDetailModal: React.FC<ChecklistRunDetailModalProps> = (
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getResultColor(result.result)}`}>
-                          {getResultIcon(result.result)} {result.result.toUpperCase()}
+                          {getResultIcon(result.result)} {(result.result || '').toUpperCase()}
                         </span>
                       </td>
                       <td className="px-6 py-4">

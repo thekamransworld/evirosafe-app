@@ -1,216 +1,234 @@
 import React, { useState, useMemo } from 'react';
 import type { Project, User, Ptw as PtwDoc } from '../types';
-import { Button } from './ui/Button';
 import { ptwTypeDetails } from '../config';
 import { useAppContext } from '../contexts';
-import { 
-  Plus, Search, FileText, 
-  AlertTriangle, Clock, Calendar, // <--- Added Calendar here
-  MapPin, User as UserIcon, CheckCircle,
-  Shield
+import {
+  Plus, Search, FileText, AlertTriangle,
+  Clock, Calendar, MapPin, User as UserIcon,
+  CheckCircle, Shield, ChevronRight, Filter
 } from 'lucide-react';
 
-// === GEN 4 STYLES ===
-const glassStyles = {
-  card: "bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.01] hover:border-cyan-500/30 group relative cursor-pointer",
-  badge: "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1",
-  filterBtn: "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300"
+// ─── Status config ────────────────────────────────────────────────────────────
+
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+  ACTIVE:             { label: 'Active',          color: '#10b981', bg: 'rgba(16,185,129,0.1)',  dot: '#10b981' },
+  APPROVAL:           { label: 'Pending Approval', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', dot: '#f59e0b' },
+  APPROVER_SIGNED:    { label: 'Approved',        color: '#3b82f6', bg: 'rgba(59,130,246,0.1)',  dot: '#3b82f6' },
+  SUBMITTED:          { label: 'Submitted',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)',  dot: '#8b5cf6' },
+  PRE_SCREEN:         { label: 'Pre-Screen',      color: '#06b6d4', bg: 'rgba(6,182,212,0.1)',   dot: '#06b6d4' },
+  SITE_INSPECTION:    { label: 'Inspection',      color: '#f97316', bg: 'rgba(249,115,22,0.1)',  dot: '#f97316' },
+  HOLD:               { label: 'On Hold',         color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   dot: '#ef4444' },
+  SUSPENDED:          { label: 'Suspended',       color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   dot: '#ef4444' },
+  COMPLETED:          { label: 'Completed',       color: '#6b7280', bg: 'rgba(107,114,128,0.1)', dot: '#6b7280' },
+  CLOSED:             { label: 'Closed',          color: '#6b7280', bg: 'rgba(107,114,128,0.1)', dot: '#6b7280' },
+  DRAFT:              { label: 'Draft',           color: '#9ca3af', bg: 'rgba(156,163,175,0.08)',dot: '#9ca3af' },
 };
 
-const getStatusConfig = (status: PtwDoc['status']) => {
-    switch (status) {
-      case 'ACTIVE': return { label: 'ACTIVE', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', icon: CheckCircle };
-      case 'APPROVAL': return { label: 'PENDING APPROVAL', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20', icon: Clock };
-      case 'PRE_SCREEN':
-      case 'SITE_INSPECTION':
-      case 'SUBMITTED': return { label: 'IN REVIEW', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', icon: FileText };
-      case 'HOLD': return { label: 'ON HOLD', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', icon: AlertTriangle };
-      case 'COMPLETED':
-      case 'CLOSED': return { label: 'CLOSED', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/20', icon: CheckCircle };
-      default: return { label: 'DRAFT', color: 'text-slate-500', bg: 'bg-slate-500/5', border: 'border-slate-500/10', icon: FileText };
-    }
-};
+const getStatus = (status: string) =>
+  STATUS_MAP[status] || { label: status, color: '#9ca3af', bg: 'rgba(156,163,175,0.08)', dot: '#9ca3af' };
 
-// --- PROPS INTERFACE ---
+// ─── Props ────────────────────────────────────────────────────────────────────
+
 interface PtwProps {
-  ptws: PtwDoc[];
-  users: User[];
-  projects: Project[];
-  onCreatePtw: () => void;
+  ptws:             PtwDoc[];
+  users:            User[];
+  projects:         Project[];
+  onCreatePtw:      () => void;
   onAddExistingPtw: () => void;
-  onSelectPtw: (ptw: PtwDoc) => void;
+  onSelectPtw:      (ptw: PtwDoc) => void;
 }
 
-const StatCard: React.FC<{ label: string, value: number, color: string, icon: React.ReactNode }> = ({ label, value, color, icon }) => (
-    <div className={`${glassStyles.card} p-4 flex items-center justify-between`}>
-        <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
-            <p className={`text-2xl font-black ${color} mt-1`}>{value}</p>
+// ─── Permit card ──────────────────────────────────────────────────────────────
+
+const PermitCard: React.FC<{ ptw: PtwDoc; project: string; onClick: () => void }> = ({ ptw, project, onClick }) => {
+  const statusCfg  = getStatus(ptw.status);
+  const typeDetails = ptwTypeDetails[ptw.type] || { icon: '📋', hex: '#6b7280' };
+
+  return (
+    <div onClick={onClick}
+      className="giq-card p-5 cursor-pointer transition-all hover:-translate-y-0.5 relative overflow-hidden">
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl"
+        style={{ background: typeDetails.hex }} />
+
+      <div className="pl-2">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="min-w-0">
+            <p className="text-xs font-mono mb-1" style={{ color: 'var(--text-muted)' }}>
+              {ptw.payload?.permit_no || 'DRAFT'}
+            </p>
+            <h3 className="font-semibold text-sm leading-snug truncate" style={{ color: 'var(--text-primary)' }}>
+              {ptw.title || 'Untitled Permit'}
+            </h3>
+          </div>
+          <span className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+            style={{ background: statusCfg.bg, color: statusCfg.color }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: statusCfg.dot }} />
+            {statusCfg.label}
+          </span>
         </div>
-        <div className={`p-3 rounded-xl bg-white/5 ${color} opacity-80`}>
-            {icon}
+
+        {/* Type */}
+        <div className="flex items-center gap-2 mb-3 py-2 px-3 rounded-lg"
+          style={{ background: 'var(--bg-elevated)' }}>
+          <span className="text-lg">{typeDetails.icon}</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>{ptw.type}</span>
         </div>
+
+        {/* Meta */}
+        <div className="space-y-1.5">
+          {ptw.payload?.work?.location && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <MapPin className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{ptw.payload.work.location}</span>
+            </div>
+          )}
+          {ptw.payload?.requester?.name && (
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <UserIcon className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{ptw.payload.requester.name}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <Shield className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{project}</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        {ptw.payload?.work?.coverage && (
+          <div className="mt-3 pt-3 flex items-center justify-between"
+            style={{ borderTop: '1px solid var(--border-default)' }}>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <Calendar className="w-3 h-3" />
+              <span>{new Date(ptw.payload.work.coverage.start_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <Clock className="w-3 h-3" />
+              <span>{ptw.payload.work.coverage.start_time} – {ptw.payload.work.coverage.end_time}</span>
+            </div>
+            <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text-muted)' }} />
+          </div>
+        )}
+      </div>
     </div>
-);
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export const Ptw: React.FC<PtwProps> = ({ ptws, users, projects, onCreatePtw, onAddExistingPtw, onSelectPtw }) => {
   const { can } = useAppContext();
-  const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Closed'>('All');
+  const [filter, setFilter] = useState<'All' | 'Active' | 'Draft' | 'Pending' | 'Closed'>('All');
   const [search, setSearch] = useState('');
 
-  const filteredPtws = useMemo(() => {
-    return ptws.filter(p => {
-        const matchesSearch = !search || 
-            p.title.toLowerCase().includes(search.toLowerCase()) || 
-            p.payload.permit_no?.toLowerCase().includes(search.toLowerCase());
-        
-        if (filter === 'All') return matchesSearch;
-        if (filter === 'Active') return matchesSearch && p.status === 'ACTIVE';
-        if (filter === 'Draft') return matchesSearch && p.status === 'DRAFT';
-        if (filter === 'Closed') return matchesSearch && (p.status === 'CLOSED' || p.status === 'COMPLETED');
-        return matchesSearch;
-    });
-  }, [ptws, filter, search]);
+  const filteredPtws = useMemo(() => ptws.filter(p => {
+    const matchSearch = !search ||
+      (p.title || '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.payload?.permit_no || '').toLowerCase().includes(search.toLowerCase());
+    if (!matchSearch) return false;
+    if (filter === 'Active')  return p.status === 'ACTIVE';
+    if (filter === 'Draft')   return p.status === 'DRAFT';
+    if (filter === 'Pending') return ['APPROVAL','SUBMITTED','PRE_SCREEN','SITE_INSPECTION','APPROVER_SIGNED'].includes(p.status);
+    if (filter === 'Closed')  return ['CLOSED','COMPLETED','CANCELLED','REJECTED','ARCHIVED'].includes(p.status);
+    return true;
+  }), [ptws, filter, search]);
 
   const stats = useMemo(() => ({
-      total: ptws.length,
-      active: ptws.filter(p => p.status === 'ACTIVE').length,
-      pending: ptws.filter(p => p.status === 'APPROVAL' || p.status === 'SUBMITTED').length,
-      highRisk: ptws.filter(p => p.type === 'Hot Work' || p.type === 'Confined Space Entry' || p.type === 'Lifting').length
+    active:  ptws.filter(p => p.status === 'ACTIVE').length,
+    pending: ptws.filter(p => ['APPROVAL','SUBMITTED','PRE_SCREEN','SITE_INSPECTION'].includes(p.status)).length,
+    onHold:  ptws.filter(p => ['HOLD','SUSPENDED'].includes(p.status)).length,
+    total:   ptws.length,
   }), [ptws]);
 
-  const getProjectName = (id: string) => projects.find(p => p.id === id)?.name || 'Unknown Project';
+  const getProject = (id: string) => projects.find(p => p.id === id)?.name || '—';
+
+  const FILTER_TABS = ['All', 'Active', 'Pending', 'Draft', 'Closed'] as const;
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-200 p-6">
-      
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+    <div className="space-y-6 animate-fade-in">
+
+      {/* Header */}
+      <div className="flex items-start justify-between">
         <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <FileText className="w-8 h-8 text-blue-400" />
-                Permit to Work
-            </h1>
-            <p className="text-slate-400 mt-1">Manage authorization for high-risk activities.</p>
+          <h1 className="giq-page-title">Permit to Work</h1>
+          <p className="giq-page-subtitle mt-1">Manage authorisations for high-risk activities</p>
         </div>
-        
         {can('create', 'ptw') && (
-            <div className="flex gap-3">
-                 <Button variant="secondary" onClick={onAddExistingPtw}>Add Existing</Button>
-                 <Button onClick={onCreatePtw} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-0 shadow-lg shadow-blue-900/20">
-                    <Plus className="w-5 h-5 mr-2" />
-                    New Permit
-                </Button>
-            </div>
+          <div className="flex gap-2">
+            <button onClick={onAddExistingPtw}
+              className="giq-btn-secondary text-sm px-4 py-2">
+              Add Existing
+            </button>
+            <button onClick={onCreatePtw}
+              className="giq-btn-primary text-sm px-4 py-2">
+              <Plus className="w-4 h-4" />New Permit
+            </button>
+          </div>
         )}
       </div>
 
-      {/* STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <StatCard label="Active Permits" value={stats.active} color="text-emerald-400" icon={<CheckCircle className="w-6 h-6"/>} />
-          <StatCard label="Pending Approval" value={stats.pending} color="text-amber-400" icon={<Clock className="w-6 h-6"/>} />
-          <StatCard label="High Risk" value={stats.highRisk} color="text-rose-400" icon={<AlertTriangle className="w-6 h-6"/>} />
-          <StatCard label="Total Permits" value={stats.total} color="text-blue-400" icon={<FileText className="w-6 h-6"/>} />
-      </div>
-
-      {/* FILTERS */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="flex bg-slate-900/50 p-1 rounded-xl border border-white/10">
-              {['All', 'Active', 'Draft', 'Closed'].map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setFilter(f as any)}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all ${
-                        filter === f 
-                        ? 'bg-blue-600 text-white shadow-lg' 
-                        : 'text-slate-400 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                      {f}
-                  </button>
-              ))}
-          </div>
-          <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input 
-                  type="text" 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by Permit # or Title..." 
-                  className="w-full h-full bg-slate-900/50 border border-white/10 rounded-xl pl-10 pr-4 text-sm text-slate-200 focus:border-blue-500/50 focus:outline-none placeholder:text-slate-600"
-              />
-          </div>
-      </div>
-
-      {/* GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPtws.map((ptw) => {
-            const statusConfig = getStatusConfig(ptw.status);
-            const typeDetails = ptwTypeDetails[ptw.type] || { icon: '?', hex: '#64748b' };
-            const StatusIcon = statusConfig.icon;
-            
-            return (
-                <div key={ptw.id} onClick={() => onSelectPtw(ptw)} className={glassStyles.card}>
-                    {/* Color Strip */}
-                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: typeDetails.hex }} />
-                    
-                    <div className="p-5 pl-7">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                                    {ptw.payload.permit_no || 'DRAFT PERMIT'}
-                                </span>
-                                <h3 className="font-bold text-slate-100 text-lg line-clamp-1">{ptw.title}</h3>
-                            </div>
-                            <div className={`${glassStyles.badge} ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
-                                <StatusIcon className="w-3 h-3" />
-                                {statusConfig.label}
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-4">
-                             <span className="text-2xl">{typeDetails.icon}</span>
-                             <span className="text-sm font-medium text-slate-300">{ptw.type}</span>
-                        </div>
-
-                        <div className="space-y-2 text-xs text-slate-400 mb-4">
-                            <div className="flex items-center gap-2">
-                                <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                                <span className="truncate">{ptw.payload.work.location}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <UserIcon className="w-3.5 h-3.5 text-slate-500" />
-                                <span>{ptw.payload.requester.name}</span>
-                            </div>
-                             <div className="flex items-center gap-2">
-                                <Shield className="w-3.5 h-3.5 text-slate-500" />
-                                <span>{getProjectName(ptw.project_id)}</span>
-                            </div>
-                        </div>
-
-                        <div className="pt-4 border-t border-white/5 flex items-center justify-between text-xs">
-                             <div className="flex items-center gap-1.5 text-slate-500">
-                                 <Calendar className="w-3.5 h-3.5" />
-                                 <span>{new Date(ptw.payload.work.coverage.start_date).toLocaleDateString()}</span>
-                             </div>
-                             <div className="flex items-center gap-1.5 text-slate-500">
-                                 <Clock className="w-3.5 h-3.5" />
-                                 <span>{ptw.payload.work.coverage.start_time} - {ptw.payload.work.coverage.end_time}</span>
-                             </div>
-                        </div>
-                    </div>
-                </div>
-            )
-        })}
-
-        {filteredPtws.length === 0 && (
-            <div className="col-span-full py-20 text-center border-2 border-dashed border-white/10 rounded-3xl">
-                <FileText className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-slate-400">No Permits Found</h3>
-                <p className="text-slate-600 text-sm">Adjust your filters or create a new permit.</p>
+      {/* KPI strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Active',          value: stats.active,  color: '#10b981', icon: CheckCircle },
+          { label: 'Pending Approval',value: stats.pending, color: '#f59e0b', icon: Clock },
+          { label: 'On Hold',         value: stats.onHold,  color: '#ef4444', icon: AlertTriangle },
+          { label: 'Total Permits',   value: stats.total,   color: '#3b82f6', icon: FileText },
+        ].map(s => (
+          <div key={s.label} className="giq-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: `${s.color}15` }}>
+                <s.icon className="w-4 h-4" style={{ color: s.color }} />
+              </div>
+              <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                {s.value > 0 ? `+${s.value}` : '0'}
+              </span>
             </div>
-        )}
+            <p className="text-2xl font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{s.value}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+          </div>
+        ))}
       </div>
+
+      {/* Filters + search */}
+      <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex items-center gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}>
+          {FILTER_TABS.map(f => (
+            <button key={f} onClick={() => setFilter(f)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={filter === f
+                ? { background: '#10b981', color: 'white' }
+                : { color: 'var(--text-secondary)' }}>
+              {f}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search by permit number or title..."
+            className="pl-9" style={{ paddingLeft: '2.25rem' }} />
+        </div>
+      </div>
+
+      {/* Grid */}
+      {filteredPtws.length === 0 ? (
+        <div className="giq-card py-20 text-center">
+          <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+          <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>No permits found</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Adjust your filters or create a new permit</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPtws.map(ptw => (
+            <PermitCard key={ptw.id} ptw={ptw} project={getProject(ptw.project_id)} onClick={() => onSelectPtw(ptw)} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

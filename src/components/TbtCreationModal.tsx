@@ -4,6 +4,7 @@ import { Button } from './ui/Button';
 import { generateTbtContent } from '../services/geminiService';
 import { tbtTopicsLibrary } from '../config';
 import { FormField } from './ui/FormField';
+import { useToast } from './ui/Toast';
 
 interface TbtCreationModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ const SparklesIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} x
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 
 export const TbtCreationModal: React.FC<TbtCreationModalProps> = ({ isOpen, onClose, onSubmit, projects, activeUser }) => {
+  const { info } = useToast();
   const [formData, setFormData] = useState<Omit<TbtSession, 'id' | 'org_id' | 'attendees' | 'attachments' | 'audit_log'>>({
     project_id: projects[0]?.id || '',
     title: '',
@@ -127,8 +129,8 @@ export const TbtCreationModal: React.FC<TbtCreationModalProps> = ({ isOpen, onCl
                        <h4 className="font-semibold text-primary-900 dark:text-primary-100">AI Content Generator</h4>
                        <p className="text-xs text-primary-700 dark:text-primary-300">Auto-fill summary, hazards, and controls based on the title.</p>
                    </div>
-                    <Button onClick={handleAiGenerate} disabled={isGenerating || !formData.title} className="bg-primary-600 text-white">
-                        {isGenerating ? 'Generating...' : <><SparklesIcon className="w-4 h-4 mr-2" /> Generate Content</>}
+                    <Button onClick={() => info('AI features are coming soon.')} className="bg-primary-600 text-white">
+                        <SparklesIcon className="w-4 h-4 mr-2" /> Generate Content <span className="ml-2 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span>
                     </Button>
                </div>
            </div>

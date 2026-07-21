@@ -70,7 +70,7 @@ export const checkSimopsConflicts = (
     // Simple string matching for demo (In real life, use GIS coordinates)
     const nearbyPermits = activePermits.filter(p => 
         p.status === 'ACTIVE' && 
-        p.payload.work.location.toLowerCase().includes(currentLocation.toLowerCase())
+        (p.payload?.work?.location ?? '').toLowerCase().includes(currentLocation.toLowerCase())
     );
 
     nearbyPermits.forEach(p => {

@@ -3,6 +3,7 @@ import type { TrainingCourse } from '../types';
 import { Button } from './ui/Button';
 import { generateCourseContent } from '../services/geminiService';
 import { Sparkles } from 'lucide-react';
+import { useToast } from './ui/Toast';
 
 interface TrainingCourseModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const FormField: React.FC<{ label: string; children: React.ReactNode }> = ({ lab
 );
 
 export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen, onClose, onUpdateCourse }) => {
+  const { info } = useToast();
   const [newCourse, setNewCourse] = useState<Omit<TrainingCourse, 'id' | 'org_id'>>({
     title: '',
     category: '',
@@ -110,8 +112,8 @@ export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen
                                 <h4 className="font-semibold text-purple-900 dark:text-purple-300">AI Syllabus Creator</h4>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">Generates modules & objectives.</p>
                             </div>
-                            <Button onClick={handleAiGenerate} disabled={isGenerating}>
-                                {isGenerating ? 'Creating...' : <><Sparkles className="w-4 h-4 mr-2"/>Draft with AI</>}
+                            <Button onClick={() => info('AI features are coming soon.')}>
+                                <Sparkles className="w-4 h-4 mr-2"/>Draft with AI <span className="ml-2 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span>
                             </Button>
                         </div>
                     </div>

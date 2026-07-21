@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useDataContext, useModalContext } from '../contexts';
 import type { Ptw, Report, Project } from '../types';
 import { ptwTypeDetails } from '../config';
-import { getRiskLevel } from '../utils/riskUtils';
+import { getRiskResult } from '../utils/riskUtils';
 
 interface MarkerProps {
     x: number;
@@ -25,8 +25,9 @@ const Marker: React.FC<MarkerProps> = ({ x, y, type, data, onClick }) => {
         color = details.hex;
     } else if (type === 'incident') {
         const report = data as Report;
-        const risk = getRiskLevel(report.risk_pre_control);
-        color = risk.color === 'red' ? '#ef4444' : '#f59e0b';
+        // Fixed: was getRiskLevel which now returns a string. getRiskResult returns { color, level, score, action }.
+        const risk = getRiskResult(report.risk_pre_control);
+        color = (risk.color === 'red' || risk.color === 'orange') ? '#ef4444' : '#f59e0b';
     }
 
     return (
@@ -47,9 +48,9 @@ const MapZone: React.FC<{
     onClick: () => void 
 }> = ({ d, label, isActive, riskScore, onClick }) => {
     const getRiskFill = (score: number) => {
-        if (score === 0) return 'rgba(255, 255, 255, 0.02)';
-        if (score < 5) return 'rgba(250, 204, 21, 0.1)';
-        if (score < 10) return 'rgba(251, 146, 60, 0.2)';
+        if (score === 0)  return 'rgba(255, 255, 255, 0.02)';
+        if (score < 5)    return 'rgba(250, 204, 21, 0.1)';
+        if (score < 10)   return 'rgba(251, 146, 60, 0.2)';
         return 'rgba(248, 113, 113, 0.3)';
     };
 
@@ -86,22 +87,26 @@ const MapZone: React.FC<{
 };
 
 export const SiteMap: React.FC<SiteMapProps> = ({ embedded = false }) => {
-    const { projects } = useDataContext();
+    const { projects, handleUpdateProject } = useDataContext();
     const { ptwList, reportList } = useDataContext();
     const { setSelectedPtw, setSelectedReport } = useModalContext();
     
-    const [selectedProject] = useState<Project | null>(projects[0] || null);
+    const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
+    const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0] || null;
+    const [showLocationEditor, setShowLocationEditor] = useState(false);
+    const [editLat, setEditLat] = useState('');
+    const [editLng, setEditLng] = useState('');
     const [selectedZone, setSelectedZone] = useState<string | null>(null);
     const [showHeatmap, setShowHeatmap] = useState(true);
     const [showPtws, setShowPtws] = useState(true);
     const [showIncidents, setShowIncidents] = useState(true);
 
     const zones = [
-        { id: 'zone_a', label: 'Tower A', d: 'M 50,50 H 250 V 300 H 50 Z' },
-        { id: 'zone_b', label: 'Tower B', d: 'M 300,50 H 500 V 300 H 300 Z' },
-        { id: 'zone_laydown', label: 'Laydown', d: 'M 550,50 H 750 V 200 H 550 Z' },
-        { id: 'zone_excavation', label: 'Pit', d: 'M 50,350 H 400 V 550 H 50 Z' },
-        { id: 'zone_office', label: 'Office', d: 'M 450,400 H 750 V 550 H 450 Z' },
+        { id: 'zone_a',         label: 'Tower A',  d: 'M 50,50 H 250 V 300 H 50 Z' },
+        { id: 'zone_b',         label: 'Tower B',  d: 'M 300,50 H 500 V 300 H 300 Z' },
+        { id: 'zone_laydown',   label: 'Laydown',  d: 'M 550,50 H 750 V 200 H 550 Z' },
+        { id: 'zone_excavation',label: 'Pit',      d: 'M 50,350 H 400 V 550 H 50 Z' },
+        { id: 'zone_office',    label: 'Office',   d: 'M 450,400 H 750 V 550 H 450 Z' },
     ];
 
     const mapItemToZone = (locationText: string): { zoneId: string, x: number, y: number } | null => {
@@ -145,8 +150,8 @@ export const SiteMap: React.FC<SiteMapProps> = ({ embedded = false }) => {
     const selectedZoneItems = useMemo(() => {
         if (!selectedZone) return { ptws: [], incidents: [] };
         return {
-            ptws: mappedData.ptws.filter(p => p.mapLoc?.zoneId === selectedZone),
-            incidents: mappedData.incidents.filter(i => i.mapLoc?.zoneId === selectedZone)
+            ptws:      mappedData.ptws.filter(p => p.mapLoc?.zoneId === selectedZone),
+            incidents: mappedData.incidents.filter(i => i.mapLoc?.zoneId === selectedZone),
         };
     }, [selectedZone, mappedData]);
 
@@ -155,16 +160,80 @@ export const SiteMap: React.FC<SiteMapProps> = ({ embedded = false }) => {
     return (
         <div className="h-full flex flex-col">
             {!embedded && (
-                <div className="p-4 flex justify-between items-center shrink-0">
+                <div className="p-4 flex justify-between items-center shrink-0 flex-wrap gap-3">
                     <div>
                         <h1 className="text-2xl font-bold text-text-primary dark:text-white">Site Digital Twin</h1>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Live view of {selectedProject.name}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Live view of {selectedProject?.name || 'No project selected'}</p>
                     </div>
-                    <div className="flex items-center space-x-2">
-                        <ToggleButton label="Heatmap" active={showHeatmap} onClick={() => setShowHeatmap(!showHeatmap)} />
-                        <ToggleButton label="Permits" active={showPtws} onClick={() => setShowPtws(!showPtws)} />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <select value={selectedProjectId} onChange={e => { setSelectedProjectId(e.target.value); setShowLocationEditor(false); }}
+                            className="giq-input text-sm" style={{ minWidth: 160 }}>
+                            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        <button onClick={() => {
+                            setEditLat(selectedProject?.latitude?.toString() || '');
+                            setEditLng(selectedProject?.longitude?.toString() || '');
+                            setShowLocationEditor(v => !v);
+                        }} className="giq-btn-secondary text-xs">
+                            📍 {selectedProject?.latitude != null ? 'Update Location' : 'Set Exact Location'}
+                        </button>
+                        <ToggleButton label="Heatmap"  active={showHeatmap}    onClick={() => setShowHeatmap(!showHeatmap)} />
+                        <ToggleButton label="Permits"  active={showPtws}       onClick={() => setShowPtws(!showPtws)} />
                         <ToggleButton label="Incidents" active={showIncidents} onClick={() => setShowIncidents(!showIncidents)} />
                     </div>
+                </div>
+            )}
+
+            {!embedded && showLocationEditor && selectedProject && (
+                <div className="mx-4 mb-3 p-4 rounded-xl flex flex-wrap items-end gap-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)' }}>
+                    <div>
+                        <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>Latitude</label>
+                        <input value={editLat} onChange={e => setEditLat(e.target.value)} placeholder="e.g. 24.7136" className="giq-input" style={{ width: 140 }} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>Longitude</label>
+                        <input value={editLng} onChange={e => setEditLng(e.target.value)} placeholder="e.g. 46.6753" className="giq-input" style={{ width: 140 }} />
+                    </div>
+                    <button
+                        onClick={() => {
+                            if (!navigator.geolocation) return;
+                            navigator.geolocation.getCurrentPosition(pos => {
+                                setEditLat(pos.coords.latitude.toString());
+                                setEditLng(pos.coords.longitude.toString());
+                            });
+                        }}
+                        className="giq-btn-secondary text-xs">
+                        Use My Current Location
+                    </button>
+                    <button
+                        disabled={!editLat || !editLng}
+                        onClick={() => {
+                            handleUpdateProject(selectedProject.id, { latitude: parseFloat(editLat), longitude: parseFloat(editLng) });
+                            setShowLocationEditor(false);
+                        }}
+                        className="giq-btn-primary text-xs">
+                        Save Exact Location
+                    </button>
+                    <button onClick={() => setShowLocationEditor(false)} className="giq-btn-secondary text-xs">Cancel</button>
+                </div>
+            )}
+
+            {!embedded && selectedProject?.latitude != null && selectedProject?.longitude != null && (
+                <div className="mx-4 mb-4 rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-default)', height: 220 }}>
+                    <iframe
+                        title="Exact project location"
+                        width="100%"
+                        height="100%"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedProject.longitude - 0.01}%2C${selectedProject.latitude - 0.01}%2C${selectedProject.longitude + 0.01}%2C${selectedProject.latitude + 0.01}&layer=mapnik&marker=${selectedProject.latitude}%2C${selectedProject.longitude}`}
+                    />
+                </div>
+            )}
+
+            {!embedded && (selectedProject?.latitude == null) && (
+                <div className="mx-4 mb-4 p-4 rounded-xl text-xs" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#b45309' }}>
+                    ⚠️ No exact GPS location set for this project yet. Click "Set Exact Location" above to pin the real site address — the diagram below is a schematic zone layout, not a real-world map.
                 </div>
             )}
 
@@ -172,7 +241,6 @@ export const SiteMap: React.FC<SiteMapProps> = ({ embedded = false }) => {
                 <div className={`flex-1 relative overflow-auto flex items-center justify-center ${embedded ? '' : 'bg-slate-100 dark:bg-slate-900/50 rounded-xl mx-4 mb-4 border border-slate-200 dark:border-white/10 shadow-inner'}`}>
                     <div className="relative" style={{ width: '800px', height: '600px' }}>
                         <div className="absolute inset-0 opacity-10 dark:opacity-5" style={{ backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
-                        
                         <svg width="800" height="600" className="absolute inset-0">
                             {zones.map(zone => (
                                 <MapZone 

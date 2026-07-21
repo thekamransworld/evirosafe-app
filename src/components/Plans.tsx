@@ -1,136 +1,175 @@
 import React, { useState, useMemo } from 'react';
 import type { Plan, PlanStatus } from '../types';
-import { Card } from './ui/Card';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
 import { planTypes } from '../config';
 import { useDataContext, useAppContext } from '../contexts';
-import { Plus, CheckCircle } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, ChevronRight, Search, BookOpen } from 'lucide-react';
 
-// --- PROPS INTERFACE (This was missing/incorrect) ---
 interface PlansProps {
   onSelectPlan: (plan: Plan) => void;
-  onNewPlan: () => void;
+  onNewPlan:    () => void;
 }
 
-const getStatusColor = (status: PlanStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
-  switch (status) {
-    case 'published': return 'green';
-    case 'approved': return 'blue';
-    case 'under_review': return 'yellow';
-    case 'archived': return 'gray';
-    case 'draft':
-    default: return 'gray';
-  }
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
+  draft:        { label: 'Draft',        color: '#9ca3af', bg: 'rgba(156,163,175,0.1)' },
+  under_review: { label: 'Under Review', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+  approved:     { label: 'Approved',     color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
+  published:    { label: 'Published',    color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+  archived:     { label: 'Archived',     color: '#6b7280', bg: 'rgba(107,114,128,0.08)' },
 };
+const getStatus = (s: string) => STATUS_MAP[s] || STATUS_MAP.draft;
 
 const PlanCard: React.FC<{ plan: Plan; onSelect: (plan: Plan) => void }> = ({ plan, onSelect }) => {
-  const safeStatus = plan.status || 'draft';
-  
+  const s = getStatus(plan.status || 'draft');
   return (
-    <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
-      <div className="flex-grow">
-        <div className="flex justify-between items-start">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary-700 bg-primary-100 dark:bg-primary-900/30 dark:text-primary-300 px-2 py-1 rounded-full">{plan.type}</span>
-          <Badge color={getStatusColor(safeStatus)}>{safeStatus.replace('_', ' ')}</Badge>
+    <div onClick={() => onSelect(plan)}
+      className="giq-card p-5 cursor-pointer transition-all hover:-translate-y-0.5 flex flex-col gap-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(16,185,129,0.1)' }}>
+            <BookOpen className="w-4 h-4" style={{ color: '#10b981' }} />
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+              {plan.type}
+            </span>
+          </div>
         </div>
-        <h3 className="text-lg font-bold text-text-primary dark:text-white mt-3">{plan.title}</h3>
-        <p className="text-sm text-text-secondary dark:text-gray-400">{plan.version}</p>
-        {plan.people?.approved_by_client?.signed_at && (
-            <div className="mt-3 flex items-center text-green-600 dark:text-green-400">
-                <CheckCircle className="w-5 h-5 mr-2" />
-                <span className="text-sm font-semibold">Client Approved</span>
-            </div>
-        )}
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
+          style={{ background: s.bg, color: s.color }}>
+          {s.label}
+        </span>
       </div>
-      <div className="border-t dark:border-dark-border mt-4 pt-4 text-xs text-gray-500 dark:text-gray-400 space-y-2">
-        <p><strong>Prepared By:</strong> {plan.people?.prepared_by?.name || 'Unknown'}</p>
-        <p><strong>Next Review:</strong> {plan.dates?.next_review_at ? new Date(plan.dates.next_review_at).toLocaleDateString() : 'N/A'}</p>
+      <div>
+        <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{plan.title}</h3>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>v{plan.version}</p>
       </div>
-      <div className="mt-4 flex justify-end">
-        <Button variant="primary" size="sm" onClick={() => onSelect(plan)}>
-          {safeStatus === 'draft' ? 'Edit Plan' : 'View Details'}
-        </Button>
+      {plan.people?.approved_by_client?.signed_at && (
+        <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: '#10b981' }}>
+          <CheckCircle className="w-3.5 h-3.5" />Client Approved
+        </div>
+      )}
+      <div className="pt-3 flex items-center justify-between"
+        style={{ borderTop: '1px solid var(--border-default)' }}>
+        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          <p>By {plan.people?.prepared_by?.name || 'Unknown'}</p>
+          {plan.dates?.next_review_at && (
+            <p className="flex items-center gap-1 mt-1">
+              <Clock className="w-3 h-3" />Review {new Date(plan.dates.next_review_at).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all"
+          style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
+          {plan.status === 'draft' ? 'Edit' : 'View'}
+        </span>
       </div>
-    </Card>
+    </div>
   );
 };
-
-const FilterButton: React.FC<{ label: string, value: string, currentFilter: string, setFilter: (val: string) => void }> = ({ label, value, currentFilter, setFilter }) => (
-    <button
-        onClick={() => setFilter(value)}
-        className={`px-3 py-1 text-sm font-medium rounded-full transition-colors duration-200 ${
-            currentFilter === value ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/20'
-        }`}
-    >
-        {label}
-    </button>
-)
 
 export const Plans: React.FC<PlansProps> = ({ onSelectPlan, onNewPlan }) => {
   const { planList, projects } = useDataContext();
   const { can } = useAppContext();
-  const [typeFilter, setTypeFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState<PlanStatus | 'All'>('All');
+  const [typeFilter, setTypeFilter]       = useState('All');
+  const [statusFilter, setStatusFilter]   = useState<PlanStatus | 'All'>('All');
   const [projectFilter, setProjectFilter] = useState('All');
+  const [search, setSearch]               = useState('');
 
-  const filteredPlans = useMemo(() => {
-    return planList.filter(plan => {
-      const typeMatch = typeFilter === 'All' || plan.type === typeFilter;
-      const statusMatch = statusFilter === 'All' || plan.status === statusFilter;
-      const projectMatch = projectFilter === 'All' || plan.project_id === projectFilter;
-      return typeMatch && statusMatch && projectMatch;
-    });
-  }, [planList, typeFilter, statusFilter, projectFilter]);
+  const filtered = useMemo(() => planList.filter(p => {
+    const tm = typeFilter    === 'All' || p.type       === typeFilter;
+    const sm = statusFilter  === 'All' || p.status     === statusFilter;
+    const pm = projectFilter === 'All' || p.project_id === projectFilter;
+    const se = !search || (p.title || '').toLowerCase().includes(search.toLowerCase());
+    return tm && sm && pm && se;
+  }), [planList, typeFilter, statusFilter, projectFilter, search]);
+
+  const stats = useMemo(() => ({
+    total:     planList.length,
+    published: planList.filter(p => p.status === 'published').length,
+    review:    planList.filter(p => p.status === 'under_review').length,
+    draft:     planList.filter(p => p.status === 'draft').length,
+  }), [planList]);
+
+  const FilterPill: React.FC<{ label: string; value: string; current: string; set: (v: any) => void }> = ({ label, value, current, set }) => (
+    <button onClick={() => set(value)}
+      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+      style={current === value ? { background: '#10b981', color: 'white' } : { color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
+      {label}
+    </button>
+  );
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-text-primary dark:text-white">HSE Plans Library</h1>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="giq-page-title">HSE Plans Library</h1>
+          <p className="giq-page-subtitle mt-1">Method statements, risk assessments and HSE plans</p>
+        </div>
         {can('create', 'plans') && (
-            <Button onClick={onNewPlan}>
-              <Plus className="w-5 h-5 mr-2" />
-              New Plan
-            </Button>
+          <button onClick={onNewPlan} className="giq-btn-primary">
+            <Plus className="w-4 h-4" />New Plan
+          </button>
         )}
       </div>
-      
-      <Card className="mb-6">
-          <div className="space-y-4">
-              <div>
-                  <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Project</label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                      <FilterButton label="All Projects" value="All" currentFilter={projectFilter} setFilter={setProjectFilter} />
-                      {projects.map(p => <FilterButton key={p.id} label={p.name} value={p.id} currentFilter={projectFilter} setFilter={setProjectFilter} />)}
-                  </div>
-              </div>
-              <div>
-                  <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Plan Type</label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                      <FilterButton label="All" value="All" currentFilter={typeFilter} setFilter={setTypeFilter} />
-                      {planTypes.map(t => <FilterButton key={t} label={t} value={t} currentFilter={typeFilter} setFilter={setTypeFilter} />)}
-                  </div>
-              </div>
-              <div>
-                  <label className="text-sm font-semibold text-gray-600 dark:text-gray-400">Status</label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                      <FilterButton label="All" value="All" currentFilter={statusFilter} setFilter={setStatusFilter as any} />
-                      {['draft', 'under_review', 'approved', 'published', 'archived'].map(s => <FilterButton key={s} label={s.replace('_', ' ')} value={s} currentFilter={statusFilter} setFilter={setStatusFilter as any} />)}
-                  </div>
-              </div>
-          </div>
-      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPlans.map((plan) => (
-          <PlanCard key={plan.id} plan={plan} onSelect={onSelectPlan} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Plans',  value: stats.total,     color: '#3b82f6' },
+          { label: 'Published',    value: stats.published, color: '#10b981' },
+          { label: 'Under Review', value: stats.review,    color: '#f59e0b' },
+          { label: 'Draft',        value: stats.draft,     color: '#9ca3af' },
+        ].map(s => (
+          <div key={s.label} className="giq-card p-4">
+            <p className="text-2xl font-bold" style={{ color: s.color, letterSpacing: '-0.02em' }}>{s.value}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+          </div>
         ))}
-        {filteredPlans.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-500">
-                <p>No plans match the current filters.</p>
+      </div>
+
+      <div className="giq-card p-4 space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-muted)' }} />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search plans..." className="pl-9" style={{ paddingLeft: '2.25rem' }} />
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Type</p>
+          <div className="flex flex-wrap gap-2">
+            <FilterPill label="All" value="All" current={typeFilter} set={setTypeFilter} />
+            {planTypes.map(t => <FilterPill key={t} label={t} value={t} current={typeFilter} set={setTypeFilter} />)}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Status</p>
+          <div className="flex flex-wrap gap-2">
+            <FilterPill label="All" value="All" current={statusFilter} set={setStatusFilter} />
+            {['draft','under_review','approved','published','archived'].map(s => (
+              <FilterPill key={s} label={s.replace('_',' ')} value={s} current={statusFilter} set={setStatusFilter} />
+            ))}
+          </div>
+        </div>
+        {projects.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Project</p>
+            <div className="flex flex-wrap gap-2">
+              <FilterPill label="All Projects" value="All" current={projectFilter} set={setProjectFilter} />
+              {projects.map(p => <FilterPill key={p.id} label={p.name} value={p.id} current={projectFilter} set={setProjectFilter} />)}
             </div>
+          </div>
         )}
       </div>
+
+      {filtered.length === 0 ? (
+        <div className="giq-card py-16 text-center">
+          <FileText className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+          <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>No plans match the filters</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map(p => <PlanCard key={p.id} plan={p} onSelect={onSelectPlan} />)}
+        </div>
+      )}
     </div>
   );
 };

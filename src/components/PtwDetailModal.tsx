@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { 
   Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
   PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage,
-  PtwWorkflowStage
+  PtwWorkflowStage, CanonicalPtwPayload
 } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
@@ -174,9 +174,94 @@ const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({
     );
 };
 
+// --- DATA SAFETY NET ---
+// Existing PTW records in Firestore may not always have every nested field
+// populated (older test data, manually-entered records, partial writes).
+// This normalizer guarantees every field this modal reads is always present
+// with a safe default, so opening ANY permit — regardless of its actual
+// stored shape — can never crash the UI.
+function normalizePayload(payload: any): CanonicalPtwPayload {
+  const p = payload ?? {};
+  return {
+    creator_id: p.creator_id ?? '',
+    permit_no: p.permit_no ?? '',
+    category: p.category ?? 'standard',
+    requester: {
+      name: '', email: '', mobile: '', designation: '', contractor: '', signature: '',
+      ...(p.requester ?? {}),
+    },
+    contractor_safety_personnel: p.contractor_safety_personnel ?? undefined,
+    work: {
+      location: '', description: '', number_of_workers: undefined, associated_permits: [],
+      risk_assessment_ref: '', emergency_contact: '',
+      ...(p.work ?? {}),
+      coverage: {
+        start_date: '', end_date: '', start_time: '', end_time: '',
+        ...(p.work?.coverage ?? {}),
+      },
+    },
+    safety_requirements: Array.isArray(p.safety_requirements) ? p.safety_requirements : [],
+    ppe: {
+      hard_hat: false, safety_shoes: false, safety_harness: false, goggles: false,
+      coverall: false, respirator: false, safety_gloves: false, vest: false,
+      ...(p.ppe ?? {}),
+    },
+    signoffs: {
+      client_proponent: { name: '', designation: '', signature: '', ...(p.signoffs?.client_proponent ?? {}) },
+      other_stakeholders: Array.isArray(p.signoffs?.other_stakeholders) ? p.signoffs.other_stakeholders : [],
+      client_hs: { name: '', designation: '', signature: '', ...(p.signoffs?.client_hs ?? {}) },
+    } as any,
+    joint_inspection: {
+      remarks: p.joint_inspection?.remarks ?? '',
+      requester: { signature: '', ...(p.joint_inspection?.requester ?? {}) },
+      client_proponent: { signature: '', ...(p.joint_inspection?.client_proponent ?? {}) },
+      client_hs: { signature: '', ...(p.joint_inspection?.client_hs ?? {}) },
+    } as any,
+    holding_or_stoppage: Array.isArray(p.holding_or_stoppage) ? p.holding_or_stoppage : [],
+    extension: {
+      reason: p.extension?.reason ?? '',
+      days: { from: '', ...(p.extension?.days ?? {}) },
+      hours: { to: '', ...(p.extension?.hours ?? {}) },
+      requester: { signature: '', ...(p.extension?.requester ?? {}) },
+      client_proponent: { signature: '', ...(p.extension?.client_proponent ?? {}) },
+      client_hs: { signature: '', ...(p.extension?.client_hs ?? {}) },
+    } as any,
+    closure: {
+      note: p.closure?.note ?? '',
+      permit_requester: { signature: '', ...(p.closure?.permit_requester ?? {}) },
+      client_proponent: { signature: '', ...(p.closure?.client_proponent ?? {}) },
+      client_hs: { signature: '', ...(p.closure?.client_hs ?? {}) },
+    } as any,
+    attachments: Array.isArray(p.attachments) ? p.attachments : [],
+    audit: Array.isArray(p.audit) ? p.audit : [],
+    global_compliance: p.global_compliance ?? { standards: [] },
+    // Type-specific fields — always default so child sections never crash
+    // regardless of which permit type is open.
+    fire_watcher: p.fire_watcher ?? { name: '', mobile: '' },
+    post_watch_minutes: p.post_watch_minutes ?? 30,
+    access_equipment: p.access_equipment ?? {},
+    gas_tests: Array.isArray(p.gas_tests) ? p.gas_tests : [],
+    entry_log: Array.isArray(p.entry_log) ? p.entry_log : [],
+    soil_type: p.soil_type ?? 'A',
+    cave_in_protection: Array.isArray(p.cave_in_protection) ? p.cave_in_protection : [],
+    closure_type: p.closure_type ?? 'partial',
+    load_calculation: p.load_calculation ?? { load_weight: 0, crane_capacity: 0, utilization_percent: 0 },
+  } as any;
+}
+
+function normalizePtw(ptw: Ptw): Ptw {
+  if (!ptw) return ptw;
+  return {
+    ...ptw,
+    status: ptw.status ?? 'DRAFT',
+    type: ptw.type ?? 'General Work',
+    payload: normalizePayload(ptw.payload),
+  } as Ptw;
+}
+
 // --- MAIN COMPONENT ---
 export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, onUpdate }) => {
-  const [formData, setFormData] = useState<Ptw>(JSON.parse(JSON.stringify(ptw)));
+  const [formData, setFormData] = useState<Ptw>(normalizePtw(JSON.parse(JSON.stringify(ptw))));
   const [activeSection, setActiveSection] = useState<SectionKey>('I');
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
@@ -191,7 +276,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
   const isClosureEditable = formData.status === 'COMPLETED' || formData.status === 'CLOSED';
 
   useEffect(() => {
-      setFormData(JSON.parse(JSON.stringify(ptw)));
+      setFormData(normalizePtw(JSON.parse(JSON.stringify(ptw))));
   }, [ptw]);
 
   const handlePayloadChange = (path: string, value: any) => {
@@ -479,19 +564,19 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
         <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
           <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0 print:hidden">
             <div>
-              <h2 id="ptw-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">{ptw.type} - {ptw.payload.permit_no || `Draft #${ptw.id.slice(-6)}`}</h2>
+              <h2 id="ptw-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">{formData.type} - {formData.payload.permit_no || `Draft #${formData.id.slice(-6)}`}</h2>
               <div className="flex items-center space-x-2">
                 <Badge color={
-                    ptw.status === 'ACTIVE' ? 'green' : 
-                    ptw.status.includes('SUBMITTED') ? 'yellow' : 
-                    ptw.status === 'APPROVAL' ? 'blue' : 
+                    formData.status === 'ACTIVE' ? 'green' : 
+                    (formData.status ?? '').includes('SUBMITTED') ? 'yellow' : 
+                    formData.status === 'APPROVAL' ? 'blue' : 
                     'gray'
                 }>
-                    {ptw.status.replace(/_/g, ' ')}
+                    {(formData.status ?? 'DRAFT').replace(/_/g, ' ')}
                 </Badge>
-                {ptw.compliance_level && (
+                {formData.compliance_level && (
                     <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        <span className="text-yellow-500">⚠️</span> {ptw.compliance_level} Compliance
+                        <span className="text-yellow-500">⚠️</span> {formData.compliance_level} Compliance
                     </span>
                 )}
               </div>
@@ -537,9 +622,9 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
       <EmailModal 
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
-        documentTitle={`PTW: ${ptw.payload.permit_no || ptw.id}`}
-        documentLink={`${window.location.href}?ptw=${ptw.id}`}
-        defaultRecipients={[...Object.values(ptw.payload.signoffs ?? {}).flat(), ptw.payload.requester].filter(Boolean) as Partial<User>[]}
+        documentTitle={`PTW: ${formData.payload.permit_no || formData.id}`}
+        documentLink={`${window.location.href}?ptw=${formData.id}`}
+        defaultRecipients={[...Object.values(formData.payload.signoffs ?? {}).flat(), formData.payload.requester].filter(Boolean) as Partial<User>[]}
       />
 
       <style>{`

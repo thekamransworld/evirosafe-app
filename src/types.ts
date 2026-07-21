@@ -78,6 +78,8 @@ export interface Project {
   code: string;
   status: 'active' | 'pending' | 'archived' | 'completed' | 'on_hold'; 
   location: string;
+  latitude?: number;
+  longitude?: number;
   start_date: string;
   finish_date: string;
   end_date?: string;

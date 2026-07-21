@@ -188,7 +188,7 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
 };
 
 // --- Team Member Card ---
-const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[] }> = ({ user, activities }) => {
+const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[]; onRemove?: () => void }> = ({ user, activities, onRemove }) => {
     const userActivities = activities.filter(a => a.user?.id === user.id);
     const recentActivity = userActivities[0];
 
@@ -217,9 +217,11 @@ const TeamMemberCard: React.FC<{ user: User; activities: ActivityItem[] }> = ({ 
                         </Badge>
                     </div>
                 </div>
-                <button className="text-slate-400 hover:text-white">
-                    <MoreVertical className="w-5 h-5" />
-                </button>
+                {onRemove && (
+                    <button onClick={onRemove} title="Remove from project" className="text-slate-400 hover:text-red-400">
+                        <MoreVertical className="w-5 h-5" />
+                    </button>
+                )}
             </div>
 
             <div className="space-y-3">
@@ -262,10 +264,13 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
     inspectionList, 
     ramsList, 
     trainingSessionList, 
-    tbtList
+    tbtList,
+    handleUpdateProject,
   } = useDataContext();
   
   const { usersList } = useAppContext();
+  const [showAssignMember, setShowAssignMember] = useState(false);
+  const [assignSearch, setAssignSearch] = useState('');
   
   const [activeTab, setActiveTab] = useState('Overview');
   const [activityFilter, setActivityFilter] = useState<string>('all');
@@ -281,15 +286,9 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
 
   // Get project team members
   const projectTeam = useMemo(() => {
-    return usersList.filter(u => 
-      u.org_id === project.org_id && 
-      (u.role === 'ADMIN' || 
-       u.role === 'ORG_ADMIN' ||
-       u.role === 'HSE_MANAGER' ||
-       u.role === 'SUPERVISOR' ||
-       u.role === 'INSPECTOR')
-    );
-  }, [usersList, project.org_id]);
+    const memberIds = project.team_members || [];
+    return usersList.filter(u => memberIds.includes(u.id));
+  }, [usersList, project.team_members]);
 
   // Create comprehensive activity feed
   const activityFeed = useMemo(() => {
@@ -343,7 +342,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
           user,
           timestamp: ptw.updated_at || new Date().toISOString(),
           data: ptw,
-          status: ptw.status.toLowerCase(),
+          status: (ptw.status || '').toLowerCase(),
           priority: 'medium'
         });
       }
@@ -528,7 +527,7 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                             <List className="w-4 h-4" />
                         </button>
                     </div>
-                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600" onClick={onEdit}>
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600" onClick={() => setShowAssignMember(true)}>
                         <Plus className="w-4 h-4 mr-2" />
                         Add Member
                     </Button>
@@ -542,6 +541,11 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                             key={user.id} 
                             user={user} 
                             activities={activityFeed} 
+                            onRemove={() => {
+                                if (window.confirm(`Remove ${user.name} from this project's team?`)) {
+                                    handleUpdateProject(project.id, { team_members: (project.team_members || []).filter(id => id !== user.id) });
+                                }
+                            }}
                         />
                     ))}
                     {projectTeam.length === 0 && (
@@ -670,6 +674,60 @@ export const ProjectDetails: React.FC<ProjectDetailsProps> = ({ project, onBack,
                     </div>
                 </DashboardWidget>
             </div>
+        </div>
+      )}
+
+      {showAssignMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4" onClick={() => setShowAssignMember(false)}>
+          <div className="bg-white dark:bg-dark-card rounded-lg shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b dark:border-dark-border">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Assign Team Member</h3>
+              <p className="text-sm text-gray-500">Add an existing person from your organization to this project</p>
+            </div>
+            <div className="p-4">
+              <input
+                value={assignSearch}
+                onChange={e => setAssignSearch(e.target.value)}
+                placeholder="Search people..."
+                className="w-full p-2 border rounded-md mb-3 dark:bg-dark-background dark:border-dark-border dark:text-white"
+                autoFocus
+              />
+              <div className="max-h-72 overflow-y-auto space-y-1">
+                {usersList
+                  .filter(u => u.org_id === project.org_id)
+                  .filter(u => !(project.team_members || []).includes(u.id))
+                  .filter(u => !assignSearch || (u.name ?? '').toLowerCase().includes(assignSearch.toLowerCase()) || (u.email ?? '').toLowerCase().includes(assignSearch.toLowerCase()))
+                  .map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        handleUpdateProject(project.id, { team_members: [...(project.team_members || []), u.id] });
+                        setShowAssignMember(false);
+                        setAssignSearch('');
+                      }}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 text-left"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {(u.name || '?').charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{u.email} · {(u.role || '').replace(/_/g, ' ')}</p>
+                      </div>
+                    </button>
+                  ))}
+                {usersList.filter(u => u.org_id === project.org_id).filter(u => !(project.team_members || []).includes(u.id)).length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-6">
+                    Everyone in your organization is already assigned to this project.
+                    Invite new people from the People page first.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="bg-gray-50 dark:bg-dark-background px-6 py-3 flex justify-end border-t dark:border-dark-border rounded-b-lg">
+              <Button variant="secondary" onClick={() => setShowAssignMember(false)}>Close</Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
