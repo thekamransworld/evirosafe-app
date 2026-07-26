@@ -160,7 +160,7 @@ const SectionHeader: React.FC<{
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, setOpen }) => {
   const { logout, currentUser }   = useAuth();
   const { notifications }         = useDataContext();
-  const { activeUser }            = useAppContext();
+  const { activeUser, usersList } = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
   const [search, setSearch]       = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -176,6 +176,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
   // disappearing due to casing differences between Firestore and this list.
   const userRole = (activeUser?.role ?? '').toUpperCase().trim();
   const canSee = (item: MenuItem) => !item.roles || item.roles.map(r => r.toUpperCase()).includes(userRole);
+
+  // TEMPORARY DEBUG — remove once the role-resolution issue is confirmed fixed.
+  const debugStoredId = typeof window !== 'undefined' ? localStorage.getItem('activeUserId') : null;
+  const debugFoundInList = usersList.find(u => u.id === debugStoredId);
 
   // Keyboard shortcut: "/" focuses the sidebar search, matching common app conventions.
   useEffect(() => {
@@ -196,6 +200,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
 
   return (
     <>
+      <div style={{
+        position: 'fixed', top: 0, left: 0, zIndex: 99999, background: '#ff00ff', color: '#000',
+        fontSize: 11, fontFamily: 'monospace', padding: 8, maxWidth: 340, lineHeight: 1.5,
+        border: '3px solid #000',
+      }}>
+        <b>DEBUG — remove after this is resolved</b><br/>
+        currentUser.uid: {currentUser?.uid || 'none'}<br/>
+        localStorage activeUserId: {debugStoredId || 'null'}<br/>
+        usersList.length: {usersList.length}<br/>
+        usersList ids: {usersList.map(u => u.id).join(', ') || '(empty)'}<br/>
+        found in usersList by stored id: {debugFoundInList ? 'YES' : 'NO'}<br/>
+        found doc role: {debugFoundInList?.role || '(n/a)'}<br/>
+        activeUser.id: {activeUser?.id || 'none'}<br/>
+        activeUser.role: {activeUser?.role || 'none'}<br/>
+      </div>
       <div
         className="giq-sidebar"
         style={{
