@@ -8,7 +8,7 @@ import {
   User as FirebaseUser,
   updateProfile
 } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -105,6 +105,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status: 'active',
         auth_uid: userCredential.user.uid, // Link Auth UID for future reference
         name: name // Ensure name matches what they typed
+    });
+
+    // 5. Write a small pointer doc keyed by the real Auth UID. Firestore security rules
+    // can only look up a document by its exact known path, not by querying a field like
+    // auth_uid — so without this, rules have no reliable way to find a user's org_id/role.
+    // This is what security rules will actually read; keep it in sync with anything that
+    // changes a user's role or org_id after this point.
+    await setDoc(doc(db, "users_by_uid", userCredential.user.uid), {
+        docId: userDoc.id,
+        org_id: userData.org_id,
+        role: userData.role,
     });
   }
 

@@ -18,7 +18,7 @@ import { useToast } from './components/ui/Toast';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, query, where } from 'firebase/firestore';
 import { useAuth } from './contexts/AuthContext';
 
 // --- NOTIFICATION SERVICE ---
@@ -79,15 +79,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Organizations were previously only ever written to Firestore, never read back —
   // meaning an org created in one session never showed up again after a reload or for
   // anyone else. This brings it in line with every other collection's fetch pattern.
+  // Organizations aren't org_id-scoped themselves (they ARE the org), so this fetches
+  // just the one this user belongs to, by ID, via the pointer doc — not the full list.
   useEffect(() => {
     if (!currentUser) return;
     (async () => {
       try {
-        const snap = await getDocs(collection(db, 'organizations'));
-        const data = snap.docs.map(d => ({ ...d.data(), id: d.id })) as Organization[];
-        if (data.length > 0) setOrganizations(data);
+        const ptrSnap = await getDoc(doc(db, 'users_by_uid', currentUser.uid));
+        const myOrgId = ptrSnap.exists() ? (ptrSnap.data() as any).org_id : null;
+        if (!myOrgId) return; // Not linked yet — DataProvider's fallback will backfill this shortly.
+        const orgSnap = await getDoc(doc(db, 'organizations', myOrgId));
+        if (orgSnap.exists()) {
+          const org = { ...orgSnap.data(), id: orgSnap.id } as Organization;
+          setOrganizations(prev => {
+            const exists = prev.some(o => o.id === org.id);
+            return exists ? prev.map(o => o.id === org.id ? org : o) : [...prev, org];
+          });
+        }
       } catch (e) {
-        console.error('Error fetching organizations:', e);
+        console.error('Error fetching organization:', e);
       }
     })();
   }, [currentUser]);
@@ -204,7 +214,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const language = activeUser?.preferences?.language || 'en';
   const dir = useMemo(() => supportedLanguages.find(l => l.code === language)?.dir || 'ltr', [language]);
 
-  const handleUpdateUser = (updatedUser: User) => setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+  const handleUpdateUser = async (updatedUser: User) => {
+    const previous = usersList.find(u => u.id === updatedUser.id);
+    setUsersList(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+    try {
+      await updateDoc(doc(db, 'users', updatedUser.id), { ...updatedUser });
+      // Keep the pointer doc in sync if this user is activated and their role/org_id
+      // actually changed — otherwise Firestore rules would keep enforcing stale
+      // permissions after a role change, exactly the kind of drift this whole
+      // pointer-collection approach exists to prevent.
+      if (
+        (updatedUser as any).auth_uid &&
+        previous &&
+        (previous.role !== updatedUser.role || previous.org_id !== updatedUser.org_id)
+      ) {
+        await setDoc(doc(db, 'users_by_uid', (updatedUser as any).auth_uid), {
+          docId: updatedUser.id,
+          org_id: updatedUser.org_id,
+          role: updatedUser.role,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to save user update:', e);
+      toast.error('Failed to save changes.');
+      if (previous) setUsersList(prev => prev.map(u => u.id === updatedUser.id ? previous : u));
+    }
+  };
   
   const handleCreateOrganization = async (data: any) => {
     const newOrg = { ...data, id: `org_${Date.now()}`, status: 'active' };
@@ -255,7 +290,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
   const handleSignUp = () => {};
-  const handleApproveUser = (id: string) => setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
+  const handleApproveUser = async (id: string) => {
+    setUsersList(prev => prev.map(u => u.id === id ? { ...u, status: 'active' } : u));
+    try {
+      await updateDoc(doc(db, 'users', id), { status: 'active' });
+    } catch (e) {
+      console.error('Failed to approve user:', e);
+    }
+  };
   const t = (key: string, fallback: string = key) => translations[language]?.[key] || translations['en']?.[key] || fallback;
 
   const value = {
@@ -361,8 +403,50 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const fetchData = async () => {
         try {
+          // Resolve this user's org_id BEFORE fetching anything else, so every query below
+          // can be scoped to it. Previously every fetchCol pulled entire collections with
+          // no filter at all — every organization's data, into every browser, every load.
+          const resolveMyOrgId = async (): Promise<string | null> => {
+            // Tier 1: the pointer doc — fast, reliable, what new activations create.
+            try {
+              const ptrSnap = await getDoc(doc(db, 'users_by_uid', currentUser.uid));
+              if (ptrSnap.exists()) {
+                const org = (ptrSnap.data() as any).org_id;
+                if (org) return org;
+              }
+            } catch (e) { console.error('Pointer lookup failed:', e); }
+
+            // Tier 2: fall back to an email match against the real users collection —
+            // covers accounts activated or manually fixed before the pointer collection
+            // existed. Also backfills the pointer so future loads use the fast path.
+            if (currentUser.email) {
+              try {
+                const emailSnap = await getDocs(query(collection(db, 'users'), where('email', '==', currentUser.email)));
+                if (!emailSnap.empty) {
+                  const data = emailSnap.docs[0].data() as any;
+                  if (data.org_id) {
+                    // Must await this — the fetchCol calls right after this function
+                    // returns will be authorized by Firestore rules against this exact
+                    // pointer doc. If it isn't written yet, those reads get denied even
+                    // though resolution succeeded on the client a moment earlier.
+                    try {
+                      await setDoc(doc(db, 'users_by_uid', currentUser.uid), {
+                        docId: emailSnap.docs[0].id, org_id: data.org_id, role: data.role || null,
+                      });
+                    } catch (e) { console.error('Pointer backfill failed:', e); }
+                    return data.org_id;
+                  }
+                }
+              } catch (e) { console.error('Email fallback lookup failed:', e); }
+            }
+            return null;
+          };
+
+          const myOrgId = await resolveMyOrgId();
+
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
-            const snap = await getDocs(collection(db, name));
+            if (!myOrgId) { setter(initialData); return; }
+            const snap = await getDocs(query(collection(db, name), where('org_id', '==', myOrgId)));
             // Spread the document's data first, then force `id` to the actual Firestore
             // document ID. .data() alone never includes it — it only came through before
             // for documents that happened to also store a matching `id` field manually.
