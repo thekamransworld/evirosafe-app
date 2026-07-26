@@ -84,7 +84,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       try {
         const snap = await getDocs(collection(db, 'organizations'));
-        const data = snap.docs.map(d => d.data()) as Organization[];
+        const data = snap.docs.map(d => ({ ...d.data(), id: d.id })) as Organization[];
         if (data.length > 0) setOrganizations(data);
       } catch (e) {
         console.error('Error fetching organizations:', e);
@@ -363,7 +363,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             const snap = await getDocs(collection(db, name));
-            const data = snap.docs.map(d => d.data());
+            // Spread the document's data first, then force `id` to the actual Firestore
+            // document ID. .data() alone never includes it — it only came through before
+            // for documents that happened to also store a matching `id` field manually.
+            // Any document missing that redundant field silently got `id: undefined` and
+            // could never be found again by ID anywhere else in the app.
+            const data = snap.docs.map(d => ({ ...d.data(), id: d.id }));
             if (data.length > 0) {
                  setter(data);
             } else {
