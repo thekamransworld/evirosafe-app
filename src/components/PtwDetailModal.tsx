@@ -295,7 +295,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
 
   const handleChecklistChange = (updatedItem: PtwSafetyRequirement) => {
       setFormData(prev => {
-          const newSafetyRequirements = prev.payload.safety_requirements.map(item => 
+          const newSafetyRequirements = (prev.payload?.safety_requirements || []).map(item => 
               item.id === updatedItem.id ? updatedItem : item
           );
           return { ...prev, payload: { ...prev.payload, safety_requirements: newSafetyRequirements } } as Ptw;
@@ -339,19 +339,19 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                 <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <InfoField label="Permit Type" value={formData.type} />
-                        <InfoField label="Permit Status" value={<Badge color="blue">{formData.status.replace('_', ' ')}</Badge>} />
-                        <InfoField label="Permit Number" value={formData.payload.permit_no || 'Draft'} />
+                        <InfoField label="Permit Status" value={<Badge color="blue">{(formData.status || '').replace('_', ' ')}</Badge>} />
+                        <InfoField label="Permit Number" value={formData.payload?.permit_no || 'Draft'} />
                         <InfoField label="Project" value={formData.project_id} />
-                        <InfoField label="Work Location" value={formData.payload.work.location} />
-                        <InfoField label="Number of Workers" value={formData.payload.work.number_of_workers || 'Not specified'} />
+                        <InfoField label="Work Location" value={formData.payload?.work?.location || 'Not specified'} />
+                        <InfoField label="Number of Workers" value={formData.payload?.work?.number_of_workers || 'Not specified'} />
                     </div>
                     <div className="mt-4">
                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Work Description</h4>
-                        <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded">{formData.payload.work.description}</p>
+                        <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded">{formData.payload?.work?.description || 'No description provided.'}</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <InfoField label="Start Time" value={`${formData.payload.work.coverage.start_date} ${formData.payload.work.coverage.start_time}`} />
-                        <InfoField label="End Time" value={`${formData.payload.work.coverage.end_date} ${formData.payload.work.coverage.end_time}`} />
+                        <InfoField label="Start Time" value={formData.payload?.work?.coverage ? `${formData.payload.work.coverage.start_date || ''} ${formData.payload.work.coverage.start_time || ''}`.trim() || 'Not set' : 'Not set'} />
+                        <InfoField label="End Time" value={formData.payload?.work?.coverage ? `${formData.payload.work.coverage.end_date || ''} ${formData.payload.work.coverage.end_time || ''}`.trim() || 'Not set' : 'Not set'} />
                     </div>
                 </div>
             );
@@ -359,21 +359,21 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
         case 'II':
             return (
                 <div className="space-y-6">
-                    {formData.type === 'Lifting' && 'load_calculation' in formData.payload && (
+                    {formData.type === 'Lifting' && formData.payload && 'load_calculation' in formData.payload && (
                         <LoadCalculationSection 
                             loadCalc={formData.payload.load_calculation as any}
                             onChange={(calc) => handlePayloadChange('load_calculation', calc)}
                             disabled={!isEditable}
                         />
                     )}
-                    {formData.type === 'Confined Space Entry' && 'gas_tests' in formData.payload && (
+                    {formData.type === 'Confined Space Entry' && formData.payload && 'gas_tests' in formData.payload && (
                         <GasTestLogSection 
                             gasTests={formData.payload.gas_tests}
                             onChange={(tests) => handlePayloadChange('gas_tests', tests)}
                             disabled={!isEditable}
                         />
                     )}
-                    {formData.type === 'Confined Space Entry' && 'entry_log' in formData.payload && (
+                    {formData.type === 'Confined Space Entry' && formData.payload && 'entry_log' in formData.payload && (
                         <PersonnelEntryLogSection 
                             entries={formData.payload.entry_log}
                             onChange={(entries) => handlePayloadChange('entry_log', entries)}
@@ -403,7 +403,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {formData.payload.safety_requirements.map((item, index) => (
+                                    {(formData.payload?.safety_requirements || []).map((item, index) => (
                                         <ChecklistRow key={item.id} index={index + 1} item={item} onChange={handleChecklistChange} disabled={!isEditable} />
                                     ))}
                                 </tbody>
@@ -419,11 +419,11 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                     <div className="border rounded-lg p-4">
                         <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section III — Permit Requester Confirmation</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <FormInput label="Permit Holder Name" value={formData.payload.requester.name} onChange={val => handlePayloadChange('requester.name', val)} required disabled={!isEditable} />
-                            <FormInput label="Designation" value={formData.payload.requester.designation} onChange={val => handlePayloadChange('requester.designation', val)} required disabled={!isEditable} />
-                            <FormInput label="Contractor Company" value={formData.payload.requester.contractor} onChange={val => handlePayloadChange('requester.contractor', val)} required disabled={!isEditable} />
+                            <FormInput label="Permit Holder Name" value={formData.payload?.requester?.name || ''} onChange={val => handlePayloadChange('requester.name', val)} required disabled={!isEditable} />
+                            <FormInput label="Designation" value={formData.payload?.requester?.designation || ''} onChange={val => handlePayloadChange('requester.designation', val)} required disabled={!isEditable} />
+                            <FormInput label="Contractor Company" value={formData.payload?.requester?.contractor || ''} onChange={val => handlePayloadChange('requester.contractor', val)} required disabled={!isEditable} />
                             <div className="md:col-span-2">
-                                <SignatureInput label="Signature" value={formData.payload.requester.signature} onChange={val => handlePayloadChange('requester.signature', val)} disabled={!isEditable} />
+                                <SignatureInput label="Signature" value={formData.payload?.requester?.signature || ''} onChange={val => handlePayloadChange('requester.signature', val)} disabled={!isEditable} />
                             </div>
                         </div>
                     </div>
@@ -435,10 +435,10 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                 <div>
                     <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section IV – Client Proponent / Stakeholder</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="Name" value={formData.payload.signoffs?.client_proponent.name} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} disabled={!isProponentEditable} />
-                        <FormInput label="Designation" value={formData.payload.signoffs?.client_proponent.designation} onChange={val => handlePayloadChange('signoffs.client_proponent.designation', val)} disabled={!isProponentEditable} />
+                        <FormInput label="Name" value={formData.payload?.signoffs?.client_proponent?.name || ''} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} disabled={!isProponentEditable} />
+                        <FormInput label="Designation" value={formData.payload?.signoffs?.client_proponent?.designation || ''} onChange={val => handlePayloadChange('signoffs.client_proponent.designation', val)} disabled={!isProponentEditable} />
                         <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_proponent.signature} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={!isProponentEditable} />
+                            <SignatureInput label="Signature" value={formData.payload?.signoffs?.client_proponent?.signature || ''} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={!isProponentEditable} />
                         </div>
                     </div>
                 </div>
@@ -449,9 +449,9 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                  <div>
                     <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section V – Client HSE Department</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="HSE Representative Name" value={formData.payload.signoffs?.client_hs.name} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} disabled={!isHseEditable} />
+                        <FormInput label="HSE Representative Name" value={formData.payload?.signoffs?.client_hs?.name || ''} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} disabled={!isHseEditable} />
                         <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload.signoffs?.client_hs.signature} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={!isHseEditable} />
+                            <SignatureInput label="Signature" value={formData.payload?.signoffs?.client_hs?.signature || ''} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={!isHseEditable} />
                         </div>
                     </div>
                 </div>
@@ -465,11 +465,11 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
                         <p className="text-sm italic text-gray-700 dark:text-gray-300">“The work area has been jointly inspected by all parties, and all safety requirements specified in Section II have been implemented and verified.”</p>
                     </div>
                     <div className="space-y-6">
-                        <FormInput label="Remarks" value={formData.payload.joint_inspection?.remarks} onChange={val => handlePayloadChange('joint_inspection.remarks', val)} disabled={!isInspectionEditable} />
+                        <FormInput label="Remarks" value={formData.payload?.joint_inspection?.remarks || ''} onChange={val => handlePayloadChange('joint_inspection.remarks', val)} disabled={!isInspectionEditable} />
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <SignatureInput label="Permit Requester" value={formData.payload.joint_inspection?.requester.signature} onChange={val => handlePayloadChange('joint_inspection.requester.signature', val)} disabled={!isInspectionEditable} />
-                            <SignatureInput label="Client Proponent" value={formData.payload.joint_inspection?.client_proponent.signature} onChange={val => handlePayloadChange('joint_inspection.client_proponent.signature', val)} disabled={!isInspectionEditable} />
-                            <SignatureInput label="Client HSE" value={formData.payload.joint_inspection?.client_hs.signature} onChange={val => handlePayloadChange('joint_inspection.client_hs.signature', val)} disabled={!isInspectionEditable} />
+                            <SignatureInput label="Permit Requester" value={formData.payload?.joint_inspection?.requester?.signature || ''} onChange={val => handlePayloadChange('joint_inspection.requester.signature', val)} disabled={!isInspectionEditable} />
+                            <SignatureInput label="Client Proponent" value={formData.payload?.joint_inspection?.client_proponent?.signature || ''} onChange={val => handlePayloadChange('joint_inspection.client_proponent.signature', val)} disabled={!isInspectionEditable} />
+                            <SignatureInput label="Client HSE" value={formData.payload?.joint_inspection?.client_hs?.signature || ''} onChange={val => handlePayloadChange('joint_inspection.client_hs.signature', val)} disabled={!isInspectionEditable} />
                         </div>
                     </div>
                 </div>
@@ -624,7 +624,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
         onClose={() => setIsEmailModalOpen(false)}
         documentTitle={`PTW: ${formData.payload.permit_no || formData.id}`}
         documentLink={`${window.location.href}?ptw=${formData.id}`}
-        defaultRecipients={[...Object.values(formData.payload.signoffs ?? {}).flat(), formData.payload.requester].filter(Boolean) as Partial<User>[]}
+        defaultRecipients={[...Object.values(formData.payload?.signoffs ?? {}).flat(), formData.payload?.requester].filter(Boolean) as Partial<User>[]}
       />
 
       <style>{`

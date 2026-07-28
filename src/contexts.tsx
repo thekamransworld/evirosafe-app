@@ -41,6 +41,7 @@ interface AppContextType {
   setUsersList: React.Dispatch<React.SetStateAction<User[]>>;
   activeUser: User | null;
   handleUpdateUser: (updatedUser: User) => void;
+  handleDeleteUser: (userId: string) => void;
   organizations: Organization[];
   handleCreateOrganization: (data: any) => void;
   invitedEmails: InvitedUser[];
@@ -240,6 +241,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (previous) setUsersList(prev => prev.map(u => u.id === updatedUser.id ? previous : u));
     }
   };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (userId === activeUser?.id) {
+      toast.error("You can't delete your own account.");
+      return;
+    }
+    const target = usersList.find(u => u.id === userId);
+    setUsersList(prev => prev.filter(u => u.id !== userId));
+    try {
+      await deleteDoc(doc(db, 'users', userId));
+      // Clean up the pointer doc too, if this user had one — an orphaned pointer
+      // with no real user doc behind it is exactly the kind of stale record that
+      // cost hours of confusion earlier in this project.
+      const authUid = (target as any)?.auth_uid;
+      if (authUid) {
+        await deleteDoc(doc(db, 'users_by_uid', authUid)).catch((e) => console.error('Pointer cleanup failed:', e));
+      }
+      toast.success('User removed.');
+    } catch (e) {
+      console.error('Failed to delete user:', e);
+      toast.error('Failed to delete user.');
+      if (target) setUsersList(prev => [...prev, target]);
+    }
+  };
   
   const handleCreateOrganization = async (data: any) => {
     const newOrg = { ...data, id: `org_${Date.now()}`, status: 'active' };
@@ -302,7 +327,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const value = {
     currentView, setCurrentView, activeOrg, setActiveOrg, isSidebarOpen, setSidebarOpen,
-    usersList, setUsersList, activeUser, handleUpdateUser, organizations, handleCreateOrganization,
+    usersList, setUsersList, activeUser, handleUpdateUser, handleDeleteUser, organizations, handleCreateOrganization,
     invitedEmails, handleInviteUser, handleSignUp, handleApproveUser, language, dir, t,
     login, logout, can, impersonatingAdmin, impersonateUser, stopImpersonating, theme, toggleTheme
   };
