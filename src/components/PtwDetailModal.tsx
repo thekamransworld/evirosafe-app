@@ -359,28 +359,28 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
         case 'II':
             return (
                 <div className="space-y-6">
-                    {formData.type === 'Lifting' && formData.payload && 'load_calculation' in formData.payload && (
+                    {formData.type === 'Lifting' && formData.payload && 'load_calculation' in formData.payload && (formData.payload as any).load_calculation && (
                         <LoadCalculationSection 
                             loadCalc={formData.payload.load_calculation as any}
                             onChange={(calc) => handlePayloadChange('load_calculation', calc)}
                             disabled={!isEditable}
                         />
                     )}
-                    {formData.type === 'Confined Space Entry' && formData.payload && 'gas_tests' in formData.payload && (
+                    {formData.type === 'Confined Space Entry' && formData.payload && 'gas_tests' in formData.payload && (formData.payload as any).gas_tests && (
                         <GasTestLogSection 
                             gasTests={formData.payload.gas_tests}
                             onChange={(tests) => handlePayloadChange('gas_tests', tests)}
                             disabled={!isEditable}
                         />
                     )}
-                    {formData.type === 'Confined Space Entry' && formData.payload && 'entry_log' in formData.payload && (
+                    {formData.type === 'Confined Space Entry' && formData.payload && 'entry_log' in formData.payload && (formData.payload as any).entry_log && (
                         <PersonnelEntryLogSection 
                             entries={formData.payload.entry_log}
                             onChange={(entries) => handlePayloadChange('entry_log', entries)}
                             disabled={!isEditable}
                         />
                     )}
-                    {formData.type === 'Work at Height' && 'access_equipment' in formData.payload && (
+                    {formData.type === 'Work at Height' && formData.payload && 'access_equipment' in formData.payload && (formData.payload as any).access_equipment && (
                         <WorkAtHeightPermit 
                             payload={formData.payload as PtwWorkAtHeightPayload}
                             onChange={(updatedPayload) => setFormData(prev => ({ ...prev, payload: updatedPayload } as Ptw))}

@@ -8,7 +8,7 @@ interface LoadCalculationSectionProps {
 }
 
 export const LoadCalculationSection: React.FC<LoadCalculationSectionProps> = ({ 
-  loadCalc, 
+  loadCalc = {} as any, 
   onChange, 
   disabled 
 }) => {

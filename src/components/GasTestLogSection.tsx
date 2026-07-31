@@ -8,7 +8,7 @@ interface GasTestLogSectionProps {
   disabled: boolean;
 }
 
-export const GasTestLogSection: React.FC<GasTestLogSectionProps> = ({ gasTests, onChange, disabled }) => {
+export const GasTestLogSection: React.FC<GasTestLogSectionProps> = ({ gasTests = [], onChange, disabled }) => {
   const addRow = () => {
     onChange([...gasTests, { time: '', o2: 20.9, lel: 0, co: 0, h2s: 0, tester_name: '' }]);
   };

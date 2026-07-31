@@ -20,14 +20,15 @@ const EQUIPMENT_LABELS: Record<keyof PtwWorkAtHeightPayload['access_equipment'],
     other: 'Other',
 };
 
-export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload, onChange, readOnly = false }) => {
+export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload = { access_equipment: {} } as any, onChange, readOnly = false }) => {
+  const equipment = payload.access_equipment || {};
   
   const handleToggle = (key: keyof PtwWorkAtHeightPayload['access_equipment']) => {
       if (readOnly || key === 'other') return;
       
       const newEquipment = { 
-          ...payload.access_equipment,
-          [key]: !payload.access_equipment[key]
+          ...equipment,
+          [key]: !equipment[key]
       };
       onChange({ ...payload, access_equipment: newEquipment });
   };
@@ -35,7 +36,7 @@ export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload,
   const handleOtherChange = (value: string) => {
       if (readOnly) return;
       const newEquipment = {
-          ...payload.access_equipment,
+          ...equipment,
           other: value
       };
       onChange({ ...payload, access_equipment: newEquipment });
@@ -55,7 +56,7 @@ export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload,
                     onClick={() => handleToggle(key)}
                     className={`
                         flex items-center p-3 rounded-lg border transition-all cursor-pointer select-none
-                        ${payload.access_equipment[key] 
+                        ${equipment[key] 
                             ? 'bg-sky-100 border-sky-300 dark:bg-sky-800 dark:border-sky-600 shadow-sm' 
                             : 'bg-white dark:bg-dark-background border-gray-200 dark:border-dark-border hover:border-sky-300 dark:hover:border-sky-700'}
                         ${readOnly ? 'cursor-default opacity-90' : ''}
@@ -63,11 +64,11 @@ export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload,
                 >
                     <input
                         type="checkbox"
-                        checked={payload.access_equipment[key]}
+                        checked={equipment[key]}
                         readOnly
                         className={`h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500 ${readOnly ? 'pointer-events-none' : ''}`}
                     />
-                    <span className={`ml-3 font-medium ${payload.access_equipment[key] ? 'text-sky-900 dark:text-sky-100' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <span className={`ml-3 font-medium ${equipment[key] ? 'text-sky-900 dark:text-sky-100' : 'text-gray-700 dark:text-gray-300'}`}>
                         {EQUIPMENT_LABELS[key]}
                     </span>
                 </div>
@@ -81,7 +82,7 @@ export const WorkAtHeightPermit: React.FC<WorkAtHeightPermitProps> = ({ payload,
             <input
                 type="text"
                 id="equip-other"
-                value={payload.access_equipment.other}
+                value={equipment.other || ''}
                 onChange={e => handleOtherChange(e.target.value)}
                 placeholder="Specify any other equipment..."
                 className="w-full p-2.5 text-sm text-gray-900 dark:text-white bg-white dark:bg-dark-background border border-gray-300 dark:border-dark-border rounded-lg shadow-sm focus:ring-2 focus:ring-sky-500 focus:border-transparent outline-none transition-all"

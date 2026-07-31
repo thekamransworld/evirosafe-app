@@ -8,7 +8,7 @@ interface PersonnelEntryLogSectionProps {
   disabled: boolean;
 }
 
-export const PersonnelEntryLogSection: React.FC<PersonnelEntryLogSectionProps> = ({ entries, onChange, disabled }) => {
+export const PersonnelEntryLogSection: React.FC<PersonnelEntryLogSectionProps> = ({ entries = [], onChange, disabled }) => {
   const addRow = () => {
     onChange([...entries, { name: '', time_in: '', time_out: '' }]);
   };
