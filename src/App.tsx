@@ -45,6 +45,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
 import { ToastProvider }  from './components/ui/Toast';
+import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { LoginScreen }    from './components/LoginScreen';
 import { DemoBanner }     from './components/DemoBanner';
 import { Sidebar }        from './components/Sidebar';
@@ -719,7 +721,11 @@ export default function App() {
             <ModalProvider>
               {/* Phase 3: Offline sync wraps everything that needs queueWrite */}
               <OfflineSyncProvider>
-                <AppContent />
+                <ThemeProvider>
+                  <PtwWorkflowProvider>
+                    <AppContent />
+                  </PtwWorkflowProvider>
+                </ThemeProvider>
               </OfflineSyncProvider>
             </ModalProvider>
           </DataProvider>
