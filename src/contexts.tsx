@@ -272,7 +272,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
         await setDoc(doc(db, 'organizations', newOrg.id), newOrg);
         toast.success("Organization created.");
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.error(e);
+        toast.error("Failed to create organization.");
+        setOrganizations(prev => prev.filter(o => o.id !== newOrg.id));
+    }
   };
 
   const handleInviteUser = async (userData: { org_id?: string; name: string; email: string; role: User['role']; project_id?: string; department?: string }) => {
@@ -518,6 +522,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await updateDoc(doc(db, collectionName, id), data);
         } catch (e) {
             console.error(`Error updating ${collectionName}:`, e);
+            throw e;
         }
     };
 
@@ -587,7 +592,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await setDoc(doc(db, 'reports', newReport.id), newReport); 
             await notifyRole(activeOrg.id, 'HSE_MANAGER', `New ${newReport.type} reported by ${activeUser?.name}`, 'warning');
             toast.success("Report saved."); 
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to save report.");
+            setReportList(prev => prev.filter(r => r.id !== newReport.id));
+        }
     };
 
     const handleCreateInspection = async (data: any) => {
@@ -604,12 +613,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await setDoc(doc(db, 'inspections', newInspection.id), newInspection); 
             await notifyRole(activeOrg.id, 'SUPERVISOR', `New Inspection: ${newInspection.title}`, 'info');
             toast.success("Inspection created."); 
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to create inspection.");
+            setInspectionList(prev => prev.filter(i => i.id !== newInspection.id));
+        }
     };
 
     const handleCreateStandaloneAction = async (data: any) => {
         const newAction = {
             id: `act_${Date.now()}`,
+            org_id: activeOrg.id,
             action: data.action,
             owner_id: data.owner_id,
             due_date: data.due_date,
@@ -626,7 +640,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await sendNotification(data.owner_id, `You have been assigned a new action: ${data.action}`, 'info');
             }
             toast.success("Action created."); 
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to create action.");
+            setStandaloneActions(prev => prev.filter(a => a.id !== newAction.id));
+        }
     };
     
     const handleCreateProject = async (data: any) => {
@@ -662,64 +680,94 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // The Guided Permit wizard doesn't collect a dedicated "title" field, so
         // without this fallback newPtw.title is undefined and the PTW list crashes
         // as soon as it's searched (p.title.toLowerCase() on undefined).
-        const newPtw = { ...data, title: data.title || data.description || 'Untitled Permit', id: `ptw_${Date.now()}`, status: 'DRAFT' };
+        const newPtw = { ...data, title: data.title || data.description || 'Untitled Permit', org_id: activeOrg.id, id: `ptw_${Date.now()}`, status: 'DRAFT' };
         setPtwList(prev => [newPtw, ...prev]);
-        try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); }
+        try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); toast.error("Failed to create permit."); setPtwList(prev => prev.filter(p => p.id !== newPtw.id)); }
     };
 
     const handleCreateChecklistTemplate = async (data: any) => {
         const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
         setChecklistTemplates(prev => [...prev, newTemplate]);
-        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); }
+        try { await setDoc(doc(db, 'checklist_templates', newTemplate.id), newTemplate); toast.success("Template created."); } catch (e) { console.error(e); toast.error("Failed to create template."); setChecklistTemplates(prev => prev.filter(t => t.id !== newTemplate.id)); }
     };
 
-    const handleStatusChange = (id: string, status: any) => {
+    const handleStatusChange = async (id: string, status: any) => {
+        const previous = reportList.find(r => r.id === id);
         setReportList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-        updateDB('reports', id, { status });
+        try {
+            await updateDB('reports', id, { status });
+        } catch (e) {
+            toast.error("Failed to update status.");
+            if (previous) setReportList(prev => prev.map(r => r.id === id ? previous : r));
+        }
     };
 
-    const handleCapaActionChange = (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
+    const handleCapaActionChange = async (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
         const report = reportList.find(r => r.id === reportId);
         if (report) {
+            const previousCapa = report.capa;
             const newCapa = [...report.capa];
             if (newCapa[capaIndex]) {
                 newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
                 setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
-                updateDB('reports', reportId, { capa: newCapa });
+                try {
+                    await updateDB('reports', reportId, { capa: newCapa });
+                } catch (e) {
+                    toast.error("Failed to update CAPA status.");
+                    setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: previousCapa } : r));
+                }
             }
         }
     };
 
-    const handleAddCapaAction = (reportId: string, action: Omit<CapaAction, 'status'>) => {
+    const handleAddCapaAction = async (reportId: string, action: Omit<CapaAction, 'status'>) => {
         const report = reportList.find(r => r.id === reportId);
         if (report) {
+            const previousCapa = report.capa;
             const newCapaAction: CapaAction = { ...action, status: 'Open' };
             const newCapa = [...(report.capa || []), newCapaAction];
             setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
-            updateDB('reports', reportId, { capa: newCapa });
-            toast.success("CAPA action added.");
+            try {
+                await updateDB('reports', reportId, { capa: newCapa });
+                toast.success("CAPA action added.");
+            } catch (e) {
+                toast.error("Failed to add CAPA action.");
+                setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: previousCapa } : r));
+            }
         }
     };
 
-    const handleUpdateActionStatus = (origin: any, newStatus: any) => {
+    const handleUpdateActionStatus = async (origin: any, newStatus: any) => {
         if (origin.type === 'report-capa') {
-            handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
+            await handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
         } else if (origin.type === 'standalone') {
+             const previous = standaloneActions.find(a => a.id === origin.parentId);
              setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a));
-             updateDB('actions', origin.parentId, { status: newStatus });
+             try {
+                 await updateDB('actions', origin.parentId, { status: newStatus });
+             } catch (e) {
+                 toast.error("Failed to update action status.");
+                 if (previous) setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? previous : a));
+             }
         }
     };
 
-    const handleUpdateInspection = (inspection: any, action?: any) => {
+    const handleUpdateInspection = async (inspection: any, action?: any) => {
         let updatedInspection = { ...inspection };
         if (action === 'submit') updatedInspection.status = 'Submitted';
         if (action === 'approve') updatedInspection.status = 'Approved';
         if (action === 'close') updatedInspection.status = 'Closed';
         if (action === 'request_revision') updatedInspection.status = 'Ongoing';
 
+        const previous = inspectionList.find(x => x.id === inspection.id);
         setInspectionList(prev => prev.map(x => x.id === inspection.id ? updatedInspection : x));
-        updateDB('inspections', inspection.id, updatedInspection);
-        toast.success("Inspection updated.");
+        try {
+            await updateDB('inspections', inspection.id, updatedInspection);
+            toast.success("Inspection updated.");
+        } catch (e) {
+            toast.error("Failed to update inspection.");
+            if (previous) setInspectionList(prev => prev.map(x => x.id === inspection.id ? previous : x));
+        }
     };
 
     const handleUpdatePtw = async (ptw: any, action?: any) => {
@@ -740,53 +788,133 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await sendNotification(ptw.payload.creator_id, `Your PTW #${ptw.payload.permit_no || ptw.id} was REJECTED`, 'error');
         }
 
+        const previous = ptwList.find(p => p.id === ptw.id);
         setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p));
-        updateDB('ptws', ptw.id, updatedPtw);
-        toast.success("Permit updated.");
-    };
-
-    const handleUpdatePlan = (plan: any) => {
-        setPlanList(prev => prev.map(p => p.id === plan.id ? plan : p));
-        updateDB('plans', plan.id, plan);
-        toast.success("Plan saved.");
-    };
-
-    const handlePlanStatusChange = (id: string, status: any) => {
-        setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p));
-        updateDB('plans', id, { status });
-    };
-
-    const handleUpdateRams = (rams: any) => {
-        setRamsList(prev => prev.map(r => r.id === rams.id ? rams : r));
-        updateDB('rams', rams.id, rams);
-        toast.success("RAMS saved.");
-    };
-
-    const handleRamsStatusChange = (id: string, status: any) => {
-        setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
-        updateDB('rams', id, { status });
-    };
-
-    const handleUpdateTbt = (tbt: any) => {
-        setTbtList(prev => prev.map(t => t.id === tbt.id ? tbt : t));
-        updateDB('tbt_sessions', tbt.id, tbt);
-        toast.success("TBT updated.");
-    };
-
-    const handleAcknowledgeReport = (id: string) => {
-        const report = reportList.find(r => r.id === id);
-        if (report) {
-            const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }];
-            setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: newAcks } : r));
-            updateDB('reports', id, { acknowledgements: newAcks });
+        try {
+            await updateDB('ptws', ptw.id, updatedPtw);
+            toast.success("Permit updated.");
+        } catch (e) {
+            toast.error("Failed to update permit.");
+            if (previous) setPtwList(prev => prev.map(p => p.id === ptw.id ? previous : p));
         }
     };
 
-    const handleCreateOrUpdateCourse = (c: any) => setTrainingCourseList(prev => [...prev.filter(x => x.id !== c.id), c]);
-    const handleScheduleSession = (d: any) => setTrainingSessionList(prev => [{ ...d, id: `ts_${Date.now()}`, roster: [] } as any, ...prev]);
-    const handleCloseSession = (id: string, att: any) => setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
+    const handleUpdatePlan = async (plan: any) => {
+        const previous = planList.find(p => p.id === plan.id);
+        setPlanList(prev => prev.map(p => p.id === plan.id ? plan : p));
+        try {
+            await updateDB('plans', plan.id, plan);
+            toast.success("Plan saved.");
+        } catch (e) {
+            toast.error("Failed to save plan.");
+            if (previous) setPlanList(prev => prev.map(p => p.id === plan.id ? previous : p));
+        }
+    };
 
-    const handleCreatePlan = (d: any) => {
+    const handlePlanStatusChange = async (id: string, status: any) => {
+        const previous = planList.find(p => p.id === id);
+        setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+        try {
+            await updateDB('plans', id, { status });
+        } catch (e) {
+            toast.error("Failed to update plan status.");
+            if (previous) setPlanList(prev => prev.map(p => p.id === id ? previous : p));
+        }
+    };
+
+    const handleUpdateRams = async (rams: any) => {
+        const previous = ramsList.find(r => r.id === rams.id);
+        setRamsList(prev => prev.map(r => r.id === rams.id ? rams : r));
+        try {
+            await updateDB('rams', rams.id, rams);
+            toast.success("RAMS saved.");
+        } catch (e) {
+            toast.error("Failed to save RAMS.");
+            if (previous) setRamsList(prev => prev.map(r => r.id === rams.id ? previous : r));
+        }
+    };
+
+    const handleRamsStatusChange = async (id: string, status: any) => {
+        const previous = ramsList.find(r => r.id === id);
+        setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+        try {
+            await updateDB('rams', id, { status });
+        } catch (e) {
+            toast.error("Failed to update RAMS status.");
+            if (previous) setRamsList(prev => prev.map(r => r.id === id ? previous : r));
+        }
+    };
+
+    const handleUpdateTbt = async (tbt: any) => {
+        const previous = tbtList.find(t => t.id === tbt.id);
+        setTbtList(prev => prev.map(t => t.id === tbt.id ? tbt : t));
+        try {
+            await updateDB('tbt_sessions', tbt.id, tbt);
+            toast.success("TBT updated.");
+        } catch (e) {
+            toast.error("Failed to update TBT.");
+            if (previous) setTbtList(prev => prev.map(t => t.id === tbt.id ? previous : t));
+        }
+    };
+
+    const handleAcknowledgeReport = async (id: string) => {
+        const report = reportList.find(r => r.id === id);
+        if (report) {
+            const previousAcks = report.acknowledgements;
+            const newAcks = [...report.acknowledgements, { user_id: activeUser?.id || '', acknowledged_at: new Date().toISOString() }];
+            setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: newAcks } : r));
+            try {
+                await updateDB('reports', id, { acknowledgements: newAcks });
+            } catch (e) {
+                toast.error("Failed to record acknowledgement.");
+                setReportList(prev => prev.map(r => r.id === id ? { ...r, acknowledgements: previousAcks } : r));
+            }
+        }
+    };
+
+    const handleCreateOrUpdateCourse = async (c: any) => {
+        const isNew = !trainingCourseList.some(x => x.id === c.id);
+        const courseId = c.id || `course_${Date.now()}`;
+        const course = { ...c, org_id: activeOrg.id, id: courseId };
+        const previous = trainingCourseList;
+        setTrainingCourseList(prev => [...prev.filter(x => x.id !== courseId), course]);
+        try {
+            await setDoc(doc(db, 'training_courses', courseId), course);
+            toast.success(isNew ? "Course created." : "Course updated.");
+        } catch (e) {
+            console.error('Failed to save course:', e);
+            toast.error("Failed to save course.");
+            setTrainingCourseList(previous);
+        }
+    };
+
+    const handleScheduleSession = async (d: any) => {
+        const newSession = { ...d, org_id: activeOrg.id, id: `ts_${Date.now()}`, roster: [] } as any;
+        setTrainingSessionList(prev => [newSession, ...prev]);
+        try {
+            await setDoc(doc(db, 'training_sessions', newSession.id), newSession);
+            toast.success("Session scheduled.");
+        } catch (e) {
+            console.error('Failed to schedule session:', e);
+            toast.error("Failed to schedule session.");
+            setTrainingSessionList(prev => prev.filter(s => s.id !== newSession.id));
+        }
+    };
+
+    const handleCloseSession = async (id: string, att: any) => {
+        const previous = trainingSessionList.find(s => s.id === id);
+        setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
+        try {
+            await updateDoc(doc(db, 'training_sessions', id), { status: 'completed', attendance: att });
+            toast.success("Session closed.");
+        } catch (e) {
+            console.error('Failed to close session:', e);
+            toast.error("Failed to close session.");
+            if (previous) setTrainingSessionList(prev => prev.map(s => s.id === id ? previous : s));
+        }
+    };
+
+    const handleCreatePlan = async (d: any) => {
         const newPlan: any = {
             id: `plan_${Date.now()}`,
             org_id: activeOrg.id,
@@ -817,12 +945,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         setPlanList(prev => [newPlan, ...prev]);
         try {
-            setDoc(doc(db, 'plans', newPlan.id), newPlan);
+            await setDoc(doc(db, 'plans', newPlan.id), newPlan);
             toast.success("Plan created successfully.");
-        } catch(e) { console.error(e); }
+        } catch(e) {
+            console.error('Failed to save plan:', e);
+            toast.error("Failed to save plan.");
+            setPlanList(prev => prev.filter(p => p.id !== newPlan.id));
+        }
     };
 
-    const handleCreateRams = (d: any) => {
+    const handleCreateRams = async (d: any) => {
         const newRams: any = {
             id: `rams_${Date.now()}`,
             org_id: activeOrg.id,
@@ -858,12 +990,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         setRamsList(prev => [newRams, ...prev]);
         try {
-            setDoc(doc(db, 'rams', newRams.id), newRams);
+            await setDoc(doc(db, 'rams', newRams.id), newRams);
             toast.success("RAMS created successfully.");
-        } catch(e) { console.error(e); }
+        } catch(e) {
+            console.error('Failed to save RAMS:', e);
+            toast.error("Failed to save RAMS.");
+            setRamsList(prev => prev.filter(r => r.id !== newRams.id));
+        }
     };
 
-    const handleCreateTbt = (d: any) => setTbtList(prev => [{ ...d, id: `tbt_${Date.now()}`, attendees: [] } as any, ...prev]);
+    const handleCreateTbt = async (d: any) => {
+        const newTbt = { ...d, org_id: activeOrg.id, id: `tbt_${Date.now()}`, attendees: [] } as any;
+        setTbtList(prev => [newTbt, ...prev]);
+        try {
+            await setDoc(doc(db, 'tbt_sessions', newTbt.id), newTbt);
+            toast.success("Toolbox Talk saved.");
+        } catch (e) {
+            console.error('Failed to save TBT:', e);
+            toast.error("Failed to save Toolbox Talk.");
+            setTbtList(prev => prev.filter(t => t.id !== newTbt.id));
+        }
+    };
 
     const actionItems = useMemo<ActionItem[]>(() => {
         const items: ActionItem[] = [];
