@@ -60,7 +60,7 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
         project_id: projects[0]?.id || '',
         type: 'Unsafe Condition' as ReportType,
         occurred_at: new Date().toISOString().slice(0, 16),
-        location: { text: '', specific_area: '', geo: undefined },
+        location: { text: '', specific_area: '' } as { text: string; specific_area: string; geo?: { lat: number; lng: number } },
         description: '',
         evidence_urls: [] as string[],
         risk_pre_control: { severity: 1 as Severity, likelihood: 1 as Likelihood },
