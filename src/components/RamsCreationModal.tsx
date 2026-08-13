@@ -24,7 +24,7 @@ type AiContent = {
 interface RamsCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { activity: string; location: string; project_id: string, aiContent: AiContent }) => void;
+  onSubmit: (data: { activity: string; location: string; project_id: string, aiContent?: AiContent }) => void;
   projects: Project[];
   activeUser: User;
 }
@@ -100,11 +100,12 @@ export const RamsCreationModal: React.FC<RamsCreationModalProps> = ({ isOpen, on
         setError('Please fill out the Activity Title and select a Project.');
         return;
     }
-    if (!aiResult) {
-        setError('Please generate the method statement with AI first.');
-        return;
-    }
-    onSubmit({ ...formData, aiContent: aiResult });
+    // AI generation is paused app-wide (AI_FEATURES_ENABLED = false), so aiResult is
+    // legitimately null here — that's no longer a hard blocker. handleCreateRams in
+    // contexts.tsx already falls back to an empty method_statement when aiContent is
+    // missing, so this never sends a literal `undefined` field to Firestore. The
+    // resulting draft RAMS can be filled in via RamsEditorModal afterward.
+    onSubmit({ ...formData, aiContent: aiResult ?? undefined });
     onClose();
   };
 
@@ -183,6 +184,9 @@ export const RamsCreationModal: React.FC<RamsCreationModalProps> = ({ isOpen, on
                     >
                         Generate Comprehensive RAMS <span className="ml-2 text-[10px] font-bold uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">Soon</span>
                     </Button>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+                        AI generation is paused for now — create the RAMS and add the method statement steps manually afterward.
+                    </p>
                 </div>
             </div>
 
@@ -244,7 +248,7 @@ export const RamsCreationModal: React.FC<RamsCreationModalProps> = ({ isOpen, on
         {/* Footer */}
         <div className="p-6 border-t dark:border-gray-700 flex justify-end gap-3 bg-white dark:bg-slate-900 rounded-b-xl">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!aiResult || !formData.activity}>Create RAMS</Button>
+          <Button onClick={handleSubmit} disabled={!formData.activity.trim() || !formData.project_id}>Create RAMS</Button>
         </div>
       </div>
     </div>
