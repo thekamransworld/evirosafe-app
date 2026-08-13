@@ -5,8 +5,13 @@ const CLOUD_NAME = "dsw9llfdo";
 const UPLOAD_PRESET = "evirosafe"; 
 
 export const uploadFileToCloud = async (file: File, folder: string = 'general'): Promise<string> => {
-  // API Endpoint for your specific cloud name
-  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  // Use the 'auto' resource type, not a hardcoded 'image' endpoint. Evidence
+  // uploads aren't restricted to images (ReportCreationModal's file input has
+  // no `accept` filter), and non-image files like .xlsx are internally ZIP
+  // containers — Cloudinary's `image` endpoint runs ZIP detection as a
+  // security check and rejects them with 400 "Unsupported ZIP file". `auto`
+  // detects image/video/raw per-file instead of assuming everything is an image.
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/auto/upload`;
   
   const formData = new FormData();
   formData.append('file', file);
