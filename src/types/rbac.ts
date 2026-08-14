@@ -5,7 +5,7 @@ export type Resource =
   | 'training' | 'people' | 'settings' | 'organizations' | 'projects' 
   | 'checklists' | 'signage' | 'tbt' | 'housekeeping' | 'actions' 
   | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights'
-  | 'plans' | 'roles' | 'files' | 'analytics'; // <--- Added 'files' and 'analytics'
+  | 'plans' | 'roles' | 'files' | 'analytics' | 'chemicals';
 
 export type Action = 'read' | 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'close' | 'export' | 'assign';
 

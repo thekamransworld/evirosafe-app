@@ -2,39 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
+import { ChemicalCreationModal } from './ChemicalCreationModal';
+import type { Chemical, GhsHazard } from '../types';
 import {
   Plus, X, Search, AlertTriangle, ExternalLink,
   ChevronRight, Flame, Skull, Droplets, Wind,
   Eye, Shield, Package, FileText
 } from 'lucide-react';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type GhsHazard =
-  | 'explosive' | 'flammable' | 'oxidising' | 'compressed_gas'
-  | 'corrosive' | 'toxic' | 'irritant' | 'environmental'
-  | 'health_hazard';
-
-export interface Chemical {
-  id:              string;
-  substance_name:  string;
-  trade_name:      string;
-  manufacturer:    string;
-  cas_number:      string;
-  un_number:       string;
-  hazard_class:    string;
-  ghs_hazards:     GhsHazard[];
-  sds_url:         string;
-  quantity_on_site:number;
-  unit:            string;
-  storage_location:string;
-  ppe_required:    string[];
-  first_aid:       string;
-  disposal_method: string;
-  status:          'active' | 'removed';
-  last_review:     string;
-}
 
 // ─── GHS config ───────────────────────────────────────────────────────────────
 
@@ -50,70 +25,17 @@ const GHS_CONFIG: Record<GhsHazard, { label: string; color: string; symbol: stri
   health_hazard:    { label: 'Health Hazard',  color: 'text-pink-600',   symbol: '⚠️' },
 };
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_CHEMICALS: Chemical[] = [
-  {
-    id: 'chem-001', substance_name: 'Diesel Fuel', trade_name: 'Diesel EN590',
-    manufacturer: 'Saudi Aramco', cas_number: '68334-30-5', un_number: 'UN1202',
-    hazard_class: 'Class 3 Flammable Liquid', ghs_hazards: ['flammable', 'environmental', 'health_hazard'],
-    sds_url: '', quantity_on_site: 5000, unit: 'L',
-    storage_location: 'Fuel storage compound — Zone D, bunded area',
-    ppe_required: ['Chemical gloves', 'Safety glasses', 'Safety boots'],
-    first_aid: 'Skin contact: wash with soap and water. Eye contact: flush with water 15 minutes. Ingestion: do not induce vomiting, seek medical attention.',
-    disposal_method: 'Collect in approved containers. Dispose via licensed waste contractor. Do not pour down drains.',
-    status: 'active', last_review: '2024-06-01',
-  },
-  {
-    id: 'chem-002', substance_name: 'Hydrochloric Acid (33%)', trade_name: 'Muriatic Acid',
-    manufacturer: 'SABIC', cas_number: '7647-01-0', un_number: 'UN1789',
-    hazard_class: 'Class 8 Corrosive', ghs_hazards: ['corrosive', 'toxic', 'irritant'],
-    sds_url: '', quantity_on_site: 200, unit: 'L',
-    storage_location: 'Chemical storage — locked cage, ventilated store',
-    ppe_required: ['Chemical face shield', 'Acid-resistant gloves', 'Acid-resistant apron', 'Safety boots', 'Respirator P2'],
-    first_aid: 'Eye contact: immediately flush with water for 20 minutes, seek hospital. Skin: remove clothing, flush with water 20 minutes. Inhalation: move to fresh air, seek medical attention.',
-    disposal_method: 'Neutralise with sodium bicarbonate. Dispose via licensed hazardous waste contractor. Never dilute with water.',
-    status: 'active', last_review: '2024-08-15',
-  },
-  {
-    id: 'chem-003', substance_name: 'Acetylene', trade_name: 'Dissolved Acetylene',
-    manufacturer: 'Air Liquide', cas_number: '74-86-2', un_number: 'UN1001',
-    hazard_class: 'Class 2.1 Flammable Gas', ghs_hazards: ['flammable', 'explosive', 'compressed_gas'],
-    sds_url: '', quantity_on_site: 20, unit: 'cylinders',
-    storage_location: 'Gas cylinder storage — chained upright, minimum 3m from oxygen',
-    ppe_required: ['Welding gloves', 'Welding visor', 'Flame-resistant clothing'],
-    first_aid: 'Inhalation: move to fresh air, call emergency services if unconscious. No specific antidote — supportive treatment.',
-    disposal_method: 'Return empty cylinders to supplier. Do not puncture or incinerate.',
-    status: 'active', last_review: '2024-09-01',
-  },
-  {
-    id: 'chem-004', substance_name: 'Epoxy Resin (Part A)', trade_name: 'SikaDur 31',
-    manufacturer: 'Sika', cas_number: '25085-99-8', un_number: 'N/A',
-    hazard_class: 'Not classified as dangerous goods', ghs_hazards: ['irritant', 'health_hazard', 'environmental'],
-    sds_url: '', quantity_on_site: 50, unit: 'kg',
-    storage_location: 'Chemical store — temperature 5–30°C',
-    ppe_required: ['Nitrile gloves', 'Safety glasses', 'Dust mask FFP2'],
-    first_aid: 'Skin: wash with soap and water. Eyes: flush with water. If skin sensitisation develops, remove from further exposure.',
-    disposal_method: 'Cure before disposal. Dispose as non-hazardous solid waste. Uncured: dispose via hazardous waste.',
-    status: 'active', last_review: '2024-07-20',
-  },
-  {
-    id: 'chem-005', substance_name: 'Chlorinated Solvent (Trichloroethylene)', trade_name: 'Triklone',
-    manufacturer: 'Solvay', cas_number: '79-01-6', un_number: 'UN1710',
-    hazard_class: 'Class 6.1 Toxic', ghs_hazards: ['toxic', 'health_hazard', 'environmental'],
-    sds_url: '', quantity_on_site: 0, unit: 'L',
-    storage_location: 'Removed from site',
-    ppe_required: ['Full face respirator', 'Chemical suit', 'Butyl rubber gloves'],
-    first_aid: 'Inhalation: remove to fresh air immediately. Liver/kidney toxin — seek urgent medical care.',
-    disposal_method: 'Licensed hazardous waste contractor only.',
-    status: 'removed', last_review: '2024-03-01',
-  },
-];
-
 // ─── Chemical Detail Modal ────────────────────────────────────────────────────
 
 const ChemicalDetailModal: React.FC<{ chemical: Chemical; onClose: () => void }> = ({ chemical, onClose }) => {
+  const { can } = useAppContext();
+  const { handleUpdateChemical } = useDataContext();
   const isHighRisk = chemical.ghs_hazards.includes('toxic') || chemical.ghs_hazards.includes('explosive') || chemical.ghs_hazards.includes('corrosive');
+
+  const toggleStatus = () => {
+    handleUpdateChemical({ ...chemical, status: chemical.status === 'active' ? 'removed' : 'active' });
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -207,6 +129,11 @@ const ChemicalDetailModal: React.FC<{ chemical: Chemical; onClose: () => void }>
                 View SDS
               </Button>
             )}
+            {can('update', 'chemicals') && (
+              <Button variant={chemical.status === 'active' ? 'danger' : 'primary'} onClick={toggleStatus}>
+                {chemical.status === 'active' ? 'Mark as Removed' : 'Reactivate'}
+              </Button>
+            )}
             <Button variant="secondary" onClick={onClose}>Close</Button>
           </div>
         </footer>
@@ -219,10 +146,11 @@ const ChemicalDetailModal: React.FC<{ chemical: Chemical; onClose: () => void }>
 
 export const ChemicalRegister: React.FC = () => {
   const { can } = useAppContext();
-  const [chemicals] = useState<Chemical[]>(MOCK_CHEMICALS);
+  const { chemicalList: chemicals, handleCreateChemical } = useDataContext();
   const [selected, setSelected]   = useState<Chemical | null>(null);
   const [search, setSearch]       = useState('');
   const [showActive, setShowActive] = useState(true);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const filtered = useMemo(() =>
     chemicals.filter(c => {
@@ -248,8 +176,8 @@ export const ChemicalRegister: React.FC = () => {
           <h1 className="text-3xl font-bold text-text-primary dark:text-white">Chemical / COSHH Register</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Hazardous substance inventory and SDS management</p>
         </div>
-        {can('create', 'reports') && (
-          <Button leftIcon={<Plus className="w-4 h-4" />}>Add Chemical</Button>
+        {can('create', 'chemicals') && (
+          <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setIsCreateOpen(true)}>Add Chemical</Button>
         )}
       </div>
 
@@ -336,6 +264,7 @@ export const ChemicalRegister: React.FC = () => {
       </div>
 
       {selected && <ChemicalDetailModal chemical={selected} onClose={() => setSelected(null)} />}
+      <ChemicalCreationModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onSubmit={handleCreateChemical} />
     </div>
   );
 };

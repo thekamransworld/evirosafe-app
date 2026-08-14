@@ -85,6 +85,7 @@ export const allPossiblePermissions: { resource: Resource; actions: Action[]; sc
     { resource: 'roles', actions: ['read', 'create', 'update'], scopes: ['org'] },
     { resource: 'settings', actions: ['read', 'update'], scopes: ['org', 'own'] },
     { resource: 'hse-statistics', actions: ['read'], scopes: ['org'] },
+    { resource: 'chemicals', actions: allActions, scopes: ['org', 'project'] },
 ];
 
 export const roles: Role[] = [

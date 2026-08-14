@@ -93,7 +93,34 @@ export interface Project {
 }
 
 export type Resource = 
-  | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights';
+  | 'dashboard' | 'reports' | 'inspections' | 'plans' | 'rams' | 'training' | 'people' | 'settings' | 'files' | 'analytics' | 'checklists' | 'signage' | 'tbt' | 'organizations' | 'projects' | 'roles' | 'ptw' | 'housekeeping' | 'actions' | 'site-map' | 'certification' | 'hse-statistics' | 'ai-insights' | 'chemicals';
+
+// --- CHEMICAL / COSHH REGISTER ---
+export type GhsHazard =
+  | 'explosive' | 'flammable' | 'oxidising' | 'compressed_gas'
+  | 'corrosive' | 'toxic' | 'irritant' | 'environmental'
+  | 'health_hazard';
+
+export interface Chemical {
+  id:               string;
+  org_id:           string;
+  substance_name:   string;
+  trade_name:       string;
+  manufacturer:     string;
+  cas_number:       string;
+  un_number:        string;
+  hazard_class:     string;
+  ghs_hazards:      GhsHazard[];
+  sds_url:          string;
+  quantity_on_site: number;
+  unit:             string;
+  storage_location: string;
+  ppe_required:     string[];
+  first_aid:        string;
+  disposal_method:  string;
+  status:           'active' | 'removed';
+  last_review:      string;
+}
 
 export type View = Resource | string;
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';

@@ -12,7 +12,7 @@ import { translations, supportedLanguages, roles } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction
+  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical
 } from './types';
 import { useToast } from './components/ui/Toast';
 
@@ -359,6 +359,7 @@ interface DataContextType {
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
   actionItems: ActionItem[];
+  chemicalList: Chemical[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -389,6 +390,8 @@ interface DataContextType {
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
+  handleCreateChemical: (data: any) => void;
+  handleUpdateChemical: (data: Chemical) => void;
 
   // --- DELETE HANDLERS ---
   handleDeleteReport: (id: string) => void;
@@ -423,6 +426,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
+    const [chemicalList, setChemicalList] = useState<Chemical[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -506,6 +510,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('training_records', setTrainingRecordList),
             fetchCol('training_sessions', setTrainingSessionList),
             fetchCol('notifications', setNotifications),
+            fetchCol('chemicals', setChemicalList),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -617,6 +622,38 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error(e);
             toast.error("Failed to create inspection.");
             setInspectionList(prev => prev.filter(i => i.id !== newInspection.id));
+        }
+    };
+
+    const handleCreateChemical = async (data: any) => {
+        const newChemical: Chemical = {
+            ...data,
+            id: `chem_${Date.now()}`,
+            org_id: activeOrg.id,
+            status: 'active',
+            last_review: new Date().toISOString(),
+        };
+        setChemicalList(prev => [newChemical, ...prev]);
+        try {
+            await setDoc(doc(db, 'chemicals', newChemical.id), newChemical);
+            toast.success("Chemical added to register.");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to add chemical.");
+            setChemicalList(prev => prev.filter(c => c.id !== newChemical.id));
+        }
+    };
+
+    const handleUpdateChemical = async (updated: Chemical) => {
+        const previous = chemicalList.find(c => c.id === updated.id);
+        setChemicalList(prev => prev.map(c => c.id === updated.id ? updated : c));
+        try {
+            await updateDoc(doc(db, 'chemicals', updated.id), updated as any);
+            toast.success("Chemical updated.");
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to update chemical.");
+            if (previous) setChemicalList(prev => prev.map(c => c.id === updated.id ? previous : c));
         }
     };
 
@@ -1037,14 +1074,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems,
+        actionItems, chemicalList,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate,
+        handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical,
         handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 

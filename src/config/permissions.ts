@@ -24,7 +24,8 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
     defaultScope: 'org',
     permissions: [
       // Admin has access to everything. We list base permissions here.
-      { resource: 'organizations', actions: ['create', 'delete', 'read', 'update'], scope: 'org' }
+      { resource: 'organizations', actions: ['create', 'delete', 'read', 'update'], scope: 'org' },
+      { resource: 'chemicals', actions: ['read', 'create', 'update', 'delete', 'export'], scope: 'org' }
     ]
   },
   'ORG_ADMIN': {
@@ -39,6 +40,7 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       { resource: 'settings', actions: ['read', 'update'], scope: 'org' },
       { resource: 'reports', actions: ['read', 'export'], scope: 'org' },
       { resource: 'inspections', actions: ['read', 'export'], scope: 'org' },
+      { resource: 'chemicals', actions: ['read', 'create', 'update', 'export'], scope: 'org' },
     ]
   },
   'HSE_MANAGER': {
@@ -56,6 +58,7 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       { resource: 'training', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
       { resource: 'actions', actions: ['read', 'create', 'update', 'approve', 'export', 'assign'], scope: 'org' },
       { resource: 'people', actions: ['read', 'assign'], scope: 'org' },
+      { resource: 'chemicals', actions: ['read', 'create', 'update', 'delete', 'approve', 'export'], scope: 'org' },
     ]
   },
   'SUPERVISOR': {
@@ -70,6 +73,7 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       { resource: 'tbt', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
       { resource: 'training', actions: ['read', 'assign'], scope: 'project' },
       { resource: 'actions', actions: ['read', 'update', 'assign'], scope: 'project' },
+      { resource: 'chemicals', actions: ['read', 'create', 'update'], scope: 'project' },
     ]
   },
   'HSE_OFFICER': {
@@ -84,6 +88,7 @@ export const ROLE_DEFINITIONS: Record<string, RoleDefinition> = {
       { resource: 'checklists', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
       { resource: 'tbt', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
       { resource: 'actions', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+      { resource: 'chemicals', actions: ['read', 'create', 'update'], scope: 'project' },
     ]
   },
   'INSPECTOR': {
