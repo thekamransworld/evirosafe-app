@@ -1,0 +1,118 @@
+rules_version = '2';
+
+// ── How this works ──────────────────────────────────────────────────────────
+// Firestore rules can only look up a document by its exact known path — they
+// can't run a query like "where auth_uid == X" the way client code can. This
+// app's user documents keep their original invite-time ID forever (see the
+// comment in AuthContext.tsx's signup() for why), so the document ID is NOT
+// the same as the Firebase Auth UID. To bridge that, every activated account
+// gets a small pointer doc at users_by_uid/{authUid} containing just
+// { docId, org_id, role }. These rules read that pointer to find out who's
+// asking and what org they belong to, then scope everything else by org_id.
+//
+// If you change how a user's role or org_id gets set anywhere in the app,
+// make sure the matching users_by_uid/{authUid} doc gets updated too — see
+// handleUpdateUser and signup() in the codebase, both of which already do
+// this. A stale pointer means stale permissions.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myPointer() {
+      return get(/databases/$(database)/documents/users_by_uid/$(request.auth.uid)).data;
+    }
+
+    function myOrgId() {
+      return myPointer().org_id;
+    }
+
+    function myRole() {
+      return myPointer().role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && myRole() in ['ADMIN', 'ORG_ADMIN'];
+    }
+
+    // True if `data` (a resource's fields) belongs to the caller's own org.
+    // Evaluates to false (not an error) if the caller has no pointer doc yet —
+    // covers the brief window between signup and the pointer being written.
+    function isOrgScoped(data) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users_by_uid/$(request.auth.uid)) &&
+        data.org_id == myOrgId();
+    }
+
+    // ---- Pointer collection ----
+    // Only the account owner can ever read or write their own pointer. Never
+    // listable — nobody queries this collection, they always know their own
+    // UID (it's their own auth.uid), which is all this collection is keyed by.
+    match /users_by_uid/{uid} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---- Users ----
+    match /users/{userId} {
+      // AuthSync resolves identity in three ways, and each one needs its own
+      // directly-provable condition here — Firestore can only approve a query
+      // against a rule that references the exact field the query filters by,
+      // so a compound condition that never mentions auth_uid can never approve
+      // a query filtered on auth_uid, no matter how it's combined with OR.
+      allow read: if isSignedIn() && (
+        resource.data.auth_uid == request.auth.uid ||
+        resource.data.email == request.auth.token.email ||
+        isOrgScoped(resource.data)
+      );
+      // Invites create new user docs before that person has ever signed in,
+      // so this can't require the pointer to exist — only that the creator
+      // is a real admin of the org they're inviting into.
+      allow create: if isAdmin() && request.resource.data.org_id == myOrgId();
+      // You can always update your own record (self-service profile changes);
+      // admins can update anyone in their own org. Nobody can move a record
+      // to a different org_id than it already had via this path.
+      allow update: if isSignedIn() && (
+        resource.data.email == request.auth.token.email ||
+        (isAdmin() && isOrgScoped(resource.data))
+      ) && request.resource.data.org_id == resource.data.org_id;
+      allow delete: if isAdmin() && isOrgScoped(resource.data);
+    }
+
+    // ---- Organizations ----
+    // Orgs aren't org_id-scoped themselves (they ARE the org) — scoped by
+    // the document's own ID matching the caller's org_id instead.
+    match /organizations/{orgId} {
+      allow read: if isSignedIn() && orgId == myOrgId();
+      // Creating a brand-new org has no existing pointer to check against yet
+      // — this is the bootstrap path. Anyone signed in can create one; update
+      // and delete require already being an admin of that specific org.
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin() && orgId == myOrgId();
+    }
+
+    // ---- Every other collection: same rule, org_id must match ----
+    match /projects/{docId}            { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /reports/{docId}             { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /inspections/{docId}         { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /ptws/{docId}                { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /checklist_templates/{docId} { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /checklist_runs/{docId}      { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /plans/{docId}               { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /rams/{docId}                { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /signs/{docId}               { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /actions/{docId}             { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /tbt_sessions/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /training_courses/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /training_records/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /training_sessions/{docId}   { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /notifications/{docId}       { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /chemicals/{docId}           { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /audit_logs/{docId}          { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+
+    // Everything not explicitly matched above is denied by default — this is
+    // Firestore's normal behavior, not something this file has to state.
+  }
+}
