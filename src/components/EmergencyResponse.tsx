@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
 import {
   Plus, X, Phone, MapPin, Calendar, Clock,
   CheckCircle, AlertTriangle, ChevronRight,
@@ -33,19 +33,7 @@ export interface DrillLog {
   improvements:    string;
 }
 
-export interface EmergencyPlan {
-  id:                string;
-  type:              ErpType;
-  title:             string;
-  description:       string;
-  assembly_point:    string;
-  emergency_contacts: EmergencyContact[];
-  procedures:        string;
-  last_drilled_at:   string | null;
-  review_date:       string;
-  drill_logs:        DrillLog[];
-  status:            'active' | 'under_review' | 'archived';
-}
+import type { EmergencyPlan } from '../types';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +50,7 @@ const ERP_TYPES: Record<ErpType, { label: string; icon: React.FC<any>; color: st
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const MOCK_PLANS: EmergencyPlan[] = [
+const MOCK_PLANS: Omit<EmergencyPlan, 'org_id'>[] = [
   {
     id: 'erp-001', type: 'fire', title: 'Site Fire Emergency Response Plan',
     description: 'Comprehensive fire emergency procedure for all site areas including offices, storage and construction zones.',
@@ -357,7 +345,10 @@ const PlanDetailModal: React.FC<{
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const EmergencyResponse: React.FC = () => {
-  const [plans, setPlans]       = useState<EmergencyPlan[]>(MOCK_PLANS);
+  const { emergencyPlans, handleCreateEmergencyPlan } = useDataContext();
+  // Real data if this org has saved any plans yet; otherwise show the
+  // default template set so there's something to edit from on first use.
+  const plans = emergencyPlans.length > 0 ? emergencyPlans : (MOCK_PLANS as EmergencyPlan[]);
   const [selected, setSelected] = useState<EmergencyPlan | null>(null);
 
   const stats = useMemo(() => ({
@@ -370,8 +361,11 @@ export const EmergencyResponse: React.FC = () => {
     reviewOverdue: plans.filter(p => daysUntil(p.review_date) < 0).length,
   }), [plans]);
 
-  const handleUpdate = (updated: EmergencyPlan) =>
-    setPlans(prev => prev.map(p => p.id === updated.id ? updated : p));
+  // setDoc-based (create/upsert), not updateDoc - a plan being edited for
+  // the first time doesn't exist in Firestore yet (it was only ever a
+  // default template), so a strict update would fail with "no document
+  // to update".
+  const handleUpdate = (updated: EmergencyPlan) => handleCreateEmergencyPlan(updated);
 
   return (
     <div className="space-y-6">

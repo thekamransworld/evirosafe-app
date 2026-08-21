@@ -56,23 +56,7 @@ interface EnvParameter {
   description: string;
 }
 
-interface EnvReading {
-  id: string;
-  org_id: string;
-  parameter_id: string;
-  parameter_name: string;
-  category: MediaCategory;
-  value: number;
-  unit: string;
-  reading_date: string;
-  location: string;
-  project_id: string;
-  recorded_by: string;
-  notes: string;
-  exceeds_limit: boolean;
-  exceeds_target: boolean;
-  created_at: string;
-}
+import type { EnvReading } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seed parameters (customisable per organisation)
@@ -357,16 +341,15 @@ const ParameterCard: React.FC<ParamCardProps> = ({ param, readings }) => {
 
 export const EnvironmentalMonitor: React.FC = () => {
   const { activeUser, activeOrg } = useAppContext();
-  const { projects } = useDataContext();
+  const { projects, envReadings: readings, handleCreateEnvReading } = useDataContext();
 
-  const [readings, setReadings]         = useState<EnvReading[]>([]);
   const [parameters]                    = useState<EnvParameter[]>(DEFAULT_PARAMETERS);
   const [activeCategory, setActiveCategory] = useState<MediaCategory | 'All'>('All');
   const [showForm, setShowForm]         = useState(false);
   const [activeTab, setActiveTab]       = useState<'overview' | 'readings' | 'alerts'>('overview');
 
   const handleSave = (reading: EnvReading) => {
-    setReadings((prev) => [reading, ...prev]);
+    handleCreateEnvReading(reading);
     setShowForm(false);
     writeAuditLog({
       org_id: activeOrg?.id ?? '',

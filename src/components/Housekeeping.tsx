@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import type { ChecklistTemplate, ChecklistRun } from '../types';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
@@ -47,7 +49,7 @@ export const Housekeeping: React.FC = () => {
         setDetailModalOpen(true);
     }
     
-    const handleSubmitRun = (data: Omit<ChecklistRun, 'id' | 'org_id' | 'executed_by_id' | 'executed_at'>) => {
+    const handleSubmitRun = async (data: Omit<ChecklistRun, 'id' | 'org_id' | 'executed_by_id' | 'executed_at'>) => {
         if (!activeUser) return;
         const newRun: ChecklistRun = {
             ...data,
@@ -59,6 +61,12 @@ export const Housekeeping: React.FC = () => {
         setChecklistRunList(prev => [newRun, ...prev]);
         setRunModalOpen(false);
         setSelectedTemplate(null);
+        try {
+            await setDoc(doc(db, 'checklist_runs', newRun.id), newRun);
+        } catch (e) {
+            console.error(e);
+            setChecklistRunList(prev => prev.filter(r => r.id !== newRun.id));
+        }
     };
 
     if (!activeUser) return null;

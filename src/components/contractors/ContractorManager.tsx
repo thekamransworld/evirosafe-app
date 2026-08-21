@@ -41,43 +41,7 @@ import { exportTableToCsv } from '../../lib/exportUtils';
 type InductionStatus = 'Pending' | 'Completed' | 'Expired' | 'Exempted';
 type AccessStatus    = 'On-site' | 'Off-site' | 'Suspended';
 type ContractorTier  = 'Approved' | 'Conditional' | 'Under Review' | 'Suspended';
-
-interface ContractorCompany {
-  id: string;
-  org_id: string;
-  company_name: string;
-  contact_name: string;
-  contact_phone: string;
-  contact_email: string;
-  trade: string;
-  tier: ContractorTier;
-  insurance_expiry: string;
-  insurance_number: string;
-  prequalification_date: string;
-  prequalification_expiry: string;
-  performance_score: number;   // 0–100
-  active_workers: number;
-  notes: string;
-  created_at: string;
-}
-
-interface ContractorWorker {
-  id: string;
-  org_id: string;
-  company_id: string;
-  name: string;
-  trade: string;
-  id_number: string;
-  phone: string;
-  induction_status: InductionStatus;
-  induction_date: string;
-  induction_expiry: string;
-  medical_clearance: boolean;
-  medical_expiry: string;
-  access_status: AccessStatus;
-  current_project_id: string;
-  created_at: string;
-}
+import type { ContractorCompany, ContractorWorker } from '../../types';
 
 interface SiteAccessLog {
   id: string;
@@ -307,10 +271,8 @@ type Tab = 'companies' | 'workers' | 'access-log';
 
 export const ContractorManager: React.FC = () => {
   const { activeUser, activeOrg } = useAppContext();
-  const { projects } = useDataContext();
+  const { projects, contractorCompanies: companies, contractorWorkers: workers, handleCreateContractorCompany, handleCreateContractorWorker, handleUpdateContractorWorker } = useDataContext();
 
-  const [companies, setCompanies] = useState<ContractorCompany[]>([]);
-  const [workers, setWorkers]     = useState<ContractorWorker[]>([]);
   const [accessLog, setAccessLog] = useState<SiteAccessLog[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('companies');
   const [showCompanyForm, setShowCompanyForm] = useState(false);
@@ -319,13 +281,13 @@ export const ContractorManager: React.FC = () => {
   const [expandedId, setExpandedId]           = useState<string | null>(null);
 
   const handleSaveCompany = (c: ContractorCompany) => {
-    setCompanies((prev) => [c, ...prev]);
+    handleCreateContractorCompany(c);
     setShowCompanyForm(false);
     writeAuditLog({ org_id: activeOrg?.id ?? '', user_id: activeUser?.id ?? '', action: 'CREATE', resource_type: 'contractor_profile', resource_id: c.id, description: `Contractor company registered: ${c.company_name}`, new_value: c, timestamp: new Date().toISOString() });
   };
 
   const handleSaveWorker = (w: ContractorWorker) => {
-    setWorkers((prev) => [w, ...prev]);
+    handleCreateContractorWorker(w);
     setShowWorkerForm(false);
   };
 
@@ -341,8 +303,13 @@ export const ContractorManager: React.FC = () => {
       gate: 'Main Gate', vehicle_reg: '', purpose: 'Work',
       approved_by: activeUser?.name ?? '',
     };
+    // Note: site access log entries (gate/time in-out detail) are kept as
+    // session-local UI history for now, not their own persisted collection -
+    // a deliberate scope reduction. The worker's on/off-site status IS
+    // persisted, since that's the state other parts of the app would need
+    // to trust.
     setAccessLog((prev) => [log, ...prev]);
-    setWorkers((prev) => prev.map((w) => w.id === workerId ? { ...w, access_status: 'On-site' } : w));
+    handleUpdateContractorWorker({ ...worker, access_status: 'On-site' });
   };
 
   const handleCheckOut = (workerId: string) => {
@@ -351,7 +318,8 @@ export const ContractorManager: React.FC = () => {
         ? { ...l, check_out: new Date().toISOString() }
         : l,
     ));
-    setWorkers((prev) => prev.map((w) => w.id === workerId ? { ...w, access_status: 'Off-site' } : w));
+    const worker = workers.find((w) => w.id === workerId);
+    if (worker) handleUpdateContractorWorker({ ...worker, access_status: 'Off-site' });
   };
 
   const filteredWorkers = workers.filter((w) =>

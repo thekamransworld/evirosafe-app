@@ -44,59 +44,7 @@ type MeetingType   = 'HSE Committee' | 'Toolbox Talk' | 'Pre-Task Brief'
                    | 'Emergency Drill Review' | 'Management Review'
                    | 'Incident Review' | 'Safety Stand-Down' | 'Other';
 type MeetingStatus = 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
-
-interface AgendaItem {
-  id: string;
-  order: number;
-  topic: string;
-  presenter: string;
-  duration_mins: number;
-  notes: string;
-  status: 'Pending' | 'Discussed' | 'Deferred';
-}
-
-interface MeetingAttendee {
-  user_id: string;
-  name: string;
-  role: string;
-  attended: boolean;
-  signed: boolean;
-}
-
-interface MeetingAction {
-  id: string;
-  action: string;
-  owner: string;
-  due_date: string;
-  status: 'Open' | 'Closed';
-  from_agenda_item: string;
-}
-
-interface SafetyMeeting {
-  id: string;
-  org_id: string;
-  title: string;
-  type: MeetingType;
-  status: MeetingStatus;
-  project_id: string;
-  location: string;
-  scheduled_date: string;
-  scheduled_time: string;
-  actual_start: string;
-  actual_end: string;
-  duration_mins: number;
-  facilitator_id: string;
-  secretary_id: string;
-  agenda: AgendaItem[];
-  attendees: MeetingAttendee[];
-  minutes: string;
-  actions: MeetingAction[];
-  next_meeting_date: string;
-  safety_moment: string;
-  attachments: string[];
-  created_by: string;
-  created_at: string;
-}
+import type { AgendaItem, MeetingAttendee, MeetingAction, SafetyMeeting } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -593,16 +541,15 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({ meeting, onChange, onClos
 
 export const SafetyMeetings: React.FC = () => {
   const { activeUser, activeOrg, usersList } = useAppContext();
-  const { projects } = useDataContext();
+  const { projects, safetyMeetings: meetings, handleCreateSafetyMeeting, handleUpdateSafetyMeeting } = useDataContext();
 
-  const [meetings, setMeetings]       = useState<SafetyMeeting[]>([]);
   const [showForm, setShowForm]       = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState<SafetyMeeting | null>(null);
   const [filterStatus, setFilterStatus] = useState<MeetingStatus | 'All'>('All');
   const [filterType, setFilterType]   = useState<MeetingType | 'All'>('All');
 
   const handleSave = (meeting: SafetyMeeting) => {
-    setMeetings((prev) => [meeting, ...prev]);
+    handleCreateSafetyMeeting(meeting);
     setShowForm(false);
     writeAuditLog({
       org_id: activeOrg?.id ?? '',
@@ -616,7 +563,7 @@ export const SafetyMeetings: React.FC = () => {
   };
 
   const handleUpdate = (updated: SafetyMeeting) => {
-    setMeetings((prev) => prev.map((m) => m.id === updated.id ? updated : m));
+    handleUpdateSafetyMeeting(updated);
     setSelectedMeeting(updated);
   };
 

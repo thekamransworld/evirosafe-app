@@ -18,7 +18,7 @@ import {
   Filter, Download, Plus, Search, ChevronDown, ExternalLink,
   BookOpen, Shield, Globe, HardHat,
 } from 'lucide-react';
-import { useAppContext } from '../../contexts';
+import { useAppContext, useDataContext } from '../../contexts';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -171,20 +171,25 @@ const ScoreGauge: React.FC<{ score: number; label: string }> = ({ score, label }
 
 export const ComplianceRegister: React.FC = () => {
   const { activeUser, usersList } = useAppContext();
+  const { complianceTracking, handleUpdateComplianceTracking } = useDataContext();
 
-  // Initialise items with defaults
-  const [items, setItems] = useState<ComplianceItem[]>(() =>
-    SEED_REQUIREMENTS.map((req) => ({
+  // SEED_REQUIREMENTS is universal reference data (the same ISO/OSHA clause
+  // catalog for every org) - it stays static. The org-specific tracking
+  // fields (status, owner, evidence, etc.) come from real Firestore data,
+  // keyed by requirement id, and get merged on top for display.
+  const items: ComplianceItem[] = useMemo(() => SEED_REQUIREMENTS.map((req) => {
+    const tracking = complianceTracking.find((t) => t.requirement_id === req.id);
+    return {
       ...req,
-      status: 'Partial' as ComplianceStatus,
-      owner_id: '',
-      evidence: '',
-      review_date: '',
-      last_reviewed: '',
-      notes: '',
-      action_required: '',
-    })),
-  );
+      status:          tracking?.status ?? 'Partial',
+      owner_id:        tracking?.owner_id ?? '',
+      evidence:        tracking?.evidence ?? '',
+      review_date:     tracking?.review_date ?? '',
+      last_reviewed:   tracking?.last_reviewed ?? '',
+      notes:           tracking?.notes ?? '',
+      action_required: tracking?.action_required ?? '',
+    } as ComplianceItem;
+  }), [complianceTracking]);
 
   const [filterStandard, setFilterStandard]   = useState<Standard | 'All'>('All');
   const [filterStatus, setFilterStatus]       = useState<ComplianceStatus | 'All'>('All');
@@ -207,7 +212,18 @@ export const ComplianceRegister: React.FC = () => {
   }), [items, filterStandard, filterStatus, filterCategory, search]);
 
   const updateItem = (id: string, field: keyof ComplianceItem, value: any) => {
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
+    const current = items.find((i) => i.id === id);
+    if (!current) return;
+    handleUpdateComplianceTracking({
+      requirement_id:  id,
+      status:          field === 'status' ? value : current.status,
+      owner_id:        field === 'owner_id' ? value : current.owner_id,
+      evidence:        field === 'evidence' ? value : current.evidence,
+      review_date:     field === 'review_date' ? value : current.review_date,
+      last_reviewed:   field === 'last_reviewed' ? value : current.last_reviewed,
+      notes:           field === 'notes' ? value : current.notes,
+      action_required: field === 'action_required' ? value : current.action_required,
+    });
   };
 
   // Scores per standard

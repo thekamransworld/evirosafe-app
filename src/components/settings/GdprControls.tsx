@@ -14,56 +14,7 @@ type RequestType   = 'DSAR' | 'Erasure' | 'Rectification' | 'Restriction' | 'Por
 type LegalBasis    = 'Consent' | 'Contract' | 'Legal Obligation' | 'Vital Interests' | 'Public Task' | 'Legitimate Interests';
 type RetentionUnit = 'days' | 'months' | 'years';
 type Tab = 'requests' | 'consent' | 'retention' | 'processing' | 'breaches';
-
-interface DataRequest {
-  id: string;
-  type: RequestType;
-  subject_name: string;
-  subject_email: string;
-  submitted_by: string;
-  submitted_at: string;
-  deadline: string;
-  status: RequestStatus;
-  notes: string;
-  completed_at?: string;
-}
-
-interface RetentionPolicy {
-  id: string;
-  data_type: string;
-  description: string;
-  retention_period: number;
-  retention_unit: RetentionUnit;
-  legal_basis: string;
-  auto_delete: boolean;
-}
-
-interface ProcessingActivity {
-  id: string;
-  name: string;
-  purpose: string;
-  categories: string[];
-  legal_basis: LegalBasis;
-  data_subjects: string[];
-  recipients: string[];
-  third_country_transfer: boolean;
-  retention_period: string;
-  security_measures: string;
-}
-
-interface DataBreach {
-  id: string;
-  discovered_at: string;
-  reported_at?: string;
-  nature: string;
-  categories_affected: string[];
-  approximate_subjects: number;
-  likely_consequences: string;
-  measures_taken: string;
-  regulator_notified: boolean;
-  notification_deadline: string;
-  status: 'Discovered' | 'Contained' | 'Reported' | 'Closed';
-}
+import type { DataRequest, RetentionPolicy, ProcessingActivity, DataBreach } from '../../types';
 
 const REQUEST_DEADLINE_DAYS = 30;
 const uid = () => `gdpr_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -83,7 +34,7 @@ const STATUS_CONFIG: Record<RequestStatus, { color: string; bg: string; icon: Re
   Rejected:       { color: 'text-red-700 dark:text-red-300',         bg: 'bg-red-100 dark:bg-red-950',         icon: X },
 };
 
-const DEFAULT_RETENTION_POLICIES: RetentionPolicy[] = [
+const DEFAULT_RETENTION_POLICIES: Omit<RetentionPolicy, 'org_id'>[] = [
   { id: 'ret_incidents',  data_type: 'Incident Reports',      description: 'Incident reports and investigation records',      retention_period: 7,  retention_unit: 'years',  legal_basis: 'Legal obligation (HSE regulations)', auto_delete: false },
   { id: 'ret_training',   data_type: 'Training Records',      description: 'Employee training completion and certifications',  retention_period: 5,  retention_unit: 'years',  legal_basis: 'Legal obligation (COSHH, LOLER)',     auto_delete: false },
   { id: 'ret_ptw',        data_type: 'Permit to Work',        description: 'Permit documentation and workflow logs',           retention_period: 7,  retention_unit: 'years',  legal_basis: 'Legal obligation (CDM, PSSR)',        auto_delete: false },
@@ -94,7 +45,7 @@ const DEFAULT_RETENTION_POLICIES: RetentionPolicy[] = [
   { id: 'ret_contracts',  data_type: 'Contractor Records',    description: 'Contractor personnel and compliance records',       retention_period: 6,  retention_unit: 'years',  legal_basis: 'Contract',                            auto_delete: false },
 ];
 
-const DEFAULT_PROCESSING_ACTIVITIES: ProcessingActivity[] = [
+const DEFAULT_PROCESSING_ACTIVITIES: Omit<ProcessingActivity, 'org_id'>[] = [
   {
     id: 'proc_incidents', name: 'Incident Management',
     purpose: 'Recording and investigating workplace incidents to ensure legal compliance and prevent recurrence',
@@ -154,13 +105,16 @@ function generateDsarExport(subjectName: string, subjectEmail: string, data: any
 
 export const GdprControls: React.FC = () => {
   const { activeUser, activeOrg, usersList } = useAppContext();
-  const { reportList, trainingRecordList, ptwList } = useDataContext();
+  const { reportList, trainingRecordList, ptwList, dataRequests: requests, retentionPolicies: policiesRaw, dataBreaches: breaches,
+    handleCreateDataRequest, handleUpdateDataRequest, handleCreateRetentionPolicy, handleUpdateRetentionPolicy, handleCreateDataBreach, handleUpdateDataBreach } = useDataContext();
+  // Retention policies ship with sensible defaults; once an org customises
+  // any of them, real data takes over entirely (same pattern as Emergency
+  // Response's plan templates).
+  const policies = policiesRaw.length > 0 ? policiesRaw : (DEFAULT_RETENTION_POLICIES as RetentionPolicy[]);
 
   const [activeTab,   setActiveTab]   = useState<Tab>('requests');
-  const [requests,    setRequests]    = useState<DataRequest[]>([]);
-  const [policies,    setPolicies]    = useState<RetentionPolicy[]>(DEFAULT_RETENTION_POLICIES);
-  const [activities]                  = useState<ProcessingActivity[]>(DEFAULT_PROCESSING_ACTIVITIES);
-  const [breaches,    setBreaches]    = useState<DataBreach[]>([]);
+  const { processingActivities: activitiesRaw } = useDataContext();
+  const activities = activitiesRaw.length > 0 ? activitiesRaw : (DEFAULT_PROCESSING_ACTIVITIES as ProcessingActivity[]);
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
   const [showNewReq,  setShowNewReq]  = useState(false);
   const [showBreach,  setShowBreach]  = useState(false);
@@ -175,15 +129,18 @@ export const GdprControls: React.FC = () => {
   const handleSubmitRequest = () => {
     if (!newReq.subject_name || !newReq.subject_email) return;
     const deadline = new Date(Date.now() + REQUEST_DEADLINE_DAYS * 86400000).toISOString().slice(0, 10);
-    const req: DataRequest = { id: uid(), ...newReq, submitted_by: activeUser?.id ?? '', submitted_at: new Date().toISOString(), deadline, status: 'Pending' };
-    setRequests((p) => [req, ...p]);
+    const req: DataRequest = { id: uid(), org_id: activeOrg?.id ?? '', ...newReq, submitted_by: activeUser?.id ?? '', submitted_at: new Date().toISOString(), deadline, status: 'Pending' };
+    handleCreateDataRequest(req);
     setShowNewReq(false);
     setNewReq({ type: 'DSAR', subject_name: '', subject_email: '', notes: '' });
     writeAuditLog({ org_id: (activeOrg as any)?.id ?? '', user_id: activeUser?.id ?? '', action: 'CREATE', resource_type: 'user', resource_id: req.id, description: `DSR submitted: ${req.type} for ${req.subject_name}`, timestamp: new Date().toISOString() });
   };
 
-  const updateStatus = (id: string, status: RequestStatus) =>
-    setRequests((p) => p.map((r) => r.id === id ? { ...r, status, ...(status === 'Completed' ? { completed_at: new Date().toISOString() } : {}) } : r));
+  const updateStatus = (id: string, status: RequestStatus) => {
+    const existing = requests.find((r) => r.id === id);
+    if (!existing) return;
+    handleUpdateDataRequest({ ...existing, status, ...(status === 'Completed' ? { completed_at: new Date().toISOString() } : {}) });
+  };
 
   const handleDsar = (req: DataRequest) => {
     generateDsarExport(req.subject_name, req.subject_email, { reportList, trainingRecordList, ptwList, usersList });
@@ -194,7 +151,7 @@ export const GdprControls: React.FC = () => {
     if (!newBreach.nature) return;
     const discovered = new Date();
     const breach: DataBreach = {
-      id: uid(), discovered_at: discovered.toISOString(),
+      id: uid(), org_id: activeOrg?.id ?? '', discovered_at: discovered.toISOString(),
       nature: newBreach.nature,
       categories_affected: newBreach.categories_affected.split(',').map((c) => c.trim()).filter(Boolean),
       approximate_subjects: newBreach.approximate_subjects,
@@ -204,7 +161,7 @@ export const GdprControls: React.FC = () => {
       notification_deadline: new Date(discovered.getTime() + 72 * 3600000).toISOString(),
       status: 'Discovered',
     };
-    setBreaches((p) => [breach, ...p]);
+    handleCreateDataBreach(breach);
     setShowBreach(false);
     setNewBreach({ nature: '', categories_affected: '', approximate_subjects: 0, likely_consequences: '', measures_taken: '' });
   };
@@ -381,7 +338,7 @@ export const GdprControls: React.FC = () => {
                   </div>
                 </div>
                 <CanDo permission="settings:admin">
-                  <button onClick={() => setPolicies((p) => p.map((x) => x.id === policy.id ? { ...x, auto_delete: !x.auto_delete } : x))}
+                  <button onClick={() => handleCreateRetentionPolicy({ ...policy, org_id: activeOrg?.id ?? '', auto_delete: !policy.auto_delete })}
                     className={`text-xs px-3 py-1.5 rounded-lg font-medium ${policy.auto_delete ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200'}`}>
                     {policy.auto_delete ? 'Auto-delete ON' : 'Auto-delete OFF'}
                   </button>
@@ -492,11 +449,11 @@ export const GdprControls: React.FC = () => {
                   </div>
                   <div className="flex flex-col gap-2 flex-shrink-0">
                     {!breach.regulator_notified && (
-                      <button onClick={() => setBreaches((p) => p.map((b) => b.id === breach.id ? { ...b, regulator_notified: true, reported_at: new Date().toISOString(), status: 'Reported' } : b))}
+                      <button onClick={() => handleUpdateDataBreach({ ...breach, regulator_notified: true, reported_at: new Date().toISOString(), status: 'Reported' })}
                         className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold">Mark Reported</button>
                     )}
                     {breach.status !== 'Closed' && (
-                      <button onClick={() => setBreaches((p) => p.map((b) => b.id === breach.id ? { ...b, status: 'Closed' } : b))}
+                      <button onClick={() => handleUpdateDataBreach({ ...breach, status: 'Closed' })}
                         className="text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-semibold">Close</button>
                     )}
                   </div>

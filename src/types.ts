@@ -67,6 +67,18 @@ export interface User {
       weight: 'kg' | 'lbs';
       distance?: 'km' | 'mi';
     };
+    notifications?: {
+      incidents: boolean;
+      permits: boolean;
+      inspections: boolean;
+      training: boolean;
+      digest: boolean;
+    };
+    privacy?: {
+      twoFactor: boolean;
+      sessionAlerts: boolean;
+      dataExport: boolean;
+    };
   };
   project_ids?: string[];
 }
@@ -120,6 +132,469 @@ export interface Chemical {
   disposal_method:  string;
   status:           'active' | 'removed';
   last_review:      string;
+}
+
+// --- BBS (BEHAVIOR-BASED SAFETY) OBSERVATIONS ---
+export type BbsObservationType = 'Safe Act' | 'Unsafe Act' | 'Safe Condition' | 'Unsafe Condition' | 'Near Miss';
+export type BbsObservationCategory =
+  | 'PPE Usage' | 'Housekeeping' | 'Procedures & Permits' | 'Tool & Equipment Use'
+  | 'Body Position & Ergonomics' | 'Communication' | 'Environmental' | 'Line of Fire'
+  | 'Energy Isolation' | 'Working at Height' | 'Driving & Vehicles' | 'Other';
+
+export interface BbsObservation {
+  id:                    string;
+  org_id:                string;
+  observer_id:           string;
+  is_anonymous:          boolean;
+  observation_date:      string;
+  project_id:            string;
+  location:              string;
+  type:                  BbsObservationType;
+  category:              BbsObservationCategory;
+  description:           string;
+  immediate_action:      string;
+  positive_recognition:  string;
+  follow_up_required:    boolean;
+  follow_up_action:      string;
+  follow_up_by:          string;
+  status:                'Open' | 'In Progress' | 'Closed';
+  created_at:            string;
+}
+
+// --- RISK MATRIX ---
+export type RiskLevel = 'Extreme' | 'High' | 'Medium' | 'Low' | 'Negligible';
+export type HazardStatus = 'Open' | 'Controlled' | 'Residual' | 'Accepted' | 'Closed';
+
+export interface Hazard {
+  id: string;
+  org_id: string;
+  title: string;
+  description: string;
+  category: string;
+  likelihood: number;
+  severity: number;
+  risk_score: number;
+  residual_likelihood: number;
+  residual_severity: number;
+  residual_score: number;
+  controls: string[];
+  project_id: string;
+  owner_id: string;
+  status: HazardStatus;
+  linked_report_id?: string;
+  created_at: string;
+}
+
+// --- CONTRACTORS ---
+export type InductionStatus = 'Pending' | 'Completed' | 'Expired' | 'Exempted';
+export type AccessStatus    = 'On-site' | 'Off-site' | 'Suspended';
+export type ContractorTier  = 'Approved' | 'Conditional' | 'Under Review' | 'Suspended';
+
+export interface ContractorCompany {
+  id: string;
+  org_id: string;
+  company_name: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  trade: string;
+  tier: ContractorTier;
+  insurance_expiry: string;
+  insurance_number: string;
+  prequalification_date: string;
+  prequalification_expiry: string;
+  performance_score: number;
+  active_workers: number;
+  notes: string;
+  created_at: string;
+}
+
+export interface ContractorWorker {
+  id: string;
+  org_id: string;
+  company_id: string;
+  name: string;
+  trade: string;
+  id_number: string;
+  phone: string;
+  induction_status: InductionStatus;
+  induction_date: string;
+  induction_expiry: string;
+  medical_clearance: boolean;
+  medical_expiry: string;
+  access_status: AccessStatus;
+  current_project_id: string;
+  created_at: string;
+}
+
+// --- PPE INVENTORY ---
+export type PpeCondition = 'Good' | 'Fair' | 'Replace' | 'Condemned';
+export type PpeCategory  = 'Head' | 'Eye' | 'Face' | 'Hearing' | 'Respiratory' | 'Hand' | 'Foot' | 'Body' | 'Fall Protection' | 'High Visibility';
+
+export interface PpeItem {
+  id: string;
+  org_id: string;
+  name: string;
+  category: PpeCategory;
+  standard: string;
+  quantity_total: number;
+  quantity_available: number;
+  quantity_issued: number;
+  reorder_level: number;
+  location: string;
+  condition: PpeCondition;
+  inspection_interval_days: number;
+  last_inspection_date: string;
+  next_inspection_date: string;
+  supplier: string;
+  unit_cost: number;
+  notes: string;
+  created_at: string;
+}
+
+export interface PpeAssignment {
+  id: string;
+  org_id: string;
+  item_id: string;
+  item_name: string;
+  user_id: string;
+  user_name: string;
+  quantity: number;
+  issued_date: string;
+  return_date: string;
+  condition_on_return: PpeCondition;
+  project_id: string;
+}
+
+// --- FATIGUE & FFD ---
+export type FatigueRisk  = 'Low' | 'Moderate' | 'High' | 'Extreme';
+export type FfdStatus    = 'Cleared' | 'Restricted' | 'Unfit' | 'Pending';
+export type ShiftType    = 'Day' | 'Night' | 'Extended';
+
+export interface ShiftLog {
+  id: string;
+  org_id: string;
+  worker_id: string;
+  shift_date: string;
+  shift_type: ShiftType;
+  start_time: string;
+  end_time: string;
+  hours_worked: number;
+  travel_hours: number;
+  sleep_hours: number;
+  project_id: string;
+  notes: string;
+  created_at: string;
+}
+
+export interface FfdAssessment {
+  id: string;
+  org_id: string;
+  worker_id: string;
+  assessment_date: string;
+  assessor_id: string;
+  fatigue_score: number;
+  risk_band: FatigueRisk;
+  status: FfdStatus;
+  hours_last_24h: number;
+  hours_last_7d: number;
+  hours_last_28d: number;
+  sleep_last_night: number;
+  travel_today: number;
+  symptoms: string[];
+  notes: string;
+  clearance_note: string;
+  created_at: string;
+}
+
+// --- ENVIRONMENTAL MONITORING ---
+export type MediaCategory = 'Emissions' | 'Waste' | 'Water' | 'Energy';
+
+export interface EnvReading {
+  id: string;
+  org_id: string;
+  parameter_id: string;
+  parameter_name: string;
+  category: MediaCategory;
+  value: number;
+  unit: string;
+  reading_date: string;
+  location: string;
+  project_id: string;
+  recorded_by: string;
+  notes: string;
+  exceeds_limit: boolean;
+  exceeds_target: boolean;
+  created_at: string;
+}
+
+// --- SAFETY MEETINGS ---
+export type MeetingType   = 'HSE Committee' | 'Toolbox Talk' | 'Pre-Task Brief'
+                   | 'Emergency Drill Review' | 'Management Review'
+                   | 'Incident Review' | 'Safety Stand-Down' | 'Other';
+export type MeetingStatus = 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
+
+export interface AgendaItem {
+  id: string;
+  order: number;
+  topic: string;
+  presenter: string;
+  duration_mins: number;
+  notes: string;
+  status: 'Pending' | 'Discussed' | 'Deferred';
+}
+
+export interface MeetingAttendee {
+  user_id: string;
+  name: string;
+  role: string;
+  attended: boolean;
+  signed: boolean;
+}
+
+export interface MeetingAction {
+  id: string;
+  action: string;
+  owner: string;
+  due_date: string;
+  status: 'Open' | 'Closed';
+  from_agenda_item: string;
+}
+
+export interface SafetyMeeting {
+  id: string;
+  org_id: string;
+  title: string;
+  type: MeetingType;
+  status: MeetingStatus;
+  project_id: string;
+  location: string;
+  scheduled_date: string;
+  scheduled_time: string;
+  actual_start: string;
+  actual_end: string;
+  duration_mins: number;
+  facilitator_id: string;
+  secretary_id: string;
+  agenda: AgendaItem[];
+  attendees: MeetingAttendee[];
+  minutes: string;
+  actions: MeetingAction[];
+  next_meeting_date: string;
+  safety_moment: string;
+  attachments: string[];
+  created_by: string;
+  created_at: string;
+}
+
+// --- EMERGENCY RESPONSE ---
+export type ErpType =
+  | 'fire' | 'medical' | 'spill' | 'evacuation'
+  | 'earthquake' | 'flood' | 'explosion' | 'other';
+
+export interface EmergencyContact {
+  name:  string;
+  role:  string;
+  phone: string;
+}
+
+export interface DrillLog {
+  id:              string;
+  drill_date:      string;
+  conducted_by:    string;
+  participants:    number;
+  evacuation_secs: number;
+  result:          'satisfactory' | 'needs_improvement' | 'unsatisfactory';
+  observations:    string;
+  improvements:    string;
+}
+
+export interface EmergencyPlan {
+  id:                string;
+  org_id:            string;
+  type:              ErpType;
+  title:             string;
+  description:       string;
+  assembly_point:    string;
+  emergency_contacts: EmergencyContact[];
+  procedures:        string;
+  last_drilled_at:   string | null;
+  review_date:       string;
+  drill_logs:        DrillLog[];
+  status:            'active' | 'under_review' | 'archived';
+}
+
+// --- DOCUMENT CONTROL ---
+// Named ControlledDocument (not Document) to avoid colliding with the
+// global DOM Document type.
+export type DocCategory =
+  | 'policy' | 'procedure' | 'form' | 'risk_assessment'
+  | 'method_statement' | 'plan' | 'register' | 'certificate'
+  | 'report' | 'permit' | 'other';
+
+export type DocStatus =
+  | 'draft' | 'under_review' | 'approved' | 'superseded' | 'obsolete';
+
+export interface DocRevision {
+  version:     string;
+  revised_by:  string;
+  revised_at:  string;
+  change_notes: string;
+}
+
+export interface ControlledDocument {
+  id:              string;
+  org_id:          string;
+  doc_number:      string;
+  title:           string;
+  category:        DocCategory;
+  current_version: string;
+  status:          DocStatus;
+  owner:           string;
+  approved_by:     string | null;
+  approved_at:     string | null;
+  review_date:     string;
+  file_url:        string;
+  revisions:       DocRevision[];
+  description:     string;
+}
+
+// --- DATA & PRIVACY (GDPR) ---
+export type RequestStatus = 'Pending' | 'In Progress' | 'Completed' | 'Rejected';
+export type RequestType   = 'DSAR' | 'Erasure' | 'Rectification' | 'Restriction' | 'Portability';
+export type LegalBasis    = 'Consent' | 'Contract' | 'Legal Obligation' | 'Vital Interests' | 'Public Task' | 'Legitimate Interests';
+export type RetentionUnit = 'days' | 'months' | 'years';
+
+export interface DataRequest {
+  id: string;
+  org_id: string;
+  type: RequestType;
+  subject_name: string;
+  subject_email: string;
+  submitted_by: string;
+  submitted_at: string;
+  deadline: string;
+  status: RequestStatus;
+  notes: string;
+  completed_at?: string;
+}
+
+export interface RetentionPolicy {
+  id: string;
+  org_id: string;
+  data_type: string;
+  description: string;
+  retention_period: number;
+  retention_unit: RetentionUnit;
+  legal_basis: string;
+  auto_delete: boolean;
+}
+
+export interface ProcessingActivity {
+  id: string;
+  org_id: string;
+  name: string;
+  purpose: string;
+  categories: string[];
+  legal_basis: LegalBasis;
+  data_subjects: string[];
+  recipients: string[];
+  third_country_transfer: boolean;
+  retention_period: string;
+  security_measures: string;
+}
+
+export interface DataBreach {
+  id: string;
+  org_id: string;
+  discovered_at: string;
+  reported_at?: string;
+  nature: string;
+  categories_affected: string[];
+  approximate_subjects: number;
+  likely_consequences: string;
+  measures_taken: string;
+  regulator_notified: boolean;
+  notification_deadline: string;
+  status: 'Discovered' | 'Contained' | 'Reported' | 'Closed';
+}
+
+// --- COMPLIANCE REGISTER ---
+// The base requirement catalog (standard, clause, title, description) is
+// universal reference data, same across every org - it stays as a static
+// list in ComplianceRegister.tsx. Only the org-specific tracking fields
+// (status, evidence, review dates, etc.) get persisted here, keyed by
+// requirement_id, and merged onto the static list for display.
+export type ComplianceStatus = 'Compliant' | 'Partial' | 'Non-Compliant' | 'Not Applicable';
+export type Standard = 'ISO 45001' | 'ISO 14001' | 'OSHA' | 'NEBOSH' | 'LOCAL';
+
+export interface ComplianceTracking {
+  id: string;
+  org_id: string;
+  requirement_id: string;
+  status: ComplianceStatus;
+  owner_id: string;
+  evidence: string;
+  review_date: string;
+  last_reviewed: string;
+  notes: string;
+  action_required: string;
+  updated_at: string;
+}
+
+// --- RCA (ROOT CAUSE ANALYSIS) ---
+export type RcaMethod = '5why' | 'fishbone' | 'bowtie';
+
+export interface WhyEntry {
+  id: string;
+  level: number;
+  question: string;
+  answer: string;
+}
+
+export type FishboneCategory =
+  | 'People' | 'Process' | 'Equipment' | 'Environment'
+  | 'Materials' | 'Management' | 'Measurement';
+
+export interface FishboneCause {
+  id: string;
+  category: FishboneCategory;
+  cause: string;
+  subCauses: string[];
+}
+
+export interface BowTieBarrier {
+  id: string;
+  type: 'preventive' | 'mitigating';
+  description: string;
+  status: 'effective' | 'degraded' | 'failed';
+}
+
+export interface BowTieConsequence {
+  id: string;
+  description: string;
+  severity: 'Low' | 'Medium' | 'High' | 'Critical';
+}
+
+export interface RcaRecord {
+  id: string;
+  org_id: string;
+  report_id: string;
+  method: RcaMethod;
+  status: 'draft' | 'complete' | 'reviewed';
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  whys?: WhyEntry[];
+  rootCause?: string;
+  problem?: string;
+  fishboneCauses?: FishboneCause[];
+  threat?: string;
+  topEvent?: string;
+  preventiveBarriers?: BowTieBarrier[];
+  mitigatingBarriers?: BowTieBarrier[];
+  consequences?: BowTieConsequence[];
+  capaRecommendations?: string[];
 }
 
 export type View = Resource | string;

@@ -31,62 +31,7 @@ import type { Report } from '../../types';
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type RcaMethod = '5why' | 'fishbone' | 'bowtie';
-
-interface WhyEntry {
-  id: string;
-  level: number;   // 1–5
-  question: string;
-  answer: string;
-}
-
-type FishboneCategory =
-  | 'People' | 'Process' | 'Equipment' | 'Environment'
-  | 'Materials' | 'Management' | 'Measurement';
-
-interface FishboneCause {
-  id: string;
-  category: FishboneCategory;
-  cause: string;
-  subCauses: string[];
-}
-
-interface BowTieBarrier {
-  id: string;
-  type: 'preventive' | 'mitigating';
-  description: string;
-  status: 'effective' | 'degraded' | 'failed';
-}
-
-interface BowTieConsequence {
-  id: string;
-  description: string;
-  severity: 'Low' | 'Medium' | 'High' | 'Critical';
-}
-
-interface RcaRecord {
-  id: string;
-  report_id: string;
-  method: RcaMethod;
-  status: 'draft' | 'complete' | 'reviewed';
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  // 5-Why
-  whys?: WhyEntry[];
-  rootCause?: string;
-  // Fishbone
-  problem?: string;
-  fishboneCauses?: FishboneCause[];
-  // Bow-tie
-  threat?: string;
-  topEvent?: string;
-  preventiveBarriers?: BowTieBarrier[];
-  mitigatingBarriers?: BowTieBarrier[];
-  consequences?: BowTieConsequence[];
-  // CAPA output
-  capaRecommendations?: string[];
-}
+import type { RcaMethod, WhyEntry, FishboneCategory, FishboneCause, BowTieBarrier, BowTieConsequence, RcaRecord } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -590,7 +535,7 @@ interface RcaModuleProps {
 
 export const RcaModule: React.FC<RcaModuleProps> = ({ report, onClose }) => {
   const { activeUser } = useAppContext();
-  const { handleCreateReport } = useDataContext();
+  const { handleCreateReport, handleCreateRcaRecord } = useDataContext();
 
   const [method, setMethod] = useState<RcaMethod>('5why');
   const [isSaving, setIsSaving] = useState(false);
@@ -668,10 +613,9 @@ Respond in this JSON format only:
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     setIsSaving(true);
-    // In production: write to Firestore 'rca_records' collection
-    // For now, we log and show success
-    const rcaRecord: Partial<RcaRecord> = {
+    const rcaRecord: RcaRecord = {
       id: `rca_${Date.now()}`,
+      org_id: '', // injected by handleCreateRcaRecord itself
       report_id: report.id,
       method,
       status: 'complete',
@@ -683,8 +627,7 @@ Respond in this JSON format only:
       ...(method === 'fishbone' ? { problem, fishboneCauses } : {}),
       ...(method === 'bowtie' ? bowtie : {}),
     };
-    console.log('[RcaModule] Saving RCA:', rcaRecord);
-    await new Promise((r) => setTimeout(r, 600)); // simulate save
+    await handleCreateRcaRecord(rcaRecord);
     setIsSaving(false);
     if (onClose) onClose();
   };

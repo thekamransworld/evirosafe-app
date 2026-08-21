@@ -28,7 +28,8 @@ import {
   Clock, User, Download, ChevronDown, XCircle,
   Moon, Sun, BarChart2,
 } from 'lucide-react';
-import { useAppContext } from '../../contexts';
+import { useAppContext, useDataContext } from '../../contexts';
+import type { ShiftLog, FfdAssessment } from '../../types';
 import { CanDo } from '../auth/RbacGuard';
 import { exportTableToCsv } from '../../lib/exportUtils';
 import { writeAuditLog } from '../../lib/auditLogger';
@@ -40,42 +41,6 @@ import { writeAuditLog } from '../../lib/auditLogger';
 type FatigueRisk  = 'Low' | 'Moderate' | 'High' | 'Extreme';
 type FfdStatus    = 'Cleared' | 'Restricted' | 'Unfit' | 'Pending';
 type ShiftType    = 'Day' | 'Night' | 'Extended';
-
-interface ShiftLog {
-  id: string;
-  org_id: string;
-  worker_id: string;
-  shift_date: string;
-  shift_type: ShiftType;
-  start_time: string;    // HH:mm
-  end_time: string;      // HH:mm
-  hours_worked: number;
-  travel_hours: number;
-  sleep_hours: number;   // previous night
-  project_id: string;
-  notes: string;
-  created_at: string;
-}
-
-interface FfdAssessment {
-  id: string;
-  org_id: string;
-  worker_id: string;
-  assessment_date: string;
-  assessor_id: string;
-  fatigue_score: number;      // 0-100
-  risk_band: FatigueRisk;
-  status: FfdStatus;
-  hours_last_24h: number;
-  hours_last_7d: number;
-  hours_last_28d: number;
-  sleep_last_night: number;
-  travel_today: number;
-  symptoms: string[];
-  notes: string;
-  clearance_note: string;
-  created_at: string;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -468,20 +433,19 @@ const FfdForm: React.FC<FfdFormProps> = ({ workerId, assessorId, orgId, shiftLog
 
 export const FatigueMonitor: React.FC = () => {
   const { activeUser, activeOrg, usersList } = useAppContext();
-  const [shiftLogs, setShiftLogs]       = useState<ShiftLog[]>([]);
-  const [assessments, setAssessments]   = useState<FfdAssessment[]>([]);
+  const { shiftLogs, ffdAssessments: assessments, handleCreateShiftLog, handleCreateFfdAssessment } = useDataContext();
   const [activeTab, setActiveTab]       = useState<'shifts' | 'assessments' | 'limits'>('shifts');
   const [showShiftForm, setShowShiftForm] = useState(false);
   const [showFfdForm, setShowFfdForm]   = useState(false);
   const [selectedWorker, setSelectedWorker] = useState(activeUser?.id ?? '');
 
   const handleSaveShift = (log: ShiftLog) => {
-    setShiftLogs((prev) => [log, ...prev]);
+    handleCreateShiftLog(log);
     setShowShiftForm(false);
   };
 
   const handleSaveFfd = (assessment: FfdAssessment) => {
-    setAssessments((prev) => [assessment, ...prev]);
+    handleCreateFfdAssessment(assessment);
     setShowFfdForm(false);
     writeAuditLog({
       org_id: activeOrg?.id ?? '',

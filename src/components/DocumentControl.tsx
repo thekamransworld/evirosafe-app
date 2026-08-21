@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useDataContext } from '../contexts';
+import { CanDo } from './auth/RbacGuard';
 import {
   Plus, X, Search, FileText, CheckCircle, Clock,
   ChevronRight, Download, Eye, History, AlertTriangle,
@@ -11,36 +12,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type DocCategory =
-  | 'policy' | 'procedure' | 'form' | 'risk_assessment'
-  | 'method_statement' | 'plan' | 'register' | 'certificate'
-  | 'report' | 'permit' | 'other';
-
-export type DocStatus =
-  | 'draft' | 'under_review' | 'approved' | 'superseded' | 'obsolete';
-
-export interface DocRevision {
-  version:     string;
-  revised_by:  string;
-  revised_at:  string;
-  change_notes: string;
-}
-
-export interface Document {
-  id:              string;
-  doc_number:      string;
-  title:           string;
-  category:        DocCategory;
-  current_version: string;
-  status:          DocStatus;
-  owner:           string;
-  approved_by:     string | null;
-  approved_at:     string | null;
-  review_date:     string;
-  file_url:        string;
-  revisions:       DocRevision[];
-  description:     string;
-}
+import type { DocCategory, DocStatus, DocRevision, ControlledDocument } from '../types';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -71,7 +43,7 @@ const daysUntil = (d: string) =>
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const MOCK_DOCS: Document[] = [
+const MOCK_DOCS: Omit<ControlledDocument, 'org_id'>[] = [
   {
     id: 'doc-001', doc_number: 'POL-HSE-001', title: 'HSE Policy Statement',
     category: 'policy', current_version: '3.1', status: 'approved',
@@ -152,9 +124,9 @@ const MOCK_DOCS: Document[] = [
 // ─── Document Detail Modal ────────────────────────────────────────────────────
 
 const DocDetailModal: React.FC<{
-  doc:      Document;
+  doc:      ControlledDocument;
   onClose:  () => void;
-  onUpdate: (d: Document) => void;
+  onUpdate: (d: ControlledDocument) => void;
 }> = ({ doc, onClose, onUpdate }) => {
   const [tab, setTab]       = useState<'details' | 'history'>('details');
   const [status, setStatus] = useState<DocStatus>(doc.status);
@@ -272,9 +244,9 @@ const DocDetailModal: React.FC<{
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const DocumentControl: React.FC = () => {
-  const { can } = useAppContext();
-  const [docs, setDocs]             = useState<Document[]>(MOCK_DOCS);
-  const [selected, setSelected]     = useState<Document | null>(null);
+  const { controlledDocuments, handleCreateControlledDocument } = useDataContext();
+  const docs = controlledDocuments.length > 0 ? controlledDocuments : (MOCK_DOCS as ControlledDocument[]);
+  const [selected, setSelected]     = useState<ControlledDocument | null>(null);
   const [search, setSearch]         = useState('');
   const [catFilter, setCatFilter]   = useState<DocCategory | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<DocStatus | 'all'>('all');
@@ -293,8 +265,9 @@ export const DocumentControl: React.FC = () => {
     reviewDue:      docs.filter(d => daysUntil(d.review_date) <= 30).length,
   }), [docs]);
 
-  const handleUpdate = (updated: Document) =>
-    setDocs(prev => prev.map(d => d.id === updated.id ? updated : d));
+  // setDoc-based (create/upsert) - a document edited for the first time
+  // doesn't exist in Firestore yet if it's still one of the defaults.
+  const handleUpdate = (updated: ControlledDocument) => handleCreateControlledDocument(updated);
 
   return (
     <div className="space-y-6">
@@ -303,9 +276,9 @@ export const DocumentControl: React.FC = () => {
           <h1 className="text-3xl font-bold text-text-primary dark:text-white">Document Control</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Version-controlled documents with approval workflow</p>
         </div>
-        {can('create', 'reports') && (
-          <Button leftIcon={<Plus className="w-4 h-4" />}>New Document</Button>
-        )}
+        <CanDo permission="document:create">
+          <Button leftIcon={<Plus className="w-4 h-4" />} disabled title="Document upload isn't built yet - only editing existing documents is wired up">New Document</Button>
+        </CanDo>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

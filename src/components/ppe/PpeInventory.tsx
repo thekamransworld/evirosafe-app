@@ -19,48 +19,15 @@ import {
   Search, Download, RefreshCw, Package,
   User, Calendar, ChevronDown, Edit3,
 } from 'lucide-react';
-import { useAppContext } from '../../contexts';
+import { useAppContext, useDataContext } from '../../contexts';
 import { CanDo } from '../auth/RbacGuard';
 import { exportTableToCsv } from '../../lib/exportUtils';
 import { writeAuditLog } from '../../lib/auditLogger';
+import type { PpeItem, PpeAssignment } from '../../types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type PpeCondition = 'Good' | 'Fair' | 'Replace' | 'Condemned';
 type PpeCategory  = 'Head' | 'Eye' | 'Face' | 'Hearing' | 'Respiratory' | 'Hand' | 'Foot' | 'Body' | 'Fall Protection' | 'High Visibility';
-
-interface PpeItem {
-  id: string;
-  org_id: string;
-  name: string;
-  category: PpeCategory;
-  standard: string;         // e.g. "EN 397", "ANSI Z89.1"
-  quantity_total: number;
-  quantity_available: number;
-  quantity_issued: number;
-  reorder_level: number;
-  location: string;
-  condition: PpeCondition;
-  inspection_interval_days: number;
-  last_inspection_date: string;
-  next_inspection_date: string;
-  supplier: string;
-  unit_cost: number;
-  notes: string;
-  created_at: string;
-}
-
-interface PpeAssignment {
-  id: string;
-  item_id: string;
-  item_name: string;
-  user_id: string;
-  user_name: string;
-  quantity: number;
-  issued_date: string;
-  return_date: string;
-  condition_on_return: PpeCondition;
-  project_id: string;
-}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const uid = () => `ppe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -170,8 +137,7 @@ const AddItemForm: React.FC<AddItemFormProps> = ({ onSave, onCancel, orgId }) =>
 // ─── Main Component ───────────────────────────────────────────────────────────
 export const PpeInventory: React.FC = () => {
   const { activeUser, activeOrg, usersList } = useAppContext();
-  const [items, setItems]           = useState<PpeItem[]>([]);
-  const [assignments, setAssignments] = useState<PpeAssignment[]>([]);
+  const { ppeItems: items, ppeAssignments: assignments, handleCreatePpeItem, handleCreatePpeAssignment, handleUpdatePpeItem } = useDataContext();
   const [showForm, setShowForm]     = useState(false);
   const [search, setSearch]         = useState('');
   const [filterCat, setFilterCat]   = useState<PpeCategory | 'All'>('All');
@@ -181,7 +147,7 @@ export const PpeInventory: React.FC = () => {
   const [issueQty, setIssueQty]     = useState(1);
 
   const handleAddItem = (item: PpeItem) => {
-    setItems((prev) => [item, ...prev]);
+    handleCreatePpeItem(item);
     setShowForm(false);
     writeAuditLog({ org_id: activeOrg?.id ?? '', user_id: activeUser?.id ?? '', action: 'CREATE', resource_type: 'ppe_item', resource_id: item.id, description: `PPE item added: ${item.name}`, new_value: item, timestamp: new Date().toISOString() });
   };
@@ -192,15 +158,13 @@ export const PpeInventory: React.FC = () => {
     if (!item || !user || issueQty <= 0 || issueQty > item.quantity_available) return;
 
     const assignment: PpeAssignment = {
-      id: `pa_${Date.now()}`, item_id: item.id, item_name: item.name,
+      id: `pa_${Date.now()}`, org_id: activeOrg?.id ?? '', item_id: item.id, item_name: item.name,
       user_id: user.id, user_name: (user as any).name ?? user.id,
       quantity: issueQty, issued_date: new Date().toISOString().slice(0, 10),
       return_date: '', condition_on_return: 'Good', project_id: '',
     };
-    setAssignments((prev) => [assignment, ...prev]);
-    setItems((prev) => prev.map((i) => i.id === item.id
-      ? { ...i, quantity_available: i.quantity_available - issueQty, quantity_issued: i.quantity_issued + issueQty }
-      : i));
+    handleCreatePpeAssignment(assignment);
+    handleUpdatePpeItem({ ...item, quantity_available: item.quantity_available - issueQty, quantity_issued: item.quantity_issued + issueQty });
     setIssueItemId(null);
   };
 

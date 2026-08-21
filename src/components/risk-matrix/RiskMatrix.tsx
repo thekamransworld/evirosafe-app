@@ -46,25 +46,7 @@ import { useAppContext } from '../../contexts';
 
 type RiskLevel = 'Extreme' | 'High' | 'Medium' | 'Low' | 'Negligible';
 type HazardStatus = 'Open' | 'Controlled' | 'Residual' | 'Accepted' | 'Closed';
-
-interface Hazard {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  likelihood: number;     // 1-5
-  severity: number;       // 1-5
-  risk_score: number;     // likelihood × severity
-  residual_likelihood: number;
-  residual_severity: number;
-  residual_score: number;
-  controls: string[];
-  project_id: string;
-  owner_id: string;
-  status: HazardStatus;
-  linked_report_id?: string;
-  created_at: string;
-}
+import type { Hazard } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Risk matrix configuration
@@ -298,10 +280,8 @@ const AddHazardForm: React.FC<AddHazardFormProps> = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const RiskMatrix: React.FC = () => {
-  const { reportList, projects } = useDataContext();
+  const { reportList, projects, hazardList: hazards, handleCreateHazard } = useDataContext();
   const { usersList, activeOrg } = useAppContext();
-
-  const [hazards, setHazards] = useState<Hazard[]>([]);
   const [selectedCell, setSelectedCell] = useState<{ l: number; s: number } | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [addFormCell, setAddFormCell] = useState<{ l: number; s: number } | null>(null);
@@ -348,7 +328,7 @@ export const RiskMatrix: React.FC = () => {
   };
 
   const handleSaveHazard = (hazard: Hazard) => {
-    setHazards((prev) => [hazard, ...prev]);
+    handleCreateHazard(hazard);
     setShowAddForm(false);
     setAddFormCell(null);
   };

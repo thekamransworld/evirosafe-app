@@ -36,7 +36,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked,
 );
 
 export const Settings: React.FC = () => {
-  const { activeUser, usersList } = useAppContext();
+  const { activeUser, usersList, handleUpdateUser } = useAppContext();
   const { theme, toggle } = useTheme();
 
   const [profile, setProfile] = useState({
@@ -47,22 +47,37 @@ export const Settings: React.FC = () => {
   });
 
   const [notifs, setNotifs] = useState({
-    incidents:    true,
-    permits:      true,
-    inspections:  true,
-    training:     false,
-    digest:       true,
+    incidents:    activeUser?.preferences?.notifications?.incidents    ?? true,
+    permits:      activeUser?.preferences?.notifications?.permits      ?? true,
+    inspections:  activeUser?.preferences?.notifications?.inspections  ?? true,
+    training:     activeUser?.preferences?.notifications?.training     ?? false,
+    digest:       activeUser?.preferences?.notifications?.digest       ?? true,
   });
 
   const [privacy, setPrivacy] = useState({
-    twoFactor:     false,
-    sessionAlerts: true,
-    dataExport:    true,
+    twoFactor:     activeUser?.preferences?.privacy?.twoFactor     ?? false,
+    sessionAlerts: activeUser?.preferences?.privacy?.sessionAlerts ?? true,
+    dataExport:    activeUser?.preferences?.privacy?.dataExport    ?? true,
   });
 
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
+    if (!activeUser) return;
+    handleUpdateUser({
+      ...activeUser,
+      name: profile.name,
+      phone: profile.phone,
+      department: profile.department,
+      // email deliberately excluded - changing it here wouldn't update
+      // Firebase Auth or the users_by_uid pointer's login credential,
+      // so it stays read-only via this form to avoid a silent mismatch.
+      preferences: {
+        ...activeUser.preferences,
+        notifications: notifs,
+        privacy,
+      },
+    });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -104,7 +119,7 @@ export const Settings: React.FC = () => {
           ].map(f => (
             <div key={f.key}>
               <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-secondary)' }}>{f.label}</label>
-              <input type={f.type} value={(profile as any)[f.key]}
+              <input type={f.type} value={(profile as any)[f.key]} disabled={f.key === 'email'}
                 onChange={e => setProfile(p => ({ ...p, [f.key]: e.target.value }))} />
             </div>
           ))}

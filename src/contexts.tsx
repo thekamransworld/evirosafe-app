@@ -12,7 +12,9 @@ import { translations, supportedLanguages, roles } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical
+  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical, BbsObservation,
+  Hazard, ContractorCompany, ContractorWorker, PpeItem, PpeAssignment, ShiftLog, FfdAssessment, EnvReading, SafetyMeeting,
+  EmergencyPlan, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord
 } from './types';
 import { useToast } from './components/ui/Toast';
 
@@ -360,6 +362,24 @@ interface DataContextType {
   ptwList: Ptw[];
   actionItems: ActionItem[];
   chemicalList: Chemical[];
+  bbsObservations: BbsObservation[];
+  hazardList: Hazard[];
+  contractorCompanies: ContractorCompany[];
+  contractorWorkers: ContractorWorker[];
+  ppeItems: PpeItem[];
+  ppeAssignments: PpeAssignment[];
+  shiftLogs: ShiftLog[];
+  ffdAssessments: FfdAssessment[];
+  envReadings: EnvReading[];
+  safetyMeetings: SafetyMeeting[];
+  emergencyPlans: EmergencyPlan[];
+  controlledDocuments: ControlledDocument[];
+  dataRequests: DataRequest[];
+  retentionPolicies: RetentionPolicy[];
+  processingActivities: ProcessingActivity[];
+  dataBreaches: DataBreach[];
+  complianceTracking: ComplianceTracking[];
+  rcaRecords: RcaRecord[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -392,6 +412,37 @@ interface DataContextType {
   handleCreateChecklistTemplate: (data: any) => void;
   handleCreateChemical: (data: any) => void;
   handleUpdateChemical: (data: Chemical) => void;
+  handleCreateBbsObservation: (data: BbsObservation) => void;
+  handleUpdateBbsObservation: (data: BbsObservation) => void;
+  handleCreateHazard: (data: Hazard) => void;
+  handleUpdateHazard: (data: Hazard) => void;
+  handleCreateContractorCompany: (data: ContractorCompany) => void;
+  handleUpdateContractorCompany: (data: ContractorCompany) => void;
+  handleCreateContractorWorker: (data: ContractorWorker) => void;
+  handleUpdateContractorWorker: (data: ContractorWorker) => void;
+  handleCreatePpeItem: (data: PpeItem) => void;
+  handleUpdatePpeItem: (data: PpeItem) => void;
+  handleCreatePpeAssignment: (data: PpeAssignment) => void;
+  handleUpdatePpeAssignment: (data: PpeAssignment) => void;
+  handleCreateShiftLog: (data: ShiftLog) => void;
+  handleCreateFfdAssessment: (data: FfdAssessment) => void;
+  handleCreateEnvReading: (data: EnvReading) => void;
+  handleCreateSafetyMeeting: (data: SafetyMeeting) => void;
+  handleUpdateSafetyMeeting: (data: SafetyMeeting) => void;
+  handleCreateEmergencyPlan: (data: EmergencyPlan) => void;
+  handleUpdateEmergencyPlan: (data: EmergencyPlan) => void;
+  handleCreateControlledDocument: (data: ControlledDocument) => void;
+  handleUpdateControlledDocument: (data: ControlledDocument) => void;
+  handleCreateDataRequest: (data: DataRequest) => void;
+  handleUpdateDataRequest: (data: DataRequest) => void;
+  handleCreateRetentionPolicy: (data: RetentionPolicy) => void;
+  handleUpdateRetentionPolicy: (data: RetentionPolicy) => void;
+  handleCreateProcessingActivity: (data: ProcessingActivity) => void;
+  handleUpdateProcessingActivity: (data: ProcessingActivity) => void;
+  handleCreateDataBreach: (data: DataBreach) => void;
+  handleUpdateDataBreach: (data: DataBreach) => void;
+  handleUpdateComplianceTracking: (data: Omit<ComplianceTracking, 'id' | 'org_id' | 'updated_at'> & { id?: string }) => void;
+  handleCreateRcaRecord: (data: RcaRecord) => void;
 
   // --- DELETE HANDLERS ---
   handleDeleteReport: (id: string) => void;
@@ -427,6 +478,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
     const [chemicalList, setChemicalList] = useState<Chemical[]>([]);
+    const [bbsObservations, setBbsObservations] = useState<BbsObservation[]>([]);
+    const [hazardList, setHazardList] = useState<Hazard[]>([]);
+    const [contractorCompanies, setContractorCompanies] = useState<ContractorCompany[]>([]);
+    const [contractorWorkers, setContractorWorkers] = useState<ContractorWorker[]>([]);
+    const [ppeItems, setPpeItems] = useState<PpeItem[]>([]);
+    const [ppeAssignments, setPpeAssignments] = useState<PpeAssignment[]>([]);
+    const [shiftLogs, setShiftLogs] = useState<ShiftLog[]>([]);
+    const [ffdAssessments, setFfdAssessments] = useState<FfdAssessment[]>([]);
+    const [envReadings, setEnvReadings] = useState<EnvReading[]>([]);
+    const [safetyMeetings, setSafetyMeetings] = useState<SafetyMeeting[]>([]);
+    const [emergencyPlans, setEmergencyPlans] = useState<EmergencyPlan[]>([]);
+    const [controlledDocuments, setControlledDocuments] = useState<ControlledDocument[]>([]);
+    const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
+    const [retentionPolicies, setRetentionPolicies] = useState<RetentionPolicy[]>([]);
+    const [processingActivities, setProcessingActivities] = useState<ProcessingActivity[]>([]);
+    const [dataBreaches, setDataBreaches] = useState<DataBreach[]>([]);
+    const [complianceTracking, setComplianceTracking] = useState<ComplianceTracking[]>([]);
+    const [rcaRecords, setRcaRecords] = useState<RcaRecord[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -511,6 +580,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('training_sessions', setTrainingSessionList),
             fetchCol('notifications', setNotifications),
             fetchCol('chemicals', setChemicalList),
+            fetchCol('bbs_observations', setBbsObservations),
+            fetchCol('hazards', setHazardList),
+            fetchCol('contractor_companies', setContractorCompanies),
+            fetchCol('contractor_workers', setContractorWorkers),
+            fetchCol('ppe_items', setPpeItems),
+            fetchCol('ppe_assignments', setPpeAssignments),
+            fetchCol('shift_logs', setShiftLogs),
+            fetchCol('ffd_assessments', setFfdAssessments),
+            fetchCol('env_readings', setEnvReadings),
+            fetchCol('safety_meetings', setSafetyMeetings),
+            fetchCol('emergency_plans', setEmergencyPlans),
+            fetchCol('controlled_documents', setControlledDocuments),
+            fetchCol('dsar_requests', setDataRequests),
+            fetchCol('retention_policies', setRetentionPolicies),
+            fetchCol('processing_activities', setProcessingActivities),
+            fetchCol('data_breaches', setDataBreaches),
+            fetchCol('compliance_tracking', setComplianceTracking),
+            fetchCol('rca_records', setRcaRecords),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -655,6 +742,228 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             toast.error("Failed to update chemical.");
             if (previous) setChemicalList(prev => prev.map(c => c.id === updated.id ? previous : c));
         }
+    };
+
+    const handleCreateBbsObservation = async (obs: BbsObservation) => {
+        setBbsObservations(prev => [obs, ...prev]);
+        try {
+            await setDoc(doc(db, 'bbs_observations', obs.id), obs);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to save observation.");
+            setBbsObservations(prev => prev.filter(o => o.id !== obs.id));
+        }
+    };
+
+    const handleUpdateBbsObservation = async (updated: BbsObservation) => {
+        const previous = bbsObservations.find(o => o.id === updated.id);
+        setBbsObservations(prev => prev.map(o => o.id === updated.id ? updated : o));
+        try {
+            await updateDoc(doc(db, 'bbs_observations', updated.id), updated as any);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to update observation.");
+            if (previous) setBbsObservations(prev => prev.map(o => o.id === updated.id ? previous : o));
+        }
+    };
+
+    const handleCreateHazard = async (data: Hazard) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setHazardList(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'hazards', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save hazard."); setHazardList(prev => prev.filter(h => h.id !== record.id)); }
+    };
+    const handleUpdateHazard = async (data: Hazard) => {
+        const previous = hazardList.find(h => h.id === data.id);
+        setHazardList(prev => prev.map(h => h.id === data.id ? data : h));
+        try { await updateDoc(doc(db, 'hazards', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update hazard."); if (previous) setHazardList(prev => prev.map(h => h.id === data.id ? previous : h)); }
+    };
+
+    const handleCreateContractorCompany = async (data: ContractorCompany) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setContractorCompanies(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'contractor_companies', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save contractor company."); setContractorCompanies(prev => prev.filter(c => c.id !== record.id)); }
+    };
+    const handleUpdateContractorCompany = async (data: ContractorCompany) => {
+        const previous = contractorCompanies.find(c => c.id === data.id);
+        setContractorCompanies(prev => prev.map(c => c.id === data.id ? data : c));
+        try { await updateDoc(doc(db, 'contractor_companies', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update contractor company."); if (previous) setContractorCompanies(prev => prev.map(c => c.id === data.id ? previous : c)); }
+    };
+
+    const handleCreateContractorWorker = async (data: ContractorWorker) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setContractorWorkers(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'contractor_workers', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save contractor worker."); setContractorWorkers(prev => prev.filter(w => w.id !== record.id)); }
+    };
+    const handleUpdateContractorWorker = async (data: ContractorWorker) => {
+        const previous = contractorWorkers.find(w => w.id === data.id);
+        setContractorWorkers(prev => prev.map(w => w.id === data.id ? data : w));
+        try { await updateDoc(doc(db, 'contractor_workers', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update contractor worker."); if (previous) setContractorWorkers(prev => prev.map(w => w.id === data.id ? previous : w)); }
+    };
+
+    const handleCreatePpeItem = async (data: PpeItem) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setPpeItems(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'ppe_items', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save PPE item."); setPpeItems(prev => prev.filter(i => i.id !== record.id)); }
+    };
+    const handleUpdatePpeItem = async (data: PpeItem) => {
+        const previous = ppeItems.find(i => i.id === data.id);
+        setPpeItems(prev => prev.map(i => i.id === data.id ? data : i));
+        try { await updateDoc(doc(db, 'ppe_items', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update PPE item."); if (previous) setPpeItems(prev => prev.map(i => i.id === data.id ? previous : i)); }
+    };
+
+    const handleCreatePpeAssignment = async (data: PpeAssignment) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setPpeAssignments(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'ppe_assignments', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save PPE assignment."); setPpeAssignments(prev => prev.filter(a => a.id !== record.id)); }
+    };
+    const handleUpdatePpeAssignment = async (data: PpeAssignment) => {
+        const previous = ppeAssignments.find(a => a.id === data.id);
+        setPpeAssignments(prev => prev.map(a => a.id === data.id ? data : a));
+        try { await updateDoc(doc(db, 'ppe_assignments', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update PPE assignment."); if (previous) setPpeAssignments(prev => prev.map(a => a.id === data.id ? previous : a)); }
+    };
+
+    const handleCreateShiftLog = async (data: ShiftLog) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setShiftLogs(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'shift_logs', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save shift log."); setShiftLogs(prev => prev.filter(s => s.id !== record.id)); }
+    };
+
+    const handleCreateFfdAssessment = async (data: FfdAssessment) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setFfdAssessments(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'ffd_assessments', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save FFD assessment."); setFfdAssessments(prev => prev.filter(f => f.id !== record.id)); }
+    };
+
+    const handleCreateEnvReading = async (data: EnvReading) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setEnvReadings(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'env_readings', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save environmental reading."); setEnvReadings(prev => prev.filter(r => r.id !== record.id)); }
+    };
+
+    const handleCreateSafetyMeeting = async (data: SafetyMeeting) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setSafetyMeetings(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'safety_meetings', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save meeting."); setSafetyMeetings(prev => prev.filter(m => m.id !== record.id)); }
+    };
+    const handleUpdateSafetyMeeting = async (data: SafetyMeeting) => {
+        const previous = safetyMeetings.find(m => m.id === data.id);
+        setSafetyMeetings(prev => prev.map(m => m.id === data.id ? data : m));
+        try { await updateDoc(doc(db, 'safety_meetings', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update meeting."); if (previous) setSafetyMeetings(prev => prev.map(m => m.id === data.id ? previous : m)); }
+    };
+
+    const handleCreateEmergencyPlan = async (data: EmergencyPlan) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setEmergencyPlans(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'emergency_plans', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save emergency plan."); setEmergencyPlans(prev => prev.filter(p => p.id !== record.id)); }
+    };
+    const handleUpdateEmergencyPlan = async (data: EmergencyPlan) => {
+        const previous = emergencyPlans.find(p => p.id === data.id);
+        setEmergencyPlans(prev => prev.map(p => p.id === data.id ? data : p));
+        try { await updateDoc(doc(db, 'emergency_plans', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update emergency plan."); if (previous) setEmergencyPlans(prev => prev.map(p => p.id === data.id ? previous : p)); }
+    };
+
+    const handleCreateControlledDocument = async (data: ControlledDocument) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setControlledDocuments(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'controlled_documents', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save document."); setControlledDocuments(prev => prev.filter(d => d.id !== record.id)); }
+    };
+    const handleUpdateControlledDocument = async (data: ControlledDocument) => {
+        const previous = controlledDocuments.find(d => d.id === data.id);
+        setControlledDocuments(prev => prev.map(d => d.id === data.id ? data : d));
+        try { await updateDoc(doc(db, 'controlled_documents', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update document."); if (previous) setControlledDocuments(prev => prev.map(d => d.id === data.id ? previous : d)); }
+    };
+
+    const handleCreateDataRequest = async (data: DataRequest) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setDataRequests(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'dsar_requests', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save request."); setDataRequests(prev => prev.filter(r => r.id !== record.id)); }
+    };
+    const handleUpdateDataRequest = async (data: DataRequest) => {
+        const previous = dataRequests.find(r => r.id === data.id);
+        setDataRequests(prev => prev.map(r => r.id === data.id ? data : r));
+        try { await updateDoc(doc(db, 'dsar_requests', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update request."); if (previous) setDataRequests(prev => prev.map(r => r.id === data.id ? previous : r)); }
+    };
+
+    const handleCreateRetentionPolicy = async (data: RetentionPolicy) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setRetentionPolicies(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'retention_policies', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save policy."); setRetentionPolicies(prev => prev.filter(p => p.id !== record.id)); }
+    };
+    const handleUpdateRetentionPolicy = async (data: RetentionPolicy) => {
+        const previous = retentionPolicies.find(p => p.id === data.id);
+        setRetentionPolicies(prev => prev.map(p => p.id === data.id ? data : p));
+        try { await updateDoc(doc(db, 'retention_policies', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update policy."); if (previous) setRetentionPolicies(prev => prev.map(p => p.id === data.id ? previous : p)); }
+    };
+
+    const handleCreateProcessingActivity = async (data: ProcessingActivity) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setProcessingActivities(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'processing_activities', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save activity."); setProcessingActivities(prev => prev.filter(a => a.id !== record.id)); }
+    };
+    const handleUpdateProcessingActivity = async (data: ProcessingActivity) => {
+        const previous = processingActivities.find(a => a.id === data.id);
+        setProcessingActivities(prev => prev.map(a => a.id === data.id ? data : a));
+        try { await updateDoc(doc(db, 'processing_activities', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update activity."); if (previous) setProcessingActivities(prev => prev.map(a => a.id === data.id ? previous : a)); }
+    };
+
+    const handleCreateDataBreach = async (data: DataBreach) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setDataBreaches(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'data_breaches', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save breach record."); setDataBreaches(prev => prev.filter(b => b.id !== record.id)); }
+    };
+    const handleUpdateDataBreach = async (data: DataBreach) => {
+        const previous = dataBreaches.find(b => b.id === data.id);
+        setDataBreaches(prev => prev.map(b => b.id === data.id ? data : b));
+        try { await updateDoc(doc(db, 'data_breaches', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update breach record."); if (previous) setDataBreaches(prev => prev.map(b => b.id === data.id ? previous : b)); }
+    };
+
+    // Upsert: one requirement can be tracked, then re-edited, without the
+    // caller needing to know whether a tracking record already exists yet.
+    const handleUpdateComplianceTracking = async (data: Omit<ComplianceTracking, 'id' | 'org_id' | 'updated_at'> & { id?: string }) => {
+        const id = data.id || `${activeOrg.id}_${data.requirement_id}`;
+        const record: ComplianceTracking = { ...data, id, org_id: activeOrg.id, updated_at: new Date().toISOString() };
+        const previous = complianceTracking.find(t => t.id === id);
+        setComplianceTracking(prev => previous ? prev.map(t => t.id === id ? record : t) : [record, ...prev]);
+        try { await setDoc(doc(db, 'compliance_tracking', id), record); }
+        catch (e) {
+            console.error(e);
+            toast.error("Failed to update compliance tracking.");
+            setComplianceTracking(prev => previous ? prev.map(t => t.id === id ? previous : t) : prev.filter(t => t.id !== id));
+        }
+    };
+
+    const handleCreateRcaRecord = async (data: RcaRecord) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setRcaRecords(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'rca_records', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save RCA record."); setRcaRecords(prev => prev.filter(r => r.id !== record.id)); }
     };
 
     const handleCreateStandaloneAction = async (data: any) => {
@@ -1074,14 +1383,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems, chemicalList,
+        actionItems, chemicalList, bbsObservations,
+        hazardList, contractorCompanies, contractorWorkers, ppeItems, ppeAssignments, shiftLogs, ffdAssessments,
+        envReadings, safetyMeetings, emergencyPlans, controlledDocuments, dataRequests, retentionPolicies,
+        processingActivities, dataBreaches, complianceTracking, rcaRecords,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
-        handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical,
+        handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical, handleCreateBbsObservation, handleUpdateBbsObservation,
+        handleCreateHazard, handleUpdateHazard, handleCreateContractorCompany, handleUpdateContractorCompany,
+        handleCreateContractorWorker, handleUpdateContractorWorker, handleCreatePpeItem, handleUpdatePpeItem,
+        handleCreatePpeAssignment, handleUpdatePpeAssignment, handleCreateShiftLog, handleCreateFfdAssessment,
+        handleCreateEnvReading, handleCreateSafetyMeeting, handleUpdateSafetyMeeting, handleCreateEmergencyPlan,
+        handleUpdateEmergencyPlan, handleCreateControlledDocument, handleUpdateControlledDocument,
+        handleCreateDataRequest, handleUpdateDataRequest, handleCreateRetentionPolicy, handleUpdateRetentionPolicy,
+        handleCreateProcessingActivity, handleUpdateProcessingActivity, handleCreateDataBreach, handleUpdateDataBreach,
+        handleUpdateComplianceTracking, handleCreateRcaRecord,
         handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 
