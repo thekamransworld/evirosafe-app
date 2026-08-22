@@ -129,6 +129,46 @@ export const roles: Role[] = [
         { resource: 'training', actions: ['read'], scope: 'own' },
         { resource: 'certification', actions: ['read', 'update'], scope: 'own' },
     ]
+  },
+  {
+    org_id: null, key: 'HSE_OFFICER', label: 'HSE Officer', is_system: true,
+    permissions: [
+        { resource: 'dashboard', actions: ['read'], scope: 'project' },
+        { resource: 'reports', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'inspections', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'ptw', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'checklists', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'tbt', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'actions', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'chemicals', actions: ['read', 'create', 'update'], scope: 'project' },
+    ]
+  },
+  {
+    org_id: null, key: 'INSPECTOR', label: 'Inspector', is_system: true,
+    permissions: [
+        { resource: 'inspections', actions: ['read', 'create', 'update'], scope: 'project' },
+        { resource: 'checklists', actions: ['read', 'create', 'update'], scope: 'project' },
+        { resource: 'reports', actions: ['read', 'create'], scope: 'project' },
+    ]
+  },
+  {
+    org_id: null, key: 'CLIENT_VIEWER', label: 'Client Viewer', is_system: true,
+    permissions: [
+        { resource: 'dashboard', actions: ['read'], scope: 'project' },
+        { resource: 'reports', actions: ['read', 'export'], scope: 'project' },
+        { resource: 'inspections', actions: ['read', 'export'], scope: 'project' },
+        { resource: 'plans', actions: ['read', 'export'], scope: 'project' },
+        { resource: 'rams', actions: ['read', 'export'], scope: 'project' },
+    ]
+  },
+  {
+    org_id: null, key: 'CUSTOM_SITE_LEAD', label: 'Custom Site Lead', is_system: true,
+    permissions: [
+        { resource: 'reports', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'inspections', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'ptw', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+        { resource: 'actions', actions: ['read', 'create', 'update', 'assign'], scope: 'project' },
+    ]
   }
 ];
 

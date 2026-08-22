@@ -41,21 +41,8 @@ import { exportTableToCsv } from '../../lib/exportUtils';
 type InductionStatus = 'Pending' | 'Completed' | 'Expired' | 'Exempted';
 type AccessStatus    = 'On-site' | 'Off-site' | 'Suspended';
 type ContractorTier  = 'Approved' | 'Conditional' | 'Under Review' | 'Suspended';
-import type { ContractorCompany, ContractorWorker } from '../../types';
+import type { ContractorCompany, ContractorWorker, SiteAccessLog } from '../../types';
 
-interface SiteAccessLog {
-  id: string;
-  worker_id: string;
-  worker_name: string;
-  company_name: string;
-  project_id: string;
-  check_in: string;
-  check_out: string;
-  gate: string;
-  vehicle_reg: string;
-  purpose: string;
-  approved_by: string;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -271,9 +258,10 @@ type Tab = 'companies' | 'workers' | 'access-log';
 
 export const ContractorManager: React.FC = () => {
   const { activeUser, activeOrg } = useAppContext();
-  const { projects, contractorCompanies: companies, contractorWorkers: workers, handleCreateContractorCompany, handleCreateContractorWorker, handleUpdateContractorWorker } = useDataContext();
+  const { projects, contractorCompanies: companies, contractorWorkers: workers, siteAccessLogs: accessLog,
+    handleCreateContractorCompany, handleCreateContractorWorker, handleUpdateContractorWorker,
+    handleCreateSiteAccessLog, handleUpdateSiteAccessLog } = useDataContext();
 
-  const [accessLog, setAccessLog] = useState<SiteAccessLog[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('companies');
   const [showCompanyForm, setShowCompanyForm] = useState(false);
   const [showWorkerForm, setShowWorkerForm]   = useState(false);
@@ -296,28 +284,20 @@ export const ContractorManager: React.FC = () => {
     if (!worker) return;
     const company = companies.find((c) => c.id === worker.company_id);
     const log: SiteAccessLog = {
-      id: uid(), worker_id: workerId, worker_name: worker.name,
+      id: uid(), org_id: activeOrg?.id ?? '', worker_id: workerId, worker_name: worker.name,
       company_name: company?.company_name ?? '',
       project_id: worker.current_project_id,
       check_in: new Date().toISOString(), check_out: '',
       gate: 'Main Gate', vehicle_reg: '', purpose: 'Work',
       approved_by: activeUser?.name ?? '',
     };
-    // Note: site access log entries (gate/time in-out detail) are kept as
-    // session-local UI history for now, not their own persisted collection -
-    // a deliberate scope reduction. The worker's on/off-site status IS
-    // persisted, since that's the state other parts of the app would need
-    // to trust.
-    setAccessLog((prev) => [log, ...prev]);
+    handleCreateSiteAccessLog(log);
     handleUpdateContractorWorker({ ...worker, access_status: 'On-site' });
   };
 
   const handleCheckOut = (workerId: string) => {
-    setAccessLog((prev) => prev.map((l) =>
-      l.worker_id === workerId && !l.check_out
-        ? { ...l, check_out: new Date().toISOString() }
-        : l,
-    ));
+    const openLog = accessLog.find((l) => l.worker_id === workerId && !l.check_out);
+    if (openLog) handleUpdateSiteAccessLog({ ...openLog, check_out: new Date().toISOString() });
     const worker = workers.find((w) => w.id === workerId);
     if (worker) handleUpdateContractorWorker({ ...worker, access_status: 'Off-site' });
   };

@@ -1,4 +1,16 @@
 // src/config/permissions.ts
+//
+// ⚠ NOT ACTUALLY USED AT RUNTIME. The can() function in contexts.tsx imports
+// `roles` from '../config' (resolves to the top-level src/config.ts file,
+// not this directory's index), which builds its permissions from that
+// file's own `allPossiblePermissions` catalog - entirely independent of
+// ROLE_DEFINITIONS below. Editing this file has zero effect on what any
+// role can actually do. If you're changing a permission, edit src/config.ts.
+// This file was discovered to be dead code the hard way - four roles
+// (HSE_OFFICER, INSPECTOR, CLIENT_VIEWER, CUSTOM_SITE_LEAD) were fully and
+// correctly defined here while being completely absent from src/config.ts,
+// meaning every user with one of those roles failed every can() permission
+// check app-wide until that was caught and fixed.
 import type { RoleDefinition, PermissionCondition } from '../types/rbac';
 import type { Ptw } from '../types';
 

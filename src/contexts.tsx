@@ -14,7 +14,8 @@ import type {
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical, BbsObservation,
   Hazard, ContractorCompany, ContractorWorker, PpeItem, PpeAssignment, ShiftLog, FfdAssessment, EnvReading, SafetyMeeting,
-  EmergencyPlan, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord
+  EmergencyPlan, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord,
+  SiteAccessLog
 } from './types';
 import { useToast } from './components/ui/Toast';
 
@@ -380,6 +381,7 @@ interface DataContextType {
   dataBreaches: DataBreach[];
   complianceTracking: ComplianceTracking[];
   rcaRecords: RcaRecord[];
+  siteAccessLogs: SiteAccessLog[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -443,6 +445,8 @@ interface DataContextType {
   handleUpdateDataBreach: (data: DataBreach) => void;
   handleUpdateComplianceTracking: (data: Omit<ComplianceTracking, 'id' | 'org_id' | 'updated_at'> & { id?: string }) => void;
   handleCreateRcaRecord: (data: RcaRecord) => void;
+  handleCreateSiteAccessLog: (data: SiteAccessLog) => void;
+  handleUpdateSiteAccessLog: (data: SiteAccessLog) => void;
 
   // --- DELETE HANDLERS ---
   handleDeleteReport: (id: string) => void;
@@ -496,6 +500,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [dataBreaches, setDataBreaches] = useState<DataBreach[]>([]);
     const [complianceTracking, setComplianceTracking] = useState<ComplianceTracking[]>([]);
     const [rcaRecords, setRcaRecords] = useState<RcaRecord[]>([]);
+    const [siteAccessLogs, setSiteAccessLogs] = useState<SiteAccessLog[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -598,6 +603,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('data_breaches', setDataBreaches),
             fetchCol('compliance_tracking', setComplianceTracking),
             fetchCol('rca_records', setRcaRecords),
+            fetchCol('site_access_logs', setSiteAccessLogs),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -964,6 +970,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setRcaRecords(prev => [record, ...prev]);
         try { await setDoc(doc(db, 'rca_records', record.id), record); }
         catch (e) { console.error(e); toast.error("Failed to save RCA record."); setRcaRecords(prev => prev.filter(r => r.id !== record.id)); }
+    };
+
+    const handleCreateSiteAccessLog = async (data: SiteAccessLog) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setSiteAccessLogs(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'site_access_logs', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save access log entry."); setSiteAccessLogs(prev => prev.filter(l => l.id !== record.id)); }
+    };
+    const handleUpdateSiteAccessLog = async (data: SiteAccessLog) => {
+        const previous = siteAccessLogs.find(l => l.id === data.id);
+        setSiteAccessLogs(prev => prev.map(l => l.id === data.id ? data : l));
+        try { await updateDoc(doc(db, 'site_access_logs', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update access log entry."); if (previous) setSiteAccessLogs(prev => prev.map(l => l.id === data.id ? previous : l)); }
     };
 
     const handleCreateStandaloneAction = async (data: any) => {
@@ -1386,7 +1405,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         actionItems, chemicalList, bbsObservations,
         hazardList, contractorCompanies, contractorWorkers, ppeItems, ppeAssignments, shiftLogs, ffdAssessments,
         envReadings, safetyMeetings, emergencyPlans, controlledDocuments, dataRequests, retentionPolicies,
-        processingActivities, dataBreaches, complianceTracking, rcaRecords,
+        processingActivities, dataBreaches, complianceTracking, rcaRecords, siteAccessLogs,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
@@ -1401,7 +1420,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleUpdateEmergencyPlan, handleCreateControlledDocument, handleUpdateControlledDocument,
         handleCreateDataRequest, handleUpdateDataRequest, handleCreateRetentionPolicy, handleUpdateRetentionPolicy,
         handleCreateProcessingActivity, handleUpdateProcessingActivity, handleCreateDataBreach, handleUpdateDataBreach,
-        handleUpdateComplianceTracking, handleCreateRcaRecord,
+        handleUpdateComplianceTracking, handleCreateRcaRecord, handleCreateSiteAccessLog, handleUpdateSiteAccessLog,
         handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 

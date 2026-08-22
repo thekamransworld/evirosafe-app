@@ -227,6 +227,21 @@ export interface ContractorWorker {
   created_at: string;
 }
 
+export interface SiteAccessLog {
+  id: string;
+  org_id: string;
+  worker_id: string;
+  worker_name: string;
+  company_name: string;
+  project_id: string;
+  check_in: string;
+  check_out: string;
+  gate: string;
+  vehicle_reg: string;
+  purpose: string;
+  approved_by: string;
+}
+
 // --- PPE INVENTORY ---
 export type PpeCondition = 'Good' | 'Fair' | 'Replace' | 'Condemned';
 export type PpeCategory  = 'Head' | 'Eye' | 'Face' | 'Hearing' | 'Respiratory' | 'Hand' | 'Foot' | 'Body' | 'Fall Protection' | 'High Visibility';
