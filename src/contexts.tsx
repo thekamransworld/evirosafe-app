@@ -15,7 +15,7 @@ import type {
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical, BbsObservation,
   Hazard, ContractorCompany, ContractorWorker, PpeItem, PpeAssignment, ShiftLog, FfdAssessment, EnvReading, SafetyMeeting,
   EmergencyPlan, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord,
-  SiteAccessLog
+  SiteAccessLog, CorrectiveAction, ManHoursEntry, Audit
 } from './types';
 import { useToast } from './components/ui/Toast';
 
@@ -60,8 +60,6 @@ interface AppContextType {
   impersonatingAdmin: User | null;
   impersonateUser: (userId: string) => void;
   stopImpersonating: () => void;
-  theme: 'light' | 'dark';
-  toggleTheme: () => void;
 }
 
 const AppContext = createContext<AppContextType>(null!);
@@ -111,17 +109,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
   const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
   const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
   const toast = useToast();
-
-  useEffect(() => {
-      const root = window.document.documentElement;
-      root.classList.remove('light', 'dark');
-      root.classList.add(theme);
-  }, [theme]);
-
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   // --- CRITICAL FIX: ROBUST USER RESOLUTION ---
   const activeUser = useMemo(() => {
@@ -336,7 +325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentView, setCurrentView, activeOrg, setActiveOrg, isSidebarOpen, setSidebarOpen,
     usersList, setUsersList, activeUser, handleUpdateUser, handleDeleteUser, organizations, handleCreateOrganization,
     invitedEmails, handleInviteUser, handleSignUp, handleApproveUser, language, dir, t,
-    login, logout, can, impersonatingAdmin, impersonateUser, stopImpersonating, theme, toggleTheme
+    login, logout, can, impersonatingAdmin, impersonateUser, stopImpersonating
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -382,6 +371,9 @@ interface DataContextType {
   complianceTracking: ComplianceTracking[];
   rcaRecords: RcaRecord[];
   siteAccessLogs: SiteAccessLog[];
+  correctiveActions: CorrectiveAction[];
+  manHoursEntries: ManHoursEntry[];
+  audits: Audit[];
   
   setInspectionList: React.Dispatch<React.SetStateAction<Inspection[]>>;
   setChecklistRunList: React.Dispatch<React.SetStateAction<ChecklistRun[]>>;
@@ -447,6 +439,11 @@ interface DataContextType {
   handleCreateRcaRecord: (data: RcaRecord) => void;
   handleCreateSiteAccessLog: (data: SiteAccessLog) => void;
   handleUpdateSiteAccessLog: (data: SiteAccessLog) => void;
+  handleCreateCorrectiveAction: (data: CorrectiveAction) => void;
+  handleUpdateCorrectiveAction: (data: CorrectiveAction) => void;
+  handleSaveManHoursEntry: (data: Omit<ManHoursEntry, 'id' | 'org_id'> & { id?: string }) => void;
+  handleCreateAudit: (data: Audit) => void;
+  handleUpdateAudit: (data: Audit) => void;
 
   // --- DELETE HANDLERS ---
   handleDeleteReport: (id: string) => void;
@@ -501,6 +498,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [complianceTracking, setComplianceTracking] = useState<ComplianceTracking[]>([]);
     const [rcaRecords, setRcaRecords] = useState<RcaRecord[]>([]);
     const [siteAccessLogs, setSiteAccessLogs] = useState<SiteAccessLog[]>([]);
+    const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([]);
+    const [manHoursEntries, setManHoursEntries] = useState<ManHoursEntry[]>([]);
+    const [audits, setAudits] = useState<Audit[]>([]);
 
     useEffect(() => {
       if (!currentUser) {
@@ -604,6 +604,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('compliance_tracking', setComplianceTracking),
             fetchCol('rca_records', setRcaRecords),
             fetchCol('site_access_logs', setSiteAccessLogs),
+            fetchCol('corrective_actions', setCorrectiveActions),
+            fetchCol('man_hours_entries', setManHoursEntries),
+            fetchCol('audits', setAudits),
           ]);
         } catch (e) {
           console.error("Error fetching data:", e);
@@ -983,6 +986,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSiteAccessLogs(prev => prev.map(l => l.id === data.id ? data : l));
         try { await updateDoc(doc(db, 'site_access_logs', data.id), data as any); }
         catch (e) { console.error(e); toast.error("Failed to update access log entry."); if (previous) setSiteAccessLogs(prev => prev.map(l => l.id === data.id ? previous : l)); }
+    };
+
+    const handleCreateCorrectiveAction = async (data: CorrectiveAction) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setCorrectiveActions(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'corrective_actions', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save corrective action."); setCorrectiveActions(prev => prev.filter(c => c.id !== record.id)); }
+    };
+    const handleUpdateCorrectiveAction = async (data: CorrectiveAction) => {
+        const previous = correctiveActions.find(c => c.id === data.id);
+        setCorrectiveActions(prev => prev.map(c => c.id === data.id ? data : c));
+        try { await updateDoc(doc(db, 'corrective_actions', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update corrective action."); if (previous) setCorrectiveActions(prev => prev.map(c => c.id === data.id ? previous : c)); }
+    };
+
+    // Upsert keyed by project_id + log_date, matching the component's
+    // existing one-entry-per-project-per-day semantics exactly - re-logging
+    // the same day/project naturally overwrites via setDoc rather than
+    // creating a duplicate.
+    const handleSaveManHoursEntry = async (data: Omit<ManHoursEntry, 'id' | 'org_id'> & { id?: string }) => {
+        const id = data.id || `${data.project_id}_${data.log_date}`;
+        const record: ManHoursEntry = { ...data, id, org_id: activeOrg.id };
+        const previous = manHoursEntries.find(e => e.id === id);
+        setManHoursEntries(prev => previous ? prev.map(e => e.id === id ? record : e) : [record, ...prev]);
+        try { await setDoc(doc(db, 'man_hours_entries', id), record); }
+        catch (e) {
+            console.error(e);
+            toast.error("Failed to save man-hours entry.");
+            setManHoursEntries(prev => previous ? prev.map(e => e.id === id ? previous : e) : prev.filter(e => e.id !== id));
+        }
+    };
+
+    const handleCreateAudit = async (data: Audit) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setAudits(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'audits', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save audit."); setAudits(prev => prev.filter(a => a.id !== record.id)); }
+    };
+    const handleUpdateAudit = async (data: Audit) => {
+        const previous = audits.find(a => a.id === data.id);
+        setAudits(prev => prev.map(a => a.id === data.id ? data : a));
+        try { await updateDoc(doc(db, 'audits', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update audit."); if (previous) setAudits(prev => prev.map(a => a.id === data.id ? previous : a)); }
     };
 
     const handleCreateStandaloneAction = async (data: any) => {
@@ -1406,6 +1452,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hazardList, contractorCompanies, contractorWorkers, ppeItems, ppeAssignments, shiftLogs, ffdAssessments,
         envReadings, safetyMeetings, emergencyPlans, controlledDocuments, dataRequests, retentionPolicies,
         processingActivities, dataBreaches, complianceTracking, rcaRecords, siteAccessLogs,
+        correctiveActions, manHoursEntries, audits,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
@@ -1421,6 +1468,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateDataRequest, handleUpdateDataRequest, handleCreateRetentionPolicy, handleUpdateRetentionPolicy,
         handleCreateProcessingActivity, handleUpdateProcessingActivity, handleCreateDataBreach, handleUpdateDataBreach,
         handleUpdateComplianceTracking, handleCreateRcaRecord, handleCreateSiteAccessLog, handleUpdateSiteAccessLog,
+        handleCreateCorrectiveAction, handleUpdateCorrectiveAction, handleSaveManHoursEntry, handleCreateAudit, handleUpdateAudit,
         handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 

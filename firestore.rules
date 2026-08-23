@@ -130,6 +130,9 @@ service cloud.firestore {
     match /compliance_tracking/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /rca_records/{docId}            { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /site_access_logs/{docId}       { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /corrective_actions/{docId}     { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /man_hours_entries/{docId}      { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /audits/{docId}                 { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
 
     // Everything not explicitly matched above is denied by default — this is
     // Firestore's normal behavior, not something this file has to state.

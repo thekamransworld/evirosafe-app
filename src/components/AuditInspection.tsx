@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
 import {
   Plus, ClipboardList, CheckCircle, XCircle, MinusCircle,
   AlertTriangle, ChevronRight, X, Search, TrendingUp,
@@ -11,39 +11,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AuditType =
-  | 'hse_inspection' | 'site_audit' | 'environmental_audit'
-  | 'fire_inspection' | 'scaffolding_inspection' | 'lifting_inspection'
-  | 'electrical_inspection' | 'ptw_audit' | 'compliance_audit';
-
-export type ItemResponse = 'yes' | 'no' | 'na' | 'partial';
-
-export interface AuditItem {
-  id:             string;
-  category:       string;
-  question:       string;
-  response:       ItemResponse | null;
-  finding:        string;
-  action_required: boolean;
-  photo_url?:     string;
-  score:          number;
-  max_score:      number;
-}
-
-export interface Audit {
-  id:            string;
-  audit_number:  string;
-  type:          AuditType;
-  title:         string;
-  conducted_by:  string;
-  conducted_at:  string;
-  location:      string;
-  status:        'in_progress' | 'completed' | 'cancelled';
-  overall_score: number | null;
-  items:         AuditItem[];
-  observations:  string;
-  recommendations: string;
-}
+import type { AuditType, ItemResponse, AuditItem, Audit } from '../types';
 
 // ─── Checklist templates ──────────────────────────────────────────────────────
 
@@ -232,47 +200,6 @@ const buildItems = (type: AuditType): AuditItem[] => {
   );
 };
 
-const MOCK_AUDITS: Audit[] = [
-  {
-    id: 'aud-001', audit_number: 'AUD-2024-0001',
-    type: 'hse_inspection', title: 'Weekly HSE Site Inspection — Tower A',
-    conducted_by: 'Sarah Mitchell', conducted_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    location: 'Tower A — Levels 3–6', status: 'completed', overall_score: 76,
-    observations: 'Generally good housekeeping on Level 3. Levels 4–5 require improvement.',
-    recommendations: '1. Install additional waste bins on Level 5. 2. Enforce 100% harness compliance.',
-    items: buildItems('hse_inspection').map((item, i) => ({
-      ...item,
-      response: i % 5 === 0 ? 'no' : i % 7 === 0 ? 'partial' : 'yes' as ItemResponse,
-      score: i % 5 === 0 ? 0 : i % 7 === 0 ? 0.5 : 1,
-      finding: i % 5 === 0 ? 'Non-compliance observed — corrective action required' : '',
-      action_required: i % 5 === 0,
-    })),
-  },
-  {
-    id: 'aud-002', audit_number: 'AUD-2024-0002',
-    type: 'fire_inspection', title: 'Monthly Fire Safety Inspection',
-    conducted_by: 'Ahmed Al-Rashid', conducted_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    location: 'All Site Areas', status: 'completed', overall_score: 88,
-    observations: 'Fire extinguishers all current. One exit route partially obstructed.',
-    recommendations: 'Clear exit route at north stairwell — immediate action.',
-    items: buildItems('fire_inspection').map((item, i) => ({
-      ...item,
-      response: i === 3 ? 'no' : 'yes' as ItemResponse,
-      score: i === 3 ? 0 : 1,
-      finding: i === 3 ? 'Exit route obstructed by stored materials' : '',
-      action_required: i === 3,
-    })),
-  },
-  {
-    id: 'aud-003', audit_number: 'AUD-2024-0003',
-    type: 'scaffolding_inspection', title: 'Scaffolding Inspection — Tower B Facade',
-    conducted_by: 'James Okafor', conducted_at: new Date().toISOString(),
-    location: 'Tower B — West Facade', status: 'in_progress', overall_score: null,
-    observations: '', recommendations: '',
-    items: buildItems('scaffolding_inspection'),
-  },
-];
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const calculateScore = (items: AuditItem[]): number => {
@@ -445,7 +372,7 @@ const AuditConductModal: React.FC<{
 
 // ─── New Audit Modal ──────────────────────────────────────────────────────────
 
-const NewAuditModal: React.FC<{ onClose: () => void; onSave: (a: Audit) => void }> = ({ onClose, onSave }) => {
+const NewAuditModal: React.FC<{ onClose: () => void; onSave: (a: Omit<Audit, 'org_id'>) => void }> = ({ onClose, onSave }) => {
   const { activeUser } = useAppContext();
   const [form, setForm] = useState({ type: 'hse_inspection' as AuditType, title: '', location: '' });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
@@ -511,7 +438,7 @@ const NewAuditModal: React.FC<{ onClose: () => void; onSave: (a: Audit) => void 
 
 export const AuditInspection: React.FC = () => {
   const { can } = useAppContext();
-  const [audits, setAudits]       = useState<Audit[]>(MOCK_AUDITS);
+  const { audits, handleCreateAudit, handleUpdateAudit } = useDataContext();
   const [selected, setSelected]   = useState<Audit | null>(null);
   const [showNew, setShowNew]     = useState(false);
   const [search, setSearch]       = useState('');
@@ -537,8 +464,7 @@ export const AuditInspection: React.FC = () => {
     };
   }, [audits]);
 
-  const handleSave = (updated: Audit) =>
-    setAudits(prev => prev.map(a => a.id === updated.id ? updated : a));
+  const handleSave = (updated: Audit) => handleUpdateAudit(updated);
 
   return (
     <div className="space-y-6">
@@ -638,7 +564,7 @@ export const AuditInspection: React.FC = () => {
       </div>
 
       {selected && <AuditConductModal audit={selected} onClose={() => setSelected(null)} onSave={handleSave} />}
-      {showNew && <NewAuditModal onClose={() => setShowNew(false)} onSave={a => setAudits(prev => [a, ...prev])} />}
+      {showNew && <NewAuditModal onClose={() => setShowNew(false)} onSave={a => handleCreateAudit(a as Audit)} />}
     </div>
   );
 };

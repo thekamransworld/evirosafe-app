@@ -612,6 +612,85 @@ export interface RcaRecord {
   capaRecommendations?: string[];
 }
 
+// --- CORRECTIVE ACTIONS (CAR REGISTER) ---
+export type CarStatus   = 'open' | 'in_progress' | 'completed' | 'verified' | 'overdue' | 'cancelled';
+export type CarPriority = 'low' | 'medium' | 'high' | 'critical';
+export type CarType     = 'corrective' | 'preventive' | 'improvement';
+
+export interface CorrectiveAction {
+  id:            string;
+  org_id:        string;
+  car_number:    string;
+  title:         string;
+  description:   string;
+  action_type:   CarType;
+  priority:      CarPriority;
+  source:        'incident' | 'audit' | 'inspection' | 'observation' | 'management';
+  source_ref?:   string;
+  assigned_to:   string;
+  assigned_by:   string;
+  target_date:   string;
+  completed_at?: string;
+  verified_by?:  string;
+  verified_at?:  string;
+  status:        CarStatus;
+  evidence:      string[];
+  notes:         string;
+  created_at:    string;
+  updated_at:    string;
+}
+
+// --- MAN-HOURS LOG ---
+export interface ManHoursEntry {
+  id:               string;
+  org_id:           string;
+  project_id:       string;
+  project_name:     string;
+  log_date:         string;
+  headcount:        number;
+  hours_worked:     number;
+  contractor_hours: number;
+  notes:            string;
+  recorded_by:      string;
+  created_at:       string;
+}
+
+// --- AUDIT / INSPECTION (formal ISO-style audits, distinct from Inspections and Audit Log) ---
+export type AuditType =
+  | 'hse_inspection' | 'site_audit' | 'environmental_audit'
+  | 'fire_inspection' | 'scaffolding_inspection' | 'lifting_inspection'
+  | 'electrical_inspection' | 'ptw_audit' | 'compliance_audit';
+
+export type ItemResponse = 'yes' | 'no' | 'na' | 'partial';
+
+export interface AuditItem {
+  id:              string;
+  category:        string;
+  question:        string;
+  response:        ItemResponse | null;
+  finding:         string;
+  action_required: boolean;
+  photo_url?:      string;
+  score:           number;
+  max_score:       number;
+}
+
+export interface Audit {
+  id:              string;
+  org_id:          string;
+  audit_number:    string;
+  type:            AuditType;
+  title:           string;
+  conducted_by:    string;
+  conducted_at:    string;
+  location:        string;
+  status:          'in_progress' | 'completed' | 'cancelled';
+  overall_score:   number | null;
+  items:           AuditItem[];
+  observations:    string;
+  recommendations: string;
+}
+
 export type View = Resource | string;
 export type Action = 'read' | 'create' | 'update' | 'approve' | 'delete' | 'export' | 'assign';
 export type Scope = 'org' | 'project' | 'own';

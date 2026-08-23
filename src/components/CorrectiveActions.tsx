@@ -2,87 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
 import { Plus, AlertTriangle, CheckCircle, Clock, XCircle, ChevronRight, X, User, Calendar, FileText, TrendingUp } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type CarStatus   = 'open' | 'in_progress' | 'completed' | 'verified' | 'overdue' | 'cancelled';
-export type CarPriority = 'low' | 'medium' | 'high' | 'critical';
-export type CarType     = 'corrective' | 'preventive' | 'improvement';
-
-export interface CorrectiveAction {
-  id:           string;
-  car_number:   string;
-  title:        string;
-  description:  string;
-  action_type:  CarType;
-  priority:     CarPriority;
-  source:       'incident' | 'audit' | 'inspection' | 'observation' | 'management';
-  source_ref?:  string;
-  assigned_to:  string;
-  assigned_by:  string;
-  target_date:  string;
-  completed_at?: string;
-  verified_by?:  string;
-  verified_at?:  string;
-  status:        CarStatus;
-  evidence:      string[];
-  notes:         string;
-  created_at:    string;
-  updated_at:    string;
-}
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_CARS: CorrectiveAction[] = [
-  {
-    id: 'car-001', car_number: 'CAR-2024-0001',
-    title: 'Install additional guardrails at Level 3 platform',
-    description: 'Following near-miss incident INC-2024-0043, additional guardrails required at all open edges of Level 3 platform to prevent fall hazards.',
-    action_type: 'corrective', priority: 'critical', source: 'incident', source_ref: 'INC-2024-0043',
-    assigned_to: 'HSE Manager', assigned_by: 'Site Director',
-    target_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'overdue', evidence: [], notes: 'Materials ordered — awaiting delivery.',
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'car-002', car_number: 'CAR-2024-0002',
-    title: 'Update Hot Work permit checklist to include gas detector calibration check',
-    description: 'Gas detector calibration checks must be added to Hot Work PTW checklist following HSE audit finding AUD-2024-0012.',
-    action_type: 'corrective', priority: 'high', source: 'audit', source_ref: 'AUD-2024-0012',
-    assigned_to: 'HSE Officer', assigned_by: 'HSE Manager',
-    target_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'in_progress', evidence: ['Updated checklist v2.pdf'], notes: 'Draft checklist reviewed — pending final approval.',
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'car-003', car_number: 'CAR-2024-0003',
-    title: 'Conduct refresher training on manual handling techniques',
-    description: 'Following 3 manual handling injuries in Q3, all workers to complete refresher training by end of month.',
-    action_type: 'preventive', priority: 'medium', source: 'management',
-    assigned_to: 'Training Coordinator', assigned_by: 'HSE Manager',
-    target_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    status: 'open', evidence: [], notes: '',
-    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'car-004', car_number: 'CAR-2024-0004',
-    title: 'Install eye wash stations at chemical storage area',
-    description: 'COSHH assessment identified missing emergency eye wash facilities at chemical storage — regulatory requirement.',
-    action_type: 'corrective', priority: 'high', source: 'inspection',
-    assigned_to: 'Facilities Manager', assigned_by: 'HSE Manager',
-    target_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    completed_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    verified_by: 'HSE Manager', verified_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    status: 'verified', evidence: ['Installation photo.jpg', 'Commissioning cert.pdf'], notes: 'Two stations installed and tested.',
-    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
+import type { CarStatus, CarPriority, CarType, CorrectiveAction } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -222,7 +147,7 @@ const CarDetailModal: React.FC<{
 
 // ─── New CAR Modal ─────────────────────────────────────────────────────────────
 
-const NewCarModal: React.FC<{ onClose: () => void; onSave: (car: CorrectiveAction) => void }> = ({ onClose, onSave }) => {
+const NewCarModal: React.FC<{ onClose: () => void; onSave: (car: Omit<CorrectiveAction, 'org_id'>) => void }> = ({ onClose, onSave }) => {
   const [form, setForm] = useState({
     title: '', description: '', action_type: 'corrective' as CarType,
     priority: 'medium' as CarPriority, source: 'management' as CorrectiveAction['source'],
@@ -326,7 +251,7 @@ const NewCarModal: React.FC<{ onClose: () => void; onSave: (car: CorrectiveActio
 
 export const CorrectiveActions: React.FC = () => {
   const { can } = useAppContext();
-  const [cars, setCars]           = useState<CorrectiveAction[]>(MOCK_CARS);
+  const { correctiveActions: cars, handleCreateCorrectiveAction, handleUpdateCorrectiveAction } = useDataContext();
   const [selected, setSelected]   = useState<CorrectiveAction | null>(null);
   const [showNew, setShowNew]     = useState(false);
   const [statusFilter, setStatusFilter] = useState<CarStatus | 'all'>('all');
@@ -345,11 +270,9 @@ export const CorrectiveActions: React.FC = () => {
     verified: cars.filter(c => c.status === 'verified').length,
   }), [cars]);
 
-  const handleUpdate = (updated: CorrectiveAction) =>
-    setCars(prev => prev.map(c => c.id === updated.id ? updated : c));
+  const handleUpdate = (updated: CorrectiveAction) => handleUpdateCorrectiveAction(updated);
 
-  const handleCreate = (car: CorrectiveAction) =>
-    setCars(prev => [car, ...prev]);
+  const handleCreate = (car: Omit<CorrectiveAction, 'org_id'>) => handleCreateCorrectiveAction(car as CorrectiveAction);
 
   return (
     <div className="space-y-6">

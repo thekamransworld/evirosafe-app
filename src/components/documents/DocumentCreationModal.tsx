@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { X, Upload, Loader2 } from 'lucide-react';
-import { Button } from './ui/Button';
-import { uploadFileToCloud } from '../services/storageService';
-import type { ControlledDocument, DocCategory } from '../types';
+import { Button } from '../ui/Button';
+import { uploadFileToCloud } from '../../services/storageService';
+import type { ControlledDocument, DocCategory } from '../../types';
 
 const CATEGORY_OPTIONS: { value: DocCategory; label: string }[] = [
   { value: 'policy',           label: 'Policy' },

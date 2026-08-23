@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { Organization, User } from '../../types';
 import { useDataContext, useAppContext } from '../../contexts';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supportedLanguages } from '../../config';
 import { 
@@ -48,7 +49,8 @@ const OfflineIndicator = () => {
 
 export const Header: React.FC<HeaderProps> = ({ activeOrg, setActiveOrg, organizations, user, toggleSidebar }) => {
   const { notifications } = useDataContext();
-  const { language, handleUpdateUser, logout: clearLocalSession, theme, toggleTheme } = useAppContext();
+  const { language, handleUpdateUser, logout: clearLocalSession } = useAppContext();
+  const { theme, toggle: toggleTheme } = useTheme();
   const { logout } = useAuth();
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);

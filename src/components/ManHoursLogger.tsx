@@ -6,44 +6,7 @@ import { Plus, Clock, Users, TrendingUp, Calendar, X, ChevronDown } from 'lucide
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface ManHoursEntry {
-  id:               string;
-  project_id:       string;
-  project_name:     string;
-  log_date:         string;
-  headcount:        number;
-  hours_worked:     number;
-  contractor_hours: number;
-  notes:            string;
-  recorded_by:      string;
-  created_at:       string;
-}
-
-// ─── Mock seed data ───────────────────────────────────────────────────────────
-
-const generateMockEntries = (): ManHoursEntry[] => {
-  const entries: ManHoursEntry[] = [];
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    if (date.getDay() === 0 || date.getDay() === 6) continue; // skip weekends
-    const headcount = Math.floor(Math.random() * 30) + 80;
-    entries.push({
-      id:               `mh-${i}`,
-      project_id:       'proj-001',
-      project_name:     'Tower A & B Construction',
-      log_date:         date.toISOString().split('T')[0],
-      headcount,
-      hours_worked:     headcount * (Math.random() > 0.2 ? 9 : 10),
-      contractor_hours: Math.floor(Math.random() * 200) + 100,
-      notes:            '',
-      recorded_by:      'Site HSE Manager',
-      created_at:       date.toISOString(),
-    });
-  }
-  return entries;
-};
-
-const MOCK_ENTRIES = generateMockEntries();
+import type { ManHoursEntry } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,7 +38,7 @@ const getWeeklyTotals = (entries: ManHoursEntry[]) => {
 
 const NewEntryModal: React.FC<{
   onClose: () => void;
-  onSave:  (entry: ManHoursEntry) => void;
+  onSave:  (entry: Omit<ManHoursEntry, 'id' | 'org_id'>) => void;
   projects: { id: string; name: string }[];
 }> = ({ onClose, onSave, projects }) => {
   const { activeUser } = useAppContext();
@@ -96,7 +59,6 @@ const NewEntryModal: React.FC<{
     if (!hc || !hw) { alert('Headcount and Hours Worked are required.'); return; }
     const proj = projects.find(p => p.id === form.project_id);
     onSave({
-      id:               `mh-${Date.now()}`,
       project_id:       form.project_id,
       project_name:     proj?.name || '',
       log_date:         form.log_date,
@@ -186,11 +148,18 @@ const MiniBar: React.FC<{ value: number; max: number; color: string }> = ({ valu
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const ManHoursLogger: React.FC = () => {
-  const { projects } = useDataContext();
+  const { projects, manHoursEntries: entriesRaw, handleSaveManHoursEntry } = useDataContext();
   const { can } = useAppContext();
-  const [entries, setEntries]   = useState<ManHoursEntry[]>(MOCK_ENTRIES);
   const [showNew, setShowNew]   = useState(false);
   const [showAll, setShowAll]   = useState(false);
+
+  // fetchCol doesn't guarantee order - replicate the newest-first sort the
+  // old local state used to maintain, since displayEntries' slice(-10) below
+  // depends on this ordering.
+  const entries = useMemo(
+    () => [...entriesRaw].sort((a, b) => b.log_date.localeCompare(a.log_date)),
+    [entriesRaw],
+  );
 
   const stats = useMemo(() => {
     const total     = entries.reduce((s, e) => s + e.hours_worked + e.contractor_hours, 0);
@@ -206,16 +175,7 @@ export const ManHoursLogger: React.FC = () => {
 
   const displayEntries = showAll ? entries : entries.slice(-10);
 
-  const handleSave = (entry: ManHoursEntry) =>
-    setEntries(prev => {
-      const existing = prev.findIndex(e => e.log_date === entry.log_date && e.project_id === entry.project_id);
-      if (existing >= 0) {
-        const updated = [...prev];
-        updated[existing] = entry;
-        return updated;
-      }
-      return [entry, ...prev].sort((a, b) => b.log_date.localeCompare(a.log_date));
-    });
+  const handleSave = (entry: Omit<ManHoursEntry, 'id' | 'org_id'>) => handleSaveManHoursEntry(entry);
 
   return (
     <div className="space-y-6">
