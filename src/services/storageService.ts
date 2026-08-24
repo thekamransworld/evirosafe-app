@@ -38,7 +38,11 @@ export const uploadFileToCloud = async (file: File, folder: string = 'general'):
 
   } catch (error) {
     console.error("Cloudinary Upload Error:", error);
-    // Fallback placeholder so the app doesn't crash if internet is bad
-    return `https://placehold.co/600x400/red/white?text=Upload+Failed`;
+    // Re-throw rather than returning a placeholder URL. A caller that gets a
+    // string back has no reliable way to know it's actually a failure
+    // marker instead of a real upload - that ambiguity is exactly what let
+    // a broken evidence/document link get silently saved as if it were
+    // real. Every caller needs a try/catch around this call now.
+    throw error instanceof Error ? error : new Error('File upload failed.');
   }
 };

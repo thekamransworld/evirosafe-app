@@ -59,17 +59,16 @@ export const DocumentCreationModal: React.FC<DocumentCreationModalProps> = ({ is
     }
 
     setUploading(true);
-    // uploadFileToCloud doesn't throw on failure - it falls back to a
-    // placeholder image URL so the app doesn't crash on a bad connection.
-    // That means we can't catch a real error here, but we can at least
-    // detect the placeholder and warn rather than silently save a broken link.
-    const fileUrl = await uploadFileToCloud(file, 'documents');
-    setUploading(false);
-
-    if (fileUrl.includes('placehold.co')) {
-      setError('Upload failed (check your connection) - the document was not saved. Try again.');
+    setError('');
+    let fileUrl: string;
+    try {
+      fileUrl = await uploadFileToCloud(file, 'documents');
+    } catch (err: any) {
+      setUploading(false);
+      setError(`Upload failed: ${err.message || 'check your connection and try again.'}`);
       return;
     }
+    setUploading(false);
 
     const now = new Date().toISOString();
     onSubmit({
