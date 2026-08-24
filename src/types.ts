@@ -402,41 +402,83 @@ export interface SafetyMeeting {
   created_at: string;
 }
 
-// --- EMERGENCY RESPONSE ---
-export type ErpType =
-  | 'fire' | 'medical' | 'spill' | 'evacuation'
-  | 'earthquake' | 'flood' | 'explosion' | 'other';
+// --- EMERGENCY RESPONSE (real module: src/components/emergency/EmergencyResponse.tsx) ---
+export type EmergencyType =
+  | 'Fire' | 'Medical' | 'Chemical Spill' | 'Explosion' | 'Structural Collapse'
+  | 'Flood' | 'Gas Leak' | 'Power Outage' | 'Evacuation' | 'Security Threat'
+  | 'Environmental Release' | 'Vehicle Accident';
 
-export interface EmergencyContact {
-  name:  string;
-  role:  string;
-  phone: string;
+export type DrillStatus  = 'Scheduled' | 'Completed' | 'Cancelled' | 'Overdue';
+export type DrillOutcome = 'Pass' | 'Partial' | 'Fail' | 'Pending';
+export type ErpPlanStatus = 'Draft' | 'Active' | 'Under Review' | 'Superseded';
+
+export interface ResponseTeamMember {
+  id: string;
+  user_id: string;
+  role: string;
+  primary_contact: string;
+  backup_contact: string;
 }
 
-export interface DrillLog {
-  id:              string;
-  drill_date:      string;
-  conducted_by:    string;
-  participants:    number;
-  evacuation_secs: number;
-  result:          'satisfactory' | 'needs_improvement' | 'unsatisfactory';
-  observations:    string;
-  improvements:    string;
+export interface MusterPoint {
+  id: string;
+  name: string;
+  location: string;
+  capacity: number;
+  coordinates?: string;
+}
+
+export interface EmergencyContact {
+  id: string;
+  name: string;
+  role: string;
+  phone: string;
+  email: string;
+  availability: '24/7' | 'Business Hours' | 'On-Call';
 }
 
 export interface EmergencyPlan {
-  id:                string;
-  org_id:            string;
-  type:              ErpType;
-  title:             string;
-  description:       string;
-  assembly_point:    string;
-  emergency_contacts: EmergencyContact[];
-  procedures:        string;
-  last_drilled_at:   string | null;
-  review_date:       string;
-  drill_logs:        DrillLog[];
-  status:            'active' | 'under_review' | 'archived';
+  id: string;
+  org_id: string;
+  title: string;
+  emergency_type: EmergencyType;
+  version: string;
+  status: ErpPlanStatus;
+  owner_id: string;
+  approved_by: string;
+  approval_date: string;
+  review_date: string;
+  scope: string;
+  immediate_actions: string[];
+  escalation_steps: string[];
+  resources_required: string[];
+  team_members: ResponseTeamMember[];
+  muster_points: MusterPoint[];
+  contacts: EmergencyContact[];
+  created_at: string;
+}
+
+export interface EmergencyDrill {
+  id: string;
+  org_id: string;
+  plan_id: string;
+  title: string;
+  emergency_type: EmergencyType;
+  scheduled_date: string;
+  actual_date?: string;
+  location: string;
+  duration_minutes: number;
+  participants_expected: number;
+  participants_actual?: number;
+  status: DrillStatus;
+  outcome: DrillOutcome;
+  coordinator_id: string;
+  objectives: string[];
+  findings: string[];
+  recommendations: string[];
+  response_time_minutes?: number;
+  score?: number;
+  created_at: string;
 }
 
 // --- DOCUMENT CONTROL ---

@@ -14,7 +14,7 @@ import type {
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical, BbsObservation,
   Hazard, ContractorCompany, ContractorWorker, PpeItem, PpeAssignment, ShiftLog, FfdAssessment, EnvReading, SafetyMeeting,
-  EmergencyPlan, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord,
+  EmergencyPlan, EmergencyDrill, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord,
   SiteAccessLog, CorrectiveAction, ManHoursEntry, Audit
 } from './types';
 import { useToast } from './components/ui/Toast';
@@ -363,6 +363,7 @@ interface DataContextType {
   envReadings: EnvReading[];
   safetyMeetings: SafetyMeeting[];
   emergencyPlans: EmergencyPlan[];
+  emergencyDrills: EmergencyDrill[];
   controlledDocuments: ControlledDocument[];
   dataRequests: DataRequest[];
   retentionPolicies: RetentionPolicy[];
@@ -425,6 +426,8 @@ interface DataContextType {
   handleUpdateSafetyMeeting: (data: SafetyMeeting) => void;
   handleCreateEmergencyPlan: (data: EmergencyPlan) => void;
   handleUpdateEmergencyPlan: (data: EmergencyPlan) => void;
+  handleCreateEmergencyDrill: (data: EmergencyDrill) => void;
+  handleUpdateEmergencyDrill: (data: EmergencyDrill) => void;
   handleCreateControlledDocument: (data: ControlledDocument) => void;
   handleUpdateControlledDocument: (data: ControlledDocument) => void;
   handleCreateDataRequest: (data: DataRequest) => void;
@@ -490,6 +493,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [envReadings, setEnvReadings] = useState<EnvReading[]>([]);
     const [safetyMeetings, setSafetyMeetings] = useState<SafetyMeeting[]>([]);
     const [emergencyPlans, setEmergencyPlans] = useState<EmergencyPlan[]>([]);
+    const [emergencyDrills, setEmergencyDrills] = useState<EmergencyDrill[]>([]);
     const [controlledDocuments, setControlledDocuments] = useState<ControlledDocument[]>([]);
     const [dataRequests, setDataRequests] = useState<DataRequest[]>([]);
     const [retentionPolicies, setRetentionPolicies] = useState<RetentionPolicy[]>([]);
@@ -596,6 +600,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('env_readings', setEnvReadings),
             fetchCol('safety_meetings', setSafetyMeetings),
             fetchCol('emergency_plans', setEmergencyPlans),
+            fetchCol('emergency_drills', setEmergencyDrills),
             fetchCol('controlled_documents', setControlledDocuments),
             fetchCol('dsar_requests', setDataRequests),
             fetchCol('retention_policies', setRetentionPolicies),
@@ -886,6 +891,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setEmergencyPlans(prev => prev.map(p => p.id === data.id ? data : p));
         try { await updateDoc(doc(db, 'emergency_plans', data.id), data as any); }
         catch (e) { console.error(e); toast.error("Failed to update emergency plan."); if (previous) setEmergencyPlans(prev => prev.map(p => p.id === data.id ? previous : p)); }
+    };
+
+    const handleCreateEmergencyDrill = async (data: EmergencyDrill) => {
+        const record = { ...data, org_id: activeOrg.id };
+        setEmergencyDrills(prev => [record, ...prev]);
+        try { await setDoc(doc(db, 'emergency_drills', record.id), record); }
+        catch (e) { console.error(e); toast.error("Failed to save drill."); setEmergencyDrills(prev => prev.filter(d => d.id !== record.id)); }
+    };
+    const handleUpdateEmergencyDrill = async (data: EmergencyDrill) => {
+        const previous = emergencyDrills.find(d => d.id === data.id);
+        setEmergencyDrills(prev => prev.map(d => d.id === data.id ? data : d));
+        try { await updateDoc(doc(db, 'emergency_drills', data.id), data as any); }
+        catch (e) { console.error(e); toast.error("Failed to update drill."); if (previous) setEmergencyDrills(prev => prev.map(d => d.id === data.id ? previous : d)); }
     };
 
     const handleCreateControlledDocument = async (data: ControlledDocument) => {
@@ -1450,7 +1468,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
         actionItems, chemicalList, bbsObservations,
         hazardList, contractorCompanies, contractorWorkers, ppeItems, ppeAssignments, shiftLogs, ffdAssessments,
-        envReadings, safetyMeetings, emergencyPlans, controlledDocuments, dataRequests, retentionPolicies,
+        envReadings, safetyMeetings, emergencyPlans, emergencyDrills, controlledDocuments, dataRequests, retentionPolicies,
         processingActivities, dataBreaches, complianceTracking, rcaRecords, siteAccessLogs,
         correctiveActions, manHoursEntries, audits,
         setInspectionList, setChecklistRunList, setPtwList,
@@ -1464,6 +1482,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateContractorWorker, handleUpdateContractorWorker, handleCreatePpeItem, handleUpdatePpeItem,
         handleCreatePpeAssignment, handleUpdatePpeAssignment, handleCreateShiftLog, handleCreateFfdAssessment,
         handleCreateEnvReading, handleCreateSafetyMeeting, handleUpdateSafetyMeeting, handleCreateEmergencyPlan,
+        handleCreateEmergencyDrill, handleUpdateEmergencyDrill,
         handleUpdateEmergencyPlan, handleCreateControlledDocument, handleUpdateControlledDocument,
         handleCreateDataRequest, handleUpdateDataRequest, handleCreateRetentionPolicy, handleUpdateRetentionPolicy,
         handleCreateProcessingActivity, handleUpdateProcessingActivity, handleCreateDataBreach, handleUpdateDataBreach,

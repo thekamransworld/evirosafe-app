@@ -18,87 +18,16 @@ import {
   ChevronRight, CheckCircle2, AlertTriangle, Clock,
   FileText, Edit3, Trash2, Shield, Download,
 } from 'lucide-react';
-import { useAppContext } from '../../contexts';
+import { useAppContext, useDataContext } from '../../contexts';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type EmergencyType =
-  | 'Fire' | 'Medical' | 'Chemical Spill' | 'Explosion' | 'Structural Collapse'
-  | 'Flood' | 'Gas Leak' | 'Power Outage' | 'Evacuation' | 'Security Threat'
-  | 'Environmental Release' | 'Vehicle Accident';
-
-type DrillStatus   = 'Scheduled' | 'Completed' | 'Cancelled' | 'Overdue';
-type DrillOutcome  = 'Pass' | 'Partial' | 'Fail' | 'Pending';
-type PlanStatus    = 'Draft' | 'Active' | 'Under Review' | 'Superseded';
-
-interface ResponseTeamMember {
-  id: string;
-  user_id: string;
-  role: string;
-  primary_contact: string;
-  backup_contact: string;
-}
-
-interface MusterPoint {
-  id: string;
-  name: string;
-  location: string;
-  capacity: number;
-  coordinates?: string;
-}
-
-interface EmergencyContact {
-  id: string;
-  name: string;
-  role: string;
-  phone: string;
-  email: string;
-  availability: '24/7' | 'Business Hours' | 'On-Call';
-}
-
-interface EmergencyPlan {
-  id: string;
-  title: string;
-  emergency_type: EmergencyType;
-  version: string;
-  status: PlanStatus;
-  owner_id: string;
-  approved_by: string;
-  approval_date: string;
-  review_date: string;
-  scope: string;
-  immediate_actions: string[];
-  escalation_steps: string[];
-  resources_required: string[];
-  team_members: ResponseTeamMember[];
-  muster_points: MusterPoint[];
-  contacts: EmergencyContact[];
-  created_at: string;
-}
-
-interface EmergencyDrill {
-  id: string;
-  plan_id: string;
-  title: string;
-  emergency_type: EmergencyType;
-  scheduled_date: string;
-  actual_date?: string;
-  location: string;
-  duration_minutes: number;
-  participants_expected: number;
-  participants_actual?: number;
-  status: DrillStatus;
-  outcome: DrillOutcome;
-  coordinator_id: string;
-  objectives: string[];
-  findings: string[];
-  recommendations: string[];
-  response_time_minutes?: number;
-  score?: number; // 0-100
-  created_at: string;
-}
+import type {
+  EmergencyType, DrillStatus, DrillOutcome, ErpPlanStatus as PlanStatus,
+  ResponseTeamMember, MusterPoint, EmergencyContact, EmergencyPlan, EmergencyDrill,
+} from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seed data
@@ -422,9 +351,8 @@ type Tab = 'plans' | 'drills' | 'teams' | 'contacts';
 
 export const EmergencyResponse: React.FC = () => {
   const { usersList } = useAppContext();
+  const { emergencyPlans: plans, emergencyDrills: drills, handleCreateEmergencyPlan, handleCreateEmergencyDrill, handleUpdateEmergencyDrill } = useDataContext();
   const [activeTab, setActiveTab] = useState<Tab>('plans');
-  const [plans, setPlans] = useState<EmergencyPlan[]>([]);
-  const [drills, setDrills] = useState<EmergencyDrill[]>([]);
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [showDrillForm, setShowDrillForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -445,7 +373,8 @@ export const EmergencyResponse: React.FC = () => {
   }), [drills]);
 
   const updateDrillOutcome = (id: string, field: keyof EmergencyDrill, value: any) => {
-    setDrills((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
+    const existing = drills.find((d) => d.id === id);
+    if (existing) handleUpdateEmergencyDrill({ ...existing, [field]: value });
   };
 
   const tabs = [
@@ -520,7 +449,7 @@ export const EmergencyResponse: React.FC = () => {
             <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
               <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">New Emergency Response Plan</h3>
               <PlanForm
-                onSave={(plan) => { setPlans((p) => [plan, ...p]); setShowPlanForm(false); }}
+                onSave={(plan) => { handleCreateEmergencyPlan(plan); setShowPlanForm(false); }}
                 onCancel={() => setShowPlanForm(false)}
                 usersList={usersList}
               />
@@ -594,7 +523,7 @@ export const EmergencyResponse: React.FC = () => {
               <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-4">Schedule Emergency Drill</h3>
               <DrillForm
                 plans={plans}
-                onSave={(drill) => { setDrills((d) => [drill, ...d]); setShowDrillForm(false); }}
+                onSave={(drill) => { handleCreateEmergencyDrill(drill); setShowDrillForm(false); }}
                 onCancel={() => setShowDrillForm(false)}
                 usersList={usersList}
               />
