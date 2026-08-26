@@ -57,7 +57,7 @@ interface AppContextType {
   login: (userId: string) => void;
   logout: () => void;
   can: (action: Action, resource: Resource) => boolean;
-  impersonatingAdmin: User | null;
+  impersonatedUser: User | null;
   impersonateUser: (userId: string) => void;
   stopImpersonating: () => void;
 }
@@ -107,7 +107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [usersList, setUsersList] = useState<User[]>(initialUsers || []);
   const [activeUserId, setActiveUserId] = useState<string | null>(() => localStorage.getItem('activeUserId'));
-  const [impersonatingAdmin, setImpersonatingAdmin] = useState<User | null>(null);
+  const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
   const [invitedEmails, setInvitedEmails] = useState<InvitedUser[]>([]);
 
   const toast = useToast();
@@ -115,7 +115,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // --- CRITICAL FIX: ROBUST USER RESOLUTION ---
   const activeUser = useMemo(() => {
     // 1. If we are impersonating, use that
-    if (impersonatingAdmin) return impersonatingAdmin;
+    if (impersonatedUser) return impersonatedUser;
 
     // 2. Try to find user in the loaded list (Database)
     if (activeUserId) {
@@ -145,7 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return null;
-  }, [activeUserId, usersList, currentUser, impersonatingAdmin, activeOrg.id]);
+  }, [activeUserId, usersList, currentUser, impersonatedUser, activeOrg.id]);
 
   const login = (userId: string) => {
     localStorage.setItem('activeUserId', userId);
@@ -166,7 +166,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = () => {
     localStorage.removeItem('activeUserId');
     setActiveUserId(null);
-    setImpersonatingAdmin(null);
+    setImpersonatedUser(null);
   };
 
   const impersonateUser = (userId: string) => {
@@ -177,13 +177,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // We need to find the user we want to be
         const targetUser = usersList.find(u => u.id === userId);
         if (targetUser) {
-            setImpersonatingAdmin(targetUser); // Set the target as the active view
+            setImpersonatedUser(targetUser); // Set the target as the active view
         }
     }
   };
 
   const stopImpersonating = () => {
-    setImpersonatingAdmin(null);
+    setImpersonatedUser(null);
   };
 
   const can = (action: Action, resource: Resource): boolean => {
@@ -325,7 +325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentView, setCurrentView, activeOrg, setActiveOrg, isSidebarOpen, setSidebarOpen,
     usersList, setUsersList, activeUser, handleUpdateUser, handleDeleteUser, organizations, handleCreateOrganization,
     invitedEmails, handleInviteUser, handleSignUp, handleApproveUser, language, dir, t,
-    login, logout, can, impersonatingAdmin, impersonateUser, stopImpersonating
+    login, logout, can, impersonatedUser, impersonateUser, stopImpersonating
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

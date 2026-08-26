@@ -25,11 +25,22 @@ const daysLeft = (d: string | null | undefined) => {
   return Math.ceil((new Date(d).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 };
 
+// Same four-state classification the Records tab already uses (computed from
+// expires_at, not the stored status field, so the two tabs never disagree).
+type MatrixStatus = 'current' | 'expiring' | 'expired' | 'not_started';
+
+const MATRIX_STATUS_CFG: Record<MatrixStatus, { label: string; color: string }> = {
+  current:     { label: 'Current',      color: '#10b981' },
+  expiring:    { label: 'Expiring ≤30d',color: '#f59e0b' },
+  expired:     { label: 'Expired',      color: '#ef4444' },
+  not_started: { label: 'Not started',  color: '#9ca3af' },
+};
+
 export const Trainings: React.FC<TrainingsProps> = ({
   courses, records, sessions, users, projects, onManageCourses, onScheduleSession, onManageAttendance,
 }) => {
   const { can } = useAppContext();
-  const [tab, setTab]       = useState<'courses' | 'sessions' | 'records'>('courses');
+  const [tab, setTab]       = useState<'courses' | 'sessions' | 'records' | 'matrix'>('courses');
   const [search, setSearch] = useState('');
 
   const stats = useMemo(() => ({
@@ -52,6 +63,33 @@ export const Trainings: React.FC<TrainingsProps> = ({
     const u = users.find(u => u.id === r.user_id);
     return (u?.name ?? '').toLowerCase().includes(search.toLowerCase());
   }), [records, search, users]);
+
+  const filteredUsers = useMemo(() => users.filter(u =>
+    !search || (u.name ?? '').toLowerCase().includes(search.toLowerCase())
+  ), [users, search]);
+
+  // Most recent record per (user, course) pair — a retake shouldn't leave an
+  // old expired record shadowing a newer valid one.
+  const latestRecordByUserCourse = useMemo(() => {
+    const map = new Map<string, TrainingRecord>();
+    for (const r of records) {
+      const key = `${r.user_id}::${r.course_id}`;
+      const existing = map.get(key);
+      if (!existing || new Date(r.issued_at).getTime() > new Date(existing.issued_at).getTime()) {
+        map.set(key, r);
+      }
+    }
+    return map;
+  }, [records]);
+
+  const getMatrixStatus = (userId: string, courseId: string): MatrixStatus => {
+    const record = latestRecordByUserCourse.get(`${userId}::${courseId}`);
+    if (!record) return 'not_started';
+    const days = daysLeft(record.expires_at);
+    if (days !== null && days < 0) return 'expired';
+    if (days !== null && days <= 30) return 'expiring';
+    return 'current';
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -92,7 +130,7 @@ export const Trainings: React.FC<TrainingsProps> = ({
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." className="pl-9" style={{ paddingLeft: '2.25rem' }} />
         </div>
         <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}>
-          {(['courses','sessions','records'] as const).map(t => (
+          {(['courses','sessions','records','matrix'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all"
               style={tab === t ? { background: '#10b981', color: 'white' } : { color: 'var(--text-secondary)' }}>
@@ -222,6 +260,76 @@ export const Trainings: React.FC<TrainingsProps> = ({
               <Award className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
               <p style={{ color: 'var(--text-secondary)' }}>No training records found</p>
             </div>
+          )}
+        </div>
+      )}
+      {/* Matrix — worker x course compliance grid. Columns are every course
+          in this org's catalog; there's no "applies to this role" concept in
+          the data model yet, so a course a worker was never meant to take
+          will show as "Not started" like any other gap. Worth a role-based
+          requirements list later if that noise becomes a problem. */}
+      {tab === 'matrix' && (
+        <div className="giq-card overflow-hidden">
+          {courses.length === 0 ? (
+            <div className="py-12 text-center">
+              <Award className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+              <p style={{ color: 'var(--text-secondary)' }}>No courses to show in the matrix yet</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-4 px-4 pt-4 pb-2 flex-wrap">
+                {(Object.entries(MATRIX_STATUS_CFG) as [MatrixStatus, typeof MATRIX_STATUS_CFG[MatrixStatus]][]).map(([key, cfg]) => (
+                  <span key={key} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: cfg.color }} />
+                    {cfg.label}
+                  </span>
+                ))}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
+                      <th className="px-4 py-3 text-left sticky left-0 z-10" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)' }}>
+                        Employee
+                      </th>
+                      {courses.map(course => (
+                        <th key={course.id} className="px-3 py-3 text-center font-medium" style={{ color: 'var(--text-muted)', minWidth: '110px' }}>
+                          {course.title}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map(user => (
+                      <tr key={user.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
+                        <td className="px-4 py-3 sticky left-0 z-10" style={{ background: 'var(--bg-card)' }}>
+                          <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{user.name}</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{user.role}</p>
+                        </td>
+                        {courses.map(course => {
+                          const status = getMatrixStatus(user.id, course.id);
+                          const cfg = MATRIX_STATUS_CFG[status];
+                          return (
+                            <td key={course.id} className="px-3 py-3 text-center">
+                              <span
+                                className="w-3 h-3 rounded-full inline-block"
+                                style={{ background: cfg.color }}
+                                title={`${course.title}: ${cfg.label}`}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredUsers.length === 0 && (
+                <div className="py-12 text-center">
+                  <p style={{ color: 'var(--text-secondary)' }}>No employees match your search</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

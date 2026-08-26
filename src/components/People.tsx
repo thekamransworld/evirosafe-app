@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { User } from '../types';
 import { useAppContext } from '../contexts';
 import { AddUserModal } from './AddUserModal';
-import { Search, Users, Shield, UserCheck, User as UserIcon, Mail, Phone, Plus, MoreHorizontal, Trash2, X } from 'lucide-react';
+import { Search, Users, Shield, UserCheck, User as UserIcon, Mail, Phone, Plus, MoreHorizontal, Trash2, X, Eye } from 'lucide-react';
 
 const ROLE_CFG: Record<string, { label: string; color: string; bg: string }> = {
   ADMIN:       { label: 'Admin',       color: '#ef4444', bg: 'rgba(239,68,68,0.1)' },
@@ -21,10 +21,12 @@ const ROLE_OPTIONS = ['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR', 'WORKER
 const UserCard: React.FC<{
   user: User;
   canManage: boolean;
+  canImpersonate: boolean;
   isSelf: boolean;
   onChangeRole: (userId: string, role: string) => void;
   onDelete: (userId: string) => void;
-}> = ({ user, canManage, isSelf, onChangeRole, onDelete }) => {
+  onImpersonate: (userId: string) => void;
+}> = ({ user, canManage, canImpersonate, isSelf, onChangeRole, onDelete, onImpersonate }) => {
   const roleCfg = getRole(user.role);
   const color   = avatarColor(user.name || 'U');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -80,6 +82,13 @@ const UserCard: React.FC<{
             </select>
           </div>
 
+          {canImpersonate && !isSelf && (
+            <button onClick={() => { onImpersonate(user.id); setMenuOpen(false); }}
+              className="w-full flex items-center gap-2 text-xs font-semibold py-1.5 rounded-lg" style={{ color: '#7c3aed' }}>
+              <Eye className="w-3.5 h-3.5" /> View as this user
+            </button>
+          )}
+
           {!isSelf && (
             confirmingDelete ? (
               <div className="space-y-2">
@@ -112,12 +121,16 @@ const UserCard: React.FC<{
 };
 
 export const People: React.FC = () => {
-  const { usersList, activeUser, handleUpdateUser, handleDeleteUser } = useAppContext();
+  const { usersList, activeUser, handleUpdateUser, handleDeleteUser, impersonatedUser, impersonateUser } = useAppContext();
   const [search, setSearch]       = useState('');
   const [roleFilter, setRole]     = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
 
   const canManage = activeUser?.role === 'ADMIN' || activeUser?.role === 'ORG_ADMIN';
+  // Only a real (not already-impersonated) ADMIN can start impersonating — matches
+  // the guard inside impersonateUser() itself. Blocking it while already
+  // impersonating avoids confusing nested "view as" chains; use Exit first.
+  const canImpersonate = activeUser?.role === 'ADMIN' && !impersonatedUser;
 
   const handleChangeRole = (userId: string, role: string) => {
     const target = usersList.find(u => u.id === userId);
@@ -192,9 +205,11 @@ export const People: React.FC = () => {
             key={u.id}
             user={u}
             canManage={canManage}
+            canImpersonate={canImpersonate}
             isSelf={u.id === activeUser?.id}
             onChangeRole={handleChangeRole}
             onDelete={handleDeleteUser}
+            onImpersonate={impersonateUser}
           />
         ))}
         {filtered.length === 0 && (

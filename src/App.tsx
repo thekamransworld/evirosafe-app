@@ -49,6 +49,7 @@ import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LoginScreen }    from './components/LoginScreen';
 import { DemoBanner }     from './components/DemoBanner';
+import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { Sidebar }        from './components/Sidebar';
 import { roles as rolesConfig } from './config';
 import type { User }      from './types';
@@ -388,6 +389,7 @@ const AppContent: React.FC = () => {
 
       {/* Phase 3: offline status banner — full width at very top */}
       <OfflineStatusBar />
+      <ImpersonationBanner />
 
       {/* Sidebar — hidden on mobile (Phase 4) */}
       {!isMobile && (
