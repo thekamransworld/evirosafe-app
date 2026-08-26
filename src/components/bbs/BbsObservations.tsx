@@ -27,8 +27,8 @@ import {
   ChevronRight, RefreshCw, Download, ThumbsUp,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { useAppContext } from '../../contexts';
-import { useDataContext } from '../../contexts';
+import { useAppContext, useDataContext } from '../../contexts';
+import type { BbsObservation, BbsObservationType as ObservationType, BbsObservationCategory as ObservationCategory } from '../../types';
 import { writeAuditLog } from '../../lib/auditLogger';
 import { CanDo } from '../auth/RbacGuard';
 import { exportTableToCsv } from '../../lib/exportUtils';
@@ -37,31 +37,6 @@ import { exportTableToCsv } from '../../lib/exportUtils';
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ObservationType = 'Safe Act' | 'Unsafe Act' | 'Safe Condition' | 'Unsafe Condition' | 'Near Miss';
-type ObservationCategory =
-  | 'PPE Usage' | 'Housekeeping' | 'Procedures & Permits' | 'Tool & Equipment Use'
-  | 'Body Position & Ergonomics' | 'Communication' | 'Environmental' | 'Line of Fire'
-  | 'Energy Isolation' | 'Working at Height' | 'Driving & Vehicles' | 'Other';
-
-interface BbsObservation {
-  id: string;
-  org_id: string;
-  observer_id: string;
-  is_anonymous: boolean;
-  observation_date: string;
-  project_id: string;
-  location: string;
-  type: ObservationType;
-  category: ObservationCategory;
-  description: string;
-  immediate_action: string;
-  positive_recognition: string;
-  follow_up_required: boolean;
-  follow_up_action: string;
-  follow_up_by: string;
-  status: 'Open' | 'In Progress' | 'Closed';
-  created_at: string;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -280,9 +255,8 @@ const AddObservationForm: React.FC<AddFormProps> = ({ onSave, onCancel, projects
 
 export const BbsObservations: React.FC = () => {
   const { activeUser, activeOrg, usersList } = useAppContext();
-  const { projects } = useDataContext();
+  const { projects, bbsObservations: observations, handleCreateBbsObservation, handleUpdateBbsObservation } = useDataContext();
 
-  const [observations, setObservations] = useState<BbsObservation[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'list' | 'trends'>('list');
   const [filterType, setFilterType] = useState<ObservationType | 'All'>('All');
@@ -290,7 +264,7 @@ export const BbsObservations: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const handleSave = (obs: BbsObservation) => {
-    setObservations((prev) => [obs, ...prev]);
+    handleCreateBbsObservation(obs);
     setShowForm(false);
     writeAuditLog({
       org_id: activeOrg.id,
@@ -513,9 +487,7 @@ export const BbsObservations: React.FC = () => {
                     <div className="flex justify-end">
                       <CanDo permission="bbs:update">
                         <button
-                          onClick={() => setObservations((prev) =>
-                            prev.map((o) => o.id === obs.id ? { ...o, status: 'Closed' } : o)
-                          )}
+                          onClick={() => handleUpdateBbsObservation({ ...obs, status: 'Closed' })}
                           disabled={obs.status === 'Closed'}
                           className="px-3 py-1.5 text-xs rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed font-semibold"
                         >
