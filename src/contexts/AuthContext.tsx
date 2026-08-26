@@ -8,12 +8,10 @@ import {
   User as FirebaseUser,
   updateProfile
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
-  userRole: string | null;
-  userStatus: string | null;
   loading: boolean;
   signup: (email: string, pass: string, name: string) => Promise<void>;
   login: (email: string, pass: string) => Promise<void>;
@@ -30,46 +28,17 @@ export const useAuth = (): AuthContextType => {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [userStatus, setUserStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  // Identity/role resolution (docId vs auth UID, email fallback, etc.) lives
+  // in AuthSync.tsx, which calls AppContext.login() to build the real
+  // activeUser. This listener only tracks the raw Firebase Auth user —
+  // it used to also attempt its own (wrong-docId) Firestore lookup here,
+  // which threw a permission-denied error on every load and populated
+  // userRole/userStatus, neither of which anything in the app read.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      
-      if (user) {
-        try {
-          // 1. Try finding user by Auth UID (Standard way)
-          let docRef = doc(db, "users", user.uid);
-          let docSnap = await getDoc(docRef);
-
-          // 2. If not found by UID, try finding by Email (Legacy/Invite way)
-          if (!docSnap.exists() && user.email) {
-             const q = query(collection(db, "users"), where("email", "==", user.email));
-             const querySnapshot = await getDocs(q);
-             if (!querySnapshot.empty) {
-                 docSnap = querySnapshot.docs[0];
-             }
-          }
-
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setUserRole(data.role);
-            setUserStatus(data.status);
-          } else {
-            setUserRole(null);
-            setUserStatus('unregistered');
-          }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setUserStatus('error');
-        }
-      } else {
-        setUserRole(null);
-        setUserStatus(null);
-      }
-      
       setLoading(false);
     });
 
@@ -125,14 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function logout() {
     await signOut(auth);
-    setUserRole(null);
-    setUserStatus(null);
   }
 
   const value: AuthContextType = {
     currentUser,
-    userRole,
-    userStatus,
     loading,
     signup,
     login,
