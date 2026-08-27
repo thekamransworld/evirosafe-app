@@ -5,6 +5,7 @@ import { RiskMatrixDisplay } from './RiskMatrixDisplay';
 import { AuditTrail } from './AuditTrail';
 import { useAppContext } from '../contexts';
 import { generateReportSummary } from '../services/geminiService';
+import { exportReportToPdf } from '../lib/exportUtils';
 import { useToast } from './ui/Toast';
 import {
   X, AlertTriangle, MapPin, Calendar, User as UserIcon,
@@ -124,11 +125,12 @@ const CapaRow: React.FC<{ action: CapaAction; index: number; canEdit: boolean; o
 export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
   report, users, activeUser, onClose, onStatusChange, onCapaActionChange, onAddCapaAction, onAcknowledgeReport, onInvestigate,
 }) => {
-  const { info } = useToast();
-  const { can } = useAppContext();
+  const { info, success, error: toastError } = useToast();
+  const { can, activeOrg } = useAppContext();
   const [tab, setTab]             = useState<Tab>('overview');
   const [aiSummary, setAiSummary] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [showAddCapa, setShowAddCapa] = useState(false);
   const [newCapaType, setNewCapaType]   = useState<'Corrective' | 'Preventive'>('Corrective');
   const [newCapaAction, setNewCapaAction] = useState('');
@@ -162,6 +164,19 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
     const s = await generateReportSummary(JSON.stringify(report, null, 2));
     setAiSummary(s);
     setLoadingAI(false);
+  };
+
+  const handleExportPdf = async () => {
+    setIsExporting(true);
+    try {
+      await exportReportToPdf(report, activeOrg?.name ?? 'EviroSafe');
+      success('Report exported.');
+    } catch (err) {
+      console.error('[ReportDetailModal] PDF export failed:', err);
+      toastError('Could not export the report. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -200,8 +215,9 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button className="giq-btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3">
-                <Download className="w-3.5 h-3.5" />Export
+              <button onClick={handleExportPdf} disabled={isExporting}
+                className="giq-btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3 disabled:opacity-60">
+                <Download className="w-3.5 h-3.5" />{isExporting ? 'Exporting…' : 'Export'}
               </button>
               <button onClick={onClose} style={{ color: 'var(--text-muted)' }}>
                 <X className="w-5 h-5" />

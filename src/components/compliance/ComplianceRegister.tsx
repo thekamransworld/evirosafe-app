@@ -19,6 +19,8 @@ import {
   BookOpen, Shield, Globe, HardHat,
 } from 'lucide-react';
 import { useAppContext, useDataContext } from '../../contexts';
+import { exportCompliancePdf } from '../../lib/exportUtils';
+import { useToast } from '../ui/Toast';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -170,8 +172,10 @@ const ScoreGauge: React.FC<{ score: number; label: string }> = ({ score, label }
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ComplianceRegister: React.FC = () => {
-  const { activeUser, usersList } = useAppContext();
+  const { activeUser, usersList, activeOrg } = useAppContext();
   const { complianceTracking, handleUpdateComplianceTracking } = useDataContext();
+  const { error: toastError } = useToast();
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // SEED_REQUIREMENTS is universal reference data (the same ISO/OSHA clause
   // catalog for every org) - it stays static. The org-specific tracking
@@ -253,6 +257,25 @@ export const ComplianceRegister: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  // PDF export — exportCompliancePdf's Owner column has no formatter of its
+  // own (it just prints whatever's in owner_id), so resolve names first the
+  // same way exportCsv already does, rather than showing raw user IDs.
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const itemsForPdf = items.map((i) => ({
+        ...i,
+        owner_id: usersList.find((u: any) => u.id === i.owner_id)?.name ?? '',
+      }));
+      await exportCompliancePdf(itemsForPdf, activeOrg?.name ?? 'EviroSafe');
+    } catch (err) {
+      console.error('[ComplianceRegister] PDF export failed:', err);
+      toastError('Could not export the compliance register. Please try again.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
 
@@ -268,13 +291,23 @@ export const ComplianceRegister: React.FC = () => {
             {items.filter((i) => i.status === 'Partial').length} partial
           </p>
         </div>
-        <button
-          onClick={exportCsv}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-700
-                     dark:text-emerald-300 rounded-xl text-sm font-semibold hover:bg-emerald-100"
-        >
-          <Download className="w-4 h-4" /> Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-700
+                       dark:text-emerald-300 rounded-xl text-sm font-semibold hover:bg-emerald-100"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <button
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950 text-blue-700
+                       dark:text-blue-300 rounded-xl text-sm font-semibold hover:bg-blue-100 disabled:opacity-60"
+          >
+            <Download className="w-4 h-4" /> {isExportingPdf ? 'Exporting…' : 'Export PDF'}
+          </button>
+        </div>
       </div>
 
       {/* Score gauges */}

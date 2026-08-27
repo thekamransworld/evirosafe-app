@@ -11,6 +11,7 @@ import type {
 } from '../types';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useToast } from './ui/Toast';
 
 // --- ICONS ---
 const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
@@ -494,23 +495,54 @@ export const InspectionReportGenerator: React.FC<{
   onEmail
 }) => {
   const reportRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const { error: toastError } = useToast();
 
   const generatePDF = async () => {
     if (!reportRef.current) return;
-    
-    const canvas = await html2canvas(reportRef.current, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-    });
-    
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`inspection-report-${inspection.id}-${new Date().toISOString().split('T')[0]}.pdf`);
+
+    setIsGeneratingPdf(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth  = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      // Full report scaled to the page's width, in mm — for any report
+      // longer than one screen this is taller than a single A4 page.
+      const imgWidthMm  = pageWidth;
+      const imgHeightMm = (canvas.height * imgWidthMm) / canvas.width;
+
+      // Slice it across as many pages as needed by drawing the same image
+      // repeatedly, shifting it upward each time — each page only shows the
+      // portion that falls within its own bounds. Previously this placed
+      // the whole (potentially very tall) image on one oversized page.
+      let heightRemaining = imgHeightMm;
+      let yOffset = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidthMm, imgHeightMm);
+      heightRemaining -= pageHeight;
+
+      while (heightRemaining > 0) {
+        yOffset = heightRemaining - imgHeightMm; // negative — shifts the image up
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, yOffset, imgWidthMm, imgHeightMm);
+        heightRemaining -= pageHeight;
+      }
+
+      pdf.save(`inspection-report-${inspection.id}-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('[InspectionReportGenerator] PDF generation failed:', err);
+      toastError('Could not generate the PDF. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handlePrint = () => {
@@ -523,10 +555,11 @@ export const InspectionReportGenerator: React.FC<{
         <div className="flex flex-wrap gap-3">
           <Button
             onClick={generatePDF}
+            disabled={isGeneratingPdf}
             leftIcon={<Download className="w-4 h-4" />}
             variant="secondary"
           >
-            Download PDF
+            {isGeneratingPdf ? 'Generating…' : 'Download PDF'}
           </Button>
           <Button
             onClick={handlePrint}
