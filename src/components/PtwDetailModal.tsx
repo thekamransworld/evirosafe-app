@@ -631,7 +631,18 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
           @media print {
               body * { visibility: hidden; }
               #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
-              #ptw-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+              #ptw-printable-area {
+                  position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none;
+                  display: block;
+              }
+              /* The content row (nav + main) is flex-grow inside overflow-hidden, sized
+                 against the modal's 95vh height on screen. Print has no definite
+                 viewport height for flex-grow to compute against, so browsers collapse
+                 it to near-zero and overflow-hidden clips everything inside to nothing -
+                 which is exactly why the printed page showed empty. Breaking it into
+                 plain block flow lets content take its natural, unclipped height. */
+              #ptw-printable-area > div { display: block; height: auto; overflow: visible; }
+              #ptw-printable-area main { overflow: visible; height: auto; }
               @page { size: A4; margin: 1.5cm; }
           }
       `}</style>

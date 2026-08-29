@@ -183,8 +183,8 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
                visible so the output is the whole plan, not just whichever
                section happened to be selected when Print was clicked. */
             .plan-printable-area .plan-section { display: block !important; }
-            main.plan-printable-area { position: absolute; left: 0; top: 0; width: 70%; height: auto; max-height: none; }
-            aside.plan-printable-area { position: absolute; left: 70%; top: 0; width: 30%; height: auto; max-height: none; }
+            main.plan-printable-area { position: absolute; left: 0; top: 0; width: 70%; height: auto; max-height: none; overflow: visible; }
+            aside.plan-printable-area { position: absolute; left: 70%; top: 0; width: 30%; height: auto; max-height: none; overflow: visible; }
             @page { size: A4; margin: 1.5cm; }
         }
     `}</style>

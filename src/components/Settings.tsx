@@ -195,7 +195,7 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Appearance */}
-      <Section title="Appearance" subtitle="Customise how GuardIQ looks for you">
+      <Section title="Appearance" subtitle="Customise how EviroSafe looks for you">
         <Row label="Theme" sub="Choose between light and dark mode">
           <div className="flex items-center gap-1 p-1 rounded-xl"
             style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)' }}>
@@ -256,7 +256,7 @@ export const Settings: React.FC = () => {
       </Section>
 
       {/* Platform info */}
-      <Section title="Platform" subtitle="GuardIQ system information">
+      <Section title="Platform" subtitle="EviroSafe system information">
         <Row label="Version"><span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>v2.0.0</span></Row>
         <Row label="Organisation"><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{activeUser?.org_id || 'N/A'}</span></Row>
         <Row label="Total Users"><span className="text-xs font-semibold" style={{ color: '#10b981' }}>{usersList.length}</span></Row>

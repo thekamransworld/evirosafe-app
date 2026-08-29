@@ -13,7 +13,7 @@ import {
   BarChart2, Download, RefreshCw
 } from 'lucide-react';
 
-// ─── GuardIQ chart palette ────────────────────────────────────────────────────
+// ─── EviroSafe chart palette ────────────────────────────────────────────────────
 
 const COLORS = {
   primary:  '#10b981',

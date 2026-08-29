@@ -1,7 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getStorage } from "firebase/storage";
 
 // Reads from VITE_FIREBASE_* env vars so different environments (local dev,
 // Vercel Preview, Vercel Production) can point at different Firebase
@@ -33,7 +32,6 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 const db = getFirestore(app);
 const auth = getAuth(app);
-const storage = getStorage(app);
 
 // --- ENABLE OFFLINE PERSISTENCE ---
 // This allows the app to work without internet
@@ -45,4 +43,4 @@ enableIndexedDbPersistence(db).catch((err) => {
     }
 });
 
-export { app, db, auth, storage };
+export { app, db, auth };

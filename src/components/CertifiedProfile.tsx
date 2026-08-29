@@ -135,10 +135,10 @@ export const CertifiedProfile: React.FC = () => {
           style={{ background: `linear-gradient(135deg, #064e3b 0%, #10b981 50%, #34d399 100%)` }}>
           <div className="absolute inset-0 opacity-10"
             style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
-          {/* GuardIQ watermark */}
+          {/* EviroSafe watermark */}
           <div className="absolute top-3 right-4 flex items-center gap-1.5">
             <Shield className="w-4 h-4 text-white/70" />
-            <span className="text-white/70 text-xs font-bold tracking-wide">GuardIQ</span>
+            <span className="text-white/70 text-xs font-bold tracking-wide">EviroSafe</span>
           </div>
         </div>
 
@@ -166,7 +166,7 @@ export const CertifiedProfile: React.FC = () => {
           {/* Info grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Organisation', value: activeOrg?.name || 'GuardIQ', icon: Building2 },
+              { label: 'Organisation', value: activeOrg?.name || 'EviroSafe', icon: Building2 },
               { label: 'Employee ID',  value: (activeUser as any).employee_id || `GIQ-${activeUser.id?.slice(0, 6).toUpperCase()}`, icon: Shield },
               { label: 'Department',   value: activeUser.department || 'HSE', icon: Star },
               { label: 'Status',       value: 'Active', icon: CheckCircle },
@@ -227,9 +227,9 @@ export const CertifiedProfile: React.FC = () => {
           <CheckCircle className="w-5 h-5" style={{ color: '#10b981' }} />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>GuardIQ Verified Profile</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>EviroSafe Verified Profile</p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            This profile is managed by {activeOrg?.name || 'your organisation'} on the GuardIQ HSE Platform.
+            This profile is managed by {activeOrg?.name || 'your organisation'} on the EviroSafe HSE Platform.
             Verified on {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}.
           </p>
         </div>

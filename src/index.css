@@ -5,7 +5,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── GuardIQ Design Tokens ──────────────────────────────────────────────── */
+/* ─── EviroSafe Design Tokens ──────────────────────────────────────────────── */
 :root {
   /* Light mode */
   --bg-page:          #f5f5f6;
@@ -89,7 +89,7 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* ─── GuardIQ Card System (Stripe-style) ─────────────────────────────────── */
+/* ─── EviroSafe Card System (Stripe-style) ─────────────────────────────────── */
 .giq-card {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
@@ -115,7 +115,7 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* ─── GuardIQ Stat Cards ─────────────────────────────────────────────────── */
+/* ─── EviroSafe Stat Cards ─────────────────────────────────────────────────── */
 .giq-stat {
   background: var(--bg-card);
   border: 1px solid var(--border-default);
@@ -130,7 +130,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* ─── GuardIQ Badge ──────────────────────────────────────────────────────── */
+/* ─── EviroSafe Badge ──────────────────────────────────────────────────────── */
 .giq-badge {
   display: inline-flex;
   align-items: center;
@@ -141,7 +141,7 @@ body {
   letter-spacing: 0.02em;
 }
 
-/* ─── GuardIQ Button ─────────────────────────────────────────────────────── */
+/* ─── EviroSafe Button ─────────────────────────────────────────────────────── */
 .giq-btn-primary {
   background: var(--accent);
   color: #fff;
@@ -179,15 +179,16 @@ body {
 }
 
 /* ─── Inputs ─────────────────────────────────────────────────────────────── */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="date"],
-input[type="datetime-local"],
-input[type="time"],
-input[type="tel"],
-input[type="search"],
+/* input[type="text"] etc. only matches inputs that explicitly declare that
+   attribute in markup - a plain <input> with no type at all (defaults to
+   text behavior in the browser, but doesn't match the CSS attribute
+   selector) previously got none of this styling, inheriting body's light
+   text color onto the browser's default white background: invisible text
+   on white in dark mode. This :not()-based selector catches every text-like
+   input regardless of whether type is declared, while still excluding the
+   handful of types (checkbox/radio/range/file/color) that need their native
+   appearance rather than this box styling. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
 textarea,
 select {
   background: var(--bg-input);
@@ -221,7 +222,7 @@ select:disabled {
   cursor: not-allowed;
 }
 
-/* ─── Sidebar (GuardIQ) ──────────────────────────────────────────────────── */
+/* ─── Sidebar (EviroSafe) ──────────────────────────────────────────────────── */
 .giq-sidebar {
   background: var(--bg-surface);
   border-right: 1px solid var(--border-default);

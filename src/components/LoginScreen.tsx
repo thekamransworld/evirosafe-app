@@ -113,7 +113,7 @@ export const LoginScreen: React.FC = () => {
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
-            <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>GuardIQ</span>
+            <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>EviroSafe</span>
             <span className="text-xs ml-2 font-medium" style={{ color: '#10b981' }}>HSE Platform</span>
           </div>
         </div>
@@ -125,7 +125,7 @@ export const LoginScreen: React.FC = () => {
             <span style={{ color: '#10b981' }}>for every site.</span>
           </h1>
           <p className="text-base mb-8" style={{ color: 'var(--text-secondary)', lineHeight: '1.7' }}>
-            GuardIQ brings together permits, incidents, training, audits and compliance into one unified platform — powered by AI.
+            EviroSafe brings together permits, incidents, training, audits and compliance into one unified platform — powered by AI.
           </p>
           <div className="space-y-4">
             {FEATURES.map(f => (
@@ -182,13 +182,13 @@ export const LoginScreen: React.FC = () => {
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#10b981' }}>
             <Shield className="w-4 h-4 text-white" />
           </div>
-          <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>GuardIQ</span>
+          <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>EviroSafe</span>
         </div>
 
         <div className="w-full max-w-sm">
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-              {mode === 'signin' ? 'Sign in to GuardIQ' : 'Activate your account'}
+              {mode === 'signin' ? 'Sign in to EviroSafe' : 'Activate your account'}
             </h2>
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               {mode === 'signin' ? 'Enter your credentials to access the platform' : 'Use the email address your admin invited — this sets your password.'}

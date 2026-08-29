@@ -169,7 +169,15 @@ export const RamsDetailModal: React.FC<RamsDetailModalProps> = ({ rams, onClose,
         @media print {
             body * { visibility: hidden; }
             #rams-printable-area, #rams-printable-area * { visibility: visible; }
-            #rams-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+            #rams-printable-area {
+                position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none;
+                display: block;
+            }
+            /* main/aside used overflow-y-auto sized against the modal's fixed
+               viewport height on screen - print has no such height to size
+               against, so without this they'd collapse to near-zero and clip
+               all content, showing an empty page. */
+            #rams-printable-area main, #rams-printable-area aside { overflow: visible; height: auto; width: 100%; }
             @page { size: A4; margin: 1.5cm; }
         }
     `}</style>
