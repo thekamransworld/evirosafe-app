@@ -109,7 +109,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
                 </ul>
             </nav>
 
-            <main className="flex-1 p-8 overflow-y-auto">
+            <main className="flex-1 p-8 overflow-y-auto plan-printable-area">
                  {status === 'under_review' && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
                         <div className="flex">
@@ -125,7 +125,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
                     </div>
                 )}
                 {bodyJson.map(section => (
-                    <div key={section.title} className={activeSection === section.title ? '' : 'hidden'}>
+                    <div key={section.title} className={`plan-section ${activeSection === section.title ? '' : 'hidden'}`}>
                         <h1 className="text-2xl font-bold border-b dark:border-dark-border pb-2 mb-4 text-gray-900 dark:text-white">{section.title}</h1>
                         <div className="prose max-w-none dark:prose-invert text-gray-800 dark:text-gray-300">
                             <ReactMarkdown>{section.content}</ReactMarkdown>
@@ -135,7 +135,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
                  {bodyJson.length === 0 && <p className="text-center text-gray-500">This plan has no content yet.</p>}
             </main>
 
-            <aside className="w-80 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-6 overflow-y-auto flex-shrink-0">
+            <aside className="w-80 bg-gray-50 dark:bg-dark-background border-l dark:border-dark-border p-6 overflow-y-auto flex-shrink-0 plan-printable-area">
                 <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white">Details</h3>
                 <div className="space-y-4">
                     <DetailItem label="Prepared By"><PersonDetail person={plan.people?.prepared_by} /></DetailItem>
@@ -174,6 +174,20 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
         documentLink={`${window.location.href}?plan=${plan.id}`}
         defaultRecipients={[plan.people?.prepared_by, plan.people?.reviewed_by, plan.people?.approved_by_client].filter(Boolean) as User[]}
     />
+    <style>{`
+        @media print {
+            body * { visibility: hidden; }
+            .plan-printable-area, .plan-printable-area * { visibility: visible; }
+            /* Sections use display:none for the inactive tab on screen (only
+               one section shows at a time) - for print, force every section
+               visible so the output is the whole plan, not just whichever
+               section happened to be selected when Print was clicked. */
+            .plan-printable-area .plan-section { display: block !important; }
+            main.plan-printable-area { position: absolute; left: 0; top: 0; width: 70%; height: auto; max-height: none; }
+            aside.plan-printable-area { position: absolute; left: 70%; top: 0; width: 30%; height: auto; max-height: none; }
+            @page { size: A4; margin: 1.5cm; }
+        }
+    `}</style>
     </>
   );
 };

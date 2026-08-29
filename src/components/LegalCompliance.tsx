@@ -2,34 +2,19 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
+import type { LegalComplianceItem, LegalComplianceStatus, LegalComplianceCategory } from '../types';
 import {
   Plus, X, Search, CheckCircle, AlertTriangle,
   XCircle, MinusCircle, ChevronRight, Scale,
   Globe, BookOpen, Shield, Calendar, User
 } from 'lucide-react';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type ComplianceStatus = 'compliant' | 'partial' | 'non_compliant' | 'not_applicable';
-export type ComplianceCategory =
-  | 'health_safety' | 'environment' | 'fire' | 'electrical'
-  | 'pressure_vessel' | 'lifting' | 'construction' | 'chemical' | 'other';
-
-export interface ComplianceItem {
-  id:              string;
-  title:           string;
-  regulation_ref:  string;
-  jurisdiction:    string;
-  category:        ComplianceCategory;
-  requirement:     string;
-  compliance_status: ComplianceStatus;
-  evidence:        string;
-  responsible:     string;
-  next_review:     string;
-  notes:           string;
-  last_assessed:   string;
-}
+// Types now live in types.ts as LegalComplianceItem/Status/Category (kept
+// here as local aliases so the rest of this file doesn't need renaming).
+type ComplianceStatus = LegalComplianceStatus;
+type ComplianceCategory = LegalComplianceCategory;
+type ComplianceItem = LegalComplianceItem;
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -58,19 +43,99 @@ const CATEGORY_CONFIG: Record<ComplianceCategory, { label: string; color: any }>
 const daysUntil = (d: string) =>
   Math.ceil((new Date(d).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Creation Modal ───────────────────────────────────────────────────────────
 
-const MOCK_ITEMS: ComplianceItem[] = [
-  { id: 'c1', title: 'Working at Height Regulations', regulation_ref: 'WAH Regulations 2005 (KSA MOMRA)', jurisdiction: 'Saudi Arabia', category: 'health_safety', requirement: 'All work above 1.8m requires fall protection. Inspection of equipment before each use.', compliance_status: 'compliant', evidence: 'PTW system active. WAH training 100% complete. Equipment inspections logged.', responsible: 'HSE Manager', next_review: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: '', last_assessed: '2024-09-01' },
-  { id: 'c2', title: 'Control of Hazardous Substances', regulation_ref: 'COSHH Regs (GAZT/MOMRA)', jurisdiction: 'Saudi Arabia', category: 'chemical', requirement: 'COSHH assessment for all hazardous substances. SDS available for every chemical on site.', compliance_status: 'partial', evidence: 'COSHH register 80% complete. 4 chemicals still require formal assessment.', responsible: 'HSE Officer', next_review: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: 'Epoxy, acetone, primer and sealant assessments outstanding.', last_assessed: '2024-08-15' },
-  { id: 'c3', title: 'Permit to Work System', regulation_ref: 'ISO 45001:2018 Clause 8.1.3 / ARAMCO SAES-A-005', jurisdiction: 'Saudi Arabia', category: 'health_safety', requirement: 'Formal PTW system for high-risk activities. Authorised issuers and receivers. Audit trail maintained.', compliance_status: 'compliant', evidence: 'EviroSafe PTW module active. All hot work, WAH and confined space work controlled by permit.', responsible: 'HSE Manager', next_review: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: '', last_assessed: '2024-09-10' },
-  { id: 'c4', title: 'Lifting Operations and Equipment', regulation_ref: 'LOLER 1998 / Saudi Standard SASO 1611', jurisdiction: 'Saudi Arabia', category: 'lifting', requirement: 'All lifting equipment inspected by competent person. Lifting plans for complex lifts. Operators certified.', compliance_status: 'partial', evidence: 'Crane certificates current. Two mobile elevated platforms have expired inspection tags.', responsible: 'Site Engineer', next_review: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: 'MEWP units 2 and 4 require urgent inspection — equipment taken out of service.', last_assessed: '2024-09-08' },
-  { id: 'c5', title: 'Fire Prevention and Protection', regulation_ref: 'Saudi Civil Defence Regulations 1428H', jurisdiction: 'Saudi Arabia', category: 'fire', requirement: 'Fire risk assessment. Extinguishers inspected monthly. Fire wardens trained. Emergency plan in place.', compliance_status: 'compliant', evidence: 'Fire risk assessment completed. 48 extinguishers inspected. 8 fire wardens certified.', responsible: 'HSE Manager', next_review: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: '', last_assessed: '2024-09-05' },
-  { id: 'c6', title: 'Electrical Safety — Temporary Installations', regulation_ref: 'IEC 60364 / Saudi SEA Regs', jurisdiction: 'Saudi Arabia', category: 'electrical', requirement: 'Temporary electrical installations inspected quarterly. All portable tools PAT tested annually. RCDs on all circuits.', compliance_status: 'non_compliant', evidence: 'PAT testing overdue for 23 portable tools. Last inspection was 14 months ago.', responsible: 'Site Engineer', next_review: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: 'CAR raised CAR-2024-0018. Tools quarantined until tested.', last_assessed: '2024-09-12' },
-  { id: 'c7', title: 'Environmental Management — Waste', regulation_ref: 'Saudi Environmental Law (Royal Decree M/165)', jurisdiction: 'Saudi Arabia', category: 'environment', requirement: 'Waste segregation. Hazardous waste manifests. No burning or dumping. Licensed contractor for disposal.', compliance_status: 'compliant', evidence: 'Waste register maintained. Licensed contractor GreenWaste Arabia. Monthly manifests filed.', responsible: 'HSE Manager', next_review: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: '', last_assessed: '2024-09-01' },
-  { id: 'c8', title: 'Occupational Health — Noise Monitoring', regulation_ref: 'KSA Labour Law Article 127 / OSHA 1910.95', jurisdiction: 'Saudi Arabia', category: 'health_safety', requirement: 'Noise monitoring where levels exceed 85dB. Hearing protection provided. Annual audiometric testing.', compliance_status: 'partial', evidence: 'Noise monitoring conducted Q2. Hearing protection available. Audiometric testing not yet scheduled.', responsible: 'HSE Officer', next_review: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: 'Audiometric testing to be scheduled for Q4.', last_assessed: '2024-07-15' },
-  { id: 'c9', title: 'Pressure Vessels and Boilers', regulation_ref: 'SASO 17 / ASME BPVC', jurisdiction: 'Saudi Arabia', category: 'pressure_vessel', requirement: 'Pressure vessels inspected annually by approved inspection body. Safety valves tested.', compliance_status: 'not_applicable', evidence: 'No pressure vessels on this project.', responsible: 'Site Engineer', next_review: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], notes: '', last_assessed: '2024-01-01' },
-];
+const ComplianceCreationModal: React.FC<{
+  onClose: () => void; onSave: (item: ComplianceItem) => void;
+}> = ({ onClose, onSave }) => {
+  const { activeUser, activeOrg } = useAppContext();
+  const [form, setForm] = useState({
+    title: '', regulation_ref: '', jurisdiction: '',
+    category: 'health_safety' as ComplianceCategory,
+    requirement: '', responsible: '',
+    next_review: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = () => {
+    if (!form.title || !form.requirement) { alert('Title and requirement are required.'); return; }
+    onSave({
+      id: `legal-${Date.now()}`,
+      org_id: activeOrg?.id ?? '',
+      ...form,
+      compliance_status: 'partial',
+      evidence: '',
+      notes: '',
+      last_assessed: new Date().toISOString().split('T')[0],
+      created_at: new Date().toISOString(),
+      created_by: activeUser?.id ?? '',
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-dark-card rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+        <header className="p-5 border-b dark:border-dark-border flex justify-between items-center">
+          <h2 className="text-lg font-bold dark:text-white">Add Regulation</h2>
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        </header>
+        <div className="p-5 space-y-3 max-h-[70vh] overflow-y-auto">
+          <div>
+            <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Title *</label>
+            <input value={form.title} onChange={e => set('title', e.target.value)}
+              className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white"
+              placeholder="e.g. Working at Height Regulations" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Regulation Reference</label>
+              <input value={form.regulation_ref} onChange={e => set('regulation_ref', e.target.value)}
+                className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white"
+                placeholder="e.g. WAH Regs 2005" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Jurisdiction</label>
+              <input value={form.jurisdiction} onChange={e => set('jurisdiction', e.target.value)}
+                className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white"
+                placeholder="e.g. Saudi Arabia" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Category</label>
+              <select value={form.category} onChange={e => set('category', e.target.value)}
+                className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white">
+                {(Object.entries(CATEGORY_CONFIG) as [ComplianceCategory, { label: string }][]).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Next Review Date</label>
+              <input type="date" value={form.next_review} onChange={e => set('next_review', e.target.value)}
+                className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Requirement *</label>
+            <textarea value={form.requirement} onChange={e => set('requirement', e.target.value)} rows={3}
+              className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white"
+              placeholder="What does this regulation require?" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Responsible Person/Role</label>
+            <input value={form.responsible} onChange={e => set('responsible', e.target.value)}
+              className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white"
+              placeholder="e.g. HSE Manager" />
+          </div>
+        </div>
+        <footer className="p-4 border-t dark:border-dark-border flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave}>Add Regulation</Button>
+        </footer>
+      </div>
+    </div>
+  );
+};
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
 
@@ -146,7 +211,9 @@ const ComplianceDetailModal: React.FC<{
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const LegalCompliance: React.FC = () => {
-  const [items, setItems]         = useState<ComplianceItem[]>(MOCK_ITEMS);
+  const { legalComplianceList, handleCreateLegalComplianceItem, handleUpdateLegalComplianceItem } = useDataContext();
+  const items = legalComplianceList;
+  const [showCreate, setShowCreate]     = useState(false);
   const [selected, setSelected]   = useState<ComplianceItem | null>(null);
   const [search, setSearch]       = useState('');
   const [catFilter, setCatFilter] = useState<ComplianceCategory | 'all'>('all');
@@ -169,8 +236,7 @@ export const LegalCompliance: React.FC = () => {
 
   const complianceRate = stats.total > 0 ? Math.round((stats.compliant / stats.total) * 100) : 0;
 
-  const handleUpdate = (updated: ComplianceItem) =>
-    setItems(prev => prev.map(i => i.id === updated.id ? updated : i));
+  const handleUpdate = (updated: ComplianceItem) => handleUpdateLegalComplianceItem(updated);
 
   return (
     <div className="space-y-6">
@@ -179,7 +245,7 @@ export const LegalCompliance: React.FC = () => {
           <h1 className="text-3xl font-bold text-text-primary dark:text-white">Legal Compliance Register</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Regulatory requirements and compliance status</p>
         </div>
-        <Button leftIcon={<Plus className="w-4 h-4" />}>Add Regulation</Button>
+        <Button leftIcon={<Plus className="w-4 h-4" />} onClick={() => setShowCreate(true)}>Add Regulation</Button>
       </div>
 
       {/* Compliance rate banner */}
@@ -255,6 +321,7 @@ export const LegalCompliance: React.FC = () => {
         })}
       </div>
 
+      {showCreate && <ComplianceCreationModal onClose={() => setShowCreate(false)} onSave={handleCreateLegalComplianceItem} />}
       {selected && <ComplianceDetailModal item={selected} onClose={() => setSelected(null)} onUpdate={handleUpdate} />}
     </div>
   );

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from './ui/Toast';
+import { supportedLanguages } from '../config';
 import {
   User, Bell, Shield, Globe, Moon, Sun,
   Save, ChevronRight, Lock, Smartphone, Database
@@ -37,7 +40,12 @@ const Toggle: React.FC<{ checked: boolean; onChange: () => void }> = ({ checked,
 
 export const Settings: React.FC = () => {
   const { activeUser, usersList, handleUpdateUser } = useAppContext();
+  const { reportList, trainingRecordList, ptwList } = useDataContext();
+  const { resetPassword } = useAuth();
   const { theme, toggle } = useTheme();
+  const { success, error: toastError } = useToast();
+  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
 
   const [profile, setProfile] = useState({
     name:       activeUser?.name || '',
@@ -60,6 +68,11 @@ export const Settings: React.FC = () => {
     dataExport:    activeUser?.preferences?.privacy?.dataExport    ?? true,
   });
 
+  // Drives AppContext's `language`/`dir`/`t()` app-wide - this dropdown
+  // previously had no value or onChange at all, so it couldn't actually
+  // change anything regardless of what someone picked.
+  const [language, setLanguage] = useState(activeUser?.preferences?.language || 'en');
+
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -76,10 +89,57 @@ export const Settings: React.FC = () => {
         ...activeUser.preferences,
         notifications: notifs,
         privacy,
+        language,
       },
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleChangePassword = async () => {
+    if (!activeUser?.email) return;
+    setIsSendingReset(true);
+    try {
+      await resetPassword(activeUser.email);
+      success(`Password reset email sent to ${activeUser.email}.`);
+    } catch (err) {
+      console.error('[Settings] Password reset failed:', err);
+      toastError('Could not send the reset email. Please try again.');
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
+
+  // Personal self-service export, distinct from the admin DSAR workflow in
+  // GdprControls.tsx - filters by the current user's real id, matching the
+  // pattern already used for this on CertifiedProfile.tsx's activity stats.
+  const handleExportMyData = async () => {
+    if (!activeUser) return;
+    setIsExportingData(true);
+    try {
+      const bundle = {
+        meta: { data_subject: activeUser.name, export_date: new Date().toISOString(), generated_by: 'EviroSafe HSE Platform' },
+        personal_data: {
+          profile: activeUser,
+          incident_reports: reportList.filter(r => r.reporter_id === activeUser.id || r.creator_id === activeUser.id),
+          training_records: trainingRecordList.filter((t: any) => t.user_id === activeUser.id),
+          permits: ptwList.filter(p => (p as any).issuer_id === activeUser.id || p.payload?.requester?.id === activeUser.id),
+        },
+      };
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `my-data-${activeUser.name?.replace(/\s+/g, '-').toLowerCase() ?? 'export'}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      success('Your data export has started downloading.');
+    } catch (err) {
+      console.error('[Settings] Data export failed:', err);
+      toastError('Could not export your data. Please try again.');
+    } finally {
+      setIsExportingData(false);
+    }
   };
 
   const ROLE_COLORS: Record<string, string> = {
@@ -152,10 +212,9 @@ export const Settings: React.FC = () => {
           </div>
         </Row>
         <Row label="Language" sub="Interface language">
-          <select className="text-xs py-1.5 px-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', color: 'var(--text-primary)' }}>
-            <option>English</option>
-            <option>العربية</option>
-            <option>اردو</option>
+          <select value={language} onChange={(e) => setLanguage(e.target.value)}
+            className="text-xs py-1.5 px-3 rounded-lg" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', color: 'var(--text-primary)' }}>
+            {supportedLanguages.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
           </select>
         </Row>
       </Section>
@@ -188,9 +247,10 @@ export const Settings: React.FC = () => {
           <Toggle checked={privacy.sessionAlerts} onChange={() => setPrivacy(p => ({ ...p, sessionAlerts: !p.sessionAlerts }))} />
         </Row>
         <Row label="Change Password">
-          <button className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+          <button onClick={handleChangePassword} disabled={isSendingReset}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60"
             style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
-            Update
+            {isSendingReset ? 'Sending…' : 'Update'}
           </button>
         </Row>
       </Section>
@@ -201,9 +261,10 @@ export const Settings: React.FC = () => {
         <Row label="Organisation"><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{activeUser?.org_id || 'N/A'}</span></Row>
         <Row label="Total Users"><span className="text-xs font-semibold" style={{ color: '#10b981' }}>{usersList.length}</span></Row>
         <Row label="Data Export">
-          <button className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+          <button onClick={handleExportMyData} disabled={isExportingData}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-60"
             style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
-            Export All Data
+            {isExportingData ? 'Exporting…' : 'Export All Data'}
           </button>
         </Row>
       </Section>

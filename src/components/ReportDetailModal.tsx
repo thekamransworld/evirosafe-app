@@ -298,6 +298,38 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
                 </div>
               )}
 
+              {/* Witness statements */}
+              {report.witnesses && report.witnesses.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Witness Statements</p>
+                  <div className="space-y-2">
+                    {report.witnesses.map((w, i) => (
+                      <div key={i} className="rounded-xl p-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)' }}>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                          {w.name} {w.contact && <span className="font-normal" style={{ color: 'var(--text-muted)' }}>({w.contact})</span>}
+                        </p>
+                        <p className="text-sm italic mt-1" style={{ color: 'var(--text-secondary)' }}>"{w.statement}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sequence of events */}
+              {report.timeline && report.timeline.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Sequence of Events</p>
+                  <div className="space-y-2">
+                    {report.timeline.map((t, i) => (
+                      <div key={i} className="flex gap-3 text-sm">
+                        <span className="font-mono flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{t.time}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{t.event}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Evidence */}
               {report.evidence_urls && report.evidence_urls.length > 0 && (
                 <div>

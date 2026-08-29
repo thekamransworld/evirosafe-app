@@ -114,7 +114,7 @@ export const RamsDetailModal: React.FC<RamsDetailModalProps> = ({ rams, onClose,
           </div>
         </header>
 
-        <div className="flex-grow flex overflow-hidden">
+        <div className="flex-grow flex overflow-hidden" id="rams-printable-area">
             <main className="flex-1 p-8 overflow-y-auto">
                 <h3 className="text-lg font-bold">Method Statement</h3>
                 <div className="prose dark:prose-invert max-w-none text-sm my-4"><ReactMarkdown>{rams.method_statement.overview}</ReactMarkdown></div>
@@ -165,6 +165,14 @@ export const RamsDetailModal: React.FC<RamsDetailModalProps> = ({ rams, onClose,
         documentLink={`${window.location.href}?rams=${rams.id}`}
         defaultRecipients={[rams.prepared_by, rams.reviewed_by, rams.approved_by_client].filter(p => p && p.email) as User[]}
     />
+    <style>{`
+        @media print {
+            body * { visibility: hidden; }
+            #rams-printable-area, #rams-printable-area * { visibility: visible; }
+            #rams-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+            @page { size: A4; margin: 1.5cm; }
+        }
+    `}</style>
     </>
   );
 };

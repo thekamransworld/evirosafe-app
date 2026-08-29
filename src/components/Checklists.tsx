@@ -6,6 +6,7 @@ import type { ChecklistTemplate, ChecklistRun } from "../types";
 import { Plus, Search, ClipboardList, CheckCircle, ChevronRight, Zap, Eye, BarChart2, X } from "lucide-react";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
+import { useToast } from "./ui/Toast";
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string }> = {
   "completed":   { label: "Completed",   color: "#10b981", bg: "rgba(16,185,129,0.1)" },
@@ -100,6 +101,7 @@ const NewTemplateModal: React.FC<{ onClose: () => void; onCreate: (data: any) =>
 // ─── Main Checklists component ────────────────────────────────────────────────
 export const Checklists: React.FC = () => {
   const { checklistTemplates, checklistRunList, setChecklistRunList, projects, handleCreateChecklistTemplate } = useDataContext();
+  const { error: toastError } = useToast();
   const { activeOrg, activeUser, can }  = useAppContext();
 
   const [tab, setTab]     = useState<"templates" | "runs">("templates");
@@ -140,7 +142,16 @@ export const Checklists: React.FC = () => {
       executed_at:    new Date().toISOString(),
     };
     setChecklistRunList(prev => [run, ...prev]);
-    try { await setDoc(doc(db, "checklist_runs", run.id), run); } catch {}
+    try {
+      await setDoc(doc(db, "checklist_runs", run.id), run);
+    } catch (err) {
+      // Previously an empty catch here - a failed save looked identical to a
+      // successful one, since the optimistic update above was never rolled
+      // back and nothing told the user anything had gone wrong.
+      console.error('[Checklists] Failed to save checklist run:', err);
+      setChecklistRunList(prev => prev.filter(r => r.id !== run.id));
+      toastError('Could not save the checklist run. Please try again.');
+    }
     setRunTemplate(null);
   };
 

@@ -120,6 +120,8 @@ service cloud.firestore {
     match /shift_logs/{docId}             { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /ffd_assessments/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /env_readings/{docId}           { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /legal_compliance_items/{docId} { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /waste_records/{docId}          { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /safety_meetings/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /emergency_plans/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /emergency_drills/{docId}       { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }

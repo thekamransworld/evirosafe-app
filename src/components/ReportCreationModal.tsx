@@ -13,6 +13,7 @@ import { useDataContext, useAppContext } from '../contexts';
 import { uploadFileToCloud } from '../services/storageService';
 import { generateSafetyReport } from '../services/geminiService';
 import { useToast } from './ui/Toast';
+import { WitnessSection, TimelineSection } from './reporting/InvestigationHelpers';
 
 interface ReportCreationModalProps {
   isOpen: boolean;
@@ -80,6 +81,8 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
         classification_codes: [] as string[],
         ai_evidence_summary: '',
         ai_suggested_evidence: [] as string[],
+        witnesses: [] as Witness[],
+        timeline: [] as { time: string; event: string }[],
     };
     if (initialData) {
       return { ...defaultState, ...initialData };
@@ -336,6 +339,17 @@ export const ReportCreationModal: React.FC<ReportCreationModalProps> = ({ isOpen
                     <section className="border-t dark:border-dark-border pt-4">
                         <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Risk Assessment</h3>
                         <RiskMatrixInput value={formData.risk_pre_control} onChange={(val) => setFormData((p: any) => ({...p, risk_pre_control: val}))} />
+                    </section>
+
+                    <section className="border-t dark:border-dark-border pt-6">
+                        <WitnessSection
+                            witnesses={formData.witnesses}
+                            onChange={(witnesses) => handleChange('witnesses', witnesses)}
+                        />
+                        <TimelineSection
+                            timeline={formData.timeline}
+                            onChange={(timeline) => handleChange('timeline', timeline)}
+                        />
                     </section>
                 </>
             )}

@@ -74,6 +74,8 @@ const MENU_SECTIONS: MenuSection[] = [
   { id: 'advanced', label: 'Advanced Modules', items: [
     { label: 'Emergency Response', view: 'emergency',    roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
     { label: 'Environmental',      view: 'environment',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Legal Compliance',   view: 'legal-compliance', roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
+    { label: 'Waste Management',   view: 'waste-management', roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
     { label: 'Contractors',        view: 'contractors',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
     { label: 'PPE Inventory',      view: 'ppe',          roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
     { label: 'Document Control',   view: 'documents' },

@@ -2,38 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
+import type { WasteType, DisposalMethod, WasteRecord } from '../types';
 import {
   Plus, X, Trash2, TrendingDown, BarChart2,
   Calendar, FileText, ChevronRight, Recycle,
   AlertTriangle, Droplets, Zap, Leaf
 } from 'lucide-react';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-export type WasteType =
-  | 'general' | 'hazardous' | 'recyclable' | 'electronic'
-  | 'chemical' | 'construction' | 'organic' | 'medical' | 'other';
-
-export type DisposalMethod =
-  | 'landfill' | 'recycling' | 'incineration'
-  | 'treatment' | 'storage' | 'reuse';
-
-export interface WasteRecord {
-  id:                  string;
-  waste_date:          string;
-  waste_type:          WasteType;
-  description:         string;
-  quantity:            number;
-  unit:                string;
-  disposal_method:     DisposalMethod;
-  disposal_contractor: string;
-  manifest_number:     string;
-  recorded_by:         string;
-  project_name:        string;
-  notes:               string;
-  created_at:          string;
-}
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -60,38 +35,32 @@ const DISPOSAL_CONFIG: Record<DisposalMethod, { label: string; color: any }> = {
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MOCK_RECORDS: WasteRecord[] = [
-  { id: 'w1', waste_date: '2024-09-15', waste_type: 'construction', description: 'Mixed concrete rubble and formwork timber', quantity: 4500, unit: 'kg', disposal_method: 'recycling', disposal_contractor: 'Green Waste Solutions', manifest_number: 'MAN-2024-0341', recorded_by: 'Ahmed Al-Rashid', project_name: 'Tower A Construction', notes: '', created_at: '2024-09-15T08:00:00Z' },
-  { id: 'w2', waste_date: '2024-09-14', waste_type: 'hazardous', description: 'Used solvent containers and contaminated rags', quantity: 85, unit: 'kg', disposal_method: 'incineration', disposal_contractor: 'HazWaste Arabia', manifest_number: 'MAN-2024-0340', recorded_by: 'Sarah Mitchell', project_name: 'Tower A Construction', notes: 'Collected from paint store', created_at: '2024-09-14T14:00:00Z' },
-  { id: 'w3', waste_date: '2024-09-13', waste_type: 'recyclable', description: 'Steel offcuts and rebar ends', quantity: 2200, unit: 'kg', disposal_method: 'recycling', disposal_contractor: 'MetalRecycle KSA', manifest_number: 'MAN-2024-0339', recorded_by: 'James Okafor', project_name: 'Tower B Construction', notes: '', created_at: '2024-09-13T09:00:00Z' },
-  { id: 'w4', waste_date: '2024-09-12', waste_type: 'chemical', description: 'Expired epoxy hardener — small containers', quantity: 25, unit: 'L', disposal_method: 'treatment', disposal_contractor: 'ChemSafe Disposal', manifest_number: 'MAN-2024-0338', recorded_by: 'Ahmed Al-Rashid', project_name: 'Tower A Construction', notes: 'SDS provided to contractor', created_at: '2024-09-12T11:00:00Z' },
-  { id: 'w5', waste_date: '2024-09-11', waste_type: 'general', description: 'Site office waste — canteen and admin', quantity: 320, unit: 'kg', disposal_method: 'landfill', disposal_contractor: 'City Municipal', manifest_number: '', recorded_by: 'Mohamed Hassan', project_name: 'Site Office', notes: '', created_at: '2024-09-11T07:00:00Z' },
-  { id: 'w6', waste_date: '2024-09-10', waste_type: 'electronic', description: 'Broken power tools and extension leads', quantity: 45, unit: 'kg', disposal_method: 'recycling', disposal_contractor: 'E-Waste Arabia', manifest_number: 'MAN-2024-0337', recorded_by: 'Sarah Mitchell', project_name: 'Site Office', notes: '', created_at: '2024-09-10T13:00:00Z' },
-  { id: 'w7', waste_date: '2024-09-09', waste_type: 'construction', description: 'Excavation spoil — clean fill material', quantity: 12000, unit: 'kg', disposal_method: 'reuse', disposal_contractor: 'Internal', manifest_number: '', recorded_by: 'James Okafor', project_name: 'Tower B Construction', notes: 'Reused as backfill Zone C', created_at: '2024-09-09T08:00:00Z' },
-  { id: 'w8', waste_date: '2024-09-08', waste_type: 'recyclable', description: 'Cardboard and plastic packaging waste', quantity: 180, unit: 'kg', disposal_method: 'recycling', disposal_contractor: 'Green Waste Solutions', manifest_number: '', recorded_by: 'Mohamed Hassan', project_name: 'Site Office', notes: '', created_at: '2024-09-08T16:00:00Z' },
-];
-
 // ─── New Entry Modal ──────────────────────────────────────────────────────────
 
 const NewWasteModal: React.FC<{ onClose: () => void; onSave: (r: WasteRecord) => void }> = ({ onClose, onSave }) => {
-  const { activeUser } = useAppContext();
+  const { activeUser, activeOrg } = useAppContext();
+  const { projects } = useDataContext();
   const [form, setForm] = useState({
     waste_date: new Date().toISOString().split('T')[0],
     waste_type: 'general' as WasteType, description: '',
     quantity: '', unit: 'kg', disposal_method: 'landfill' as DisposalMethod,
     disposal_contractor: '', manifest_number: '', notes: '',
+    project_id: projects[0]?.id || '',
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSave = () => {
     if (!form.description || !form.quantity) { alert('Description and quantity required.'); return; }
+    const { project_id, ...rest } = form;
+    const project = projects.find(p => p.id === project_id);
     onSave({
-      id: `w-${Date.now()}`, ...form,
+      id: `w-${Date.now()}`,
+      org_id: activeOrg?.id ?? '',
+      ...rest,
       quantity: parseFloat(form.quantity),
       recorded_by: activeUser?.name || 'HSE Officer',
-      project_name: 'Active Project',
+      project_id: project_id,
+      project_name: project?.name || 'Unassigned',
       created_at: new Date().toISOString(),
     });
     onClose();
@@ -146,6 +115,14 @@ const NewWasteModal: React.FC<{ onClose: () => void; onSave: (r: WasteRecord) =>
             </div>
           </div>
           <div>
+            <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Project</label>
+            <select value={form.project_id} onChange={e => set('project_id', e.target.value)}
+              className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white">
+              {projects.length === 0 && <option value="">No projects available</option>}
+              {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="block text-xs font-semibold mb-1 text-gray-600 dark:text-gray-400">Waste Transfer Note / Manifest No.</label>
             <input value={form.manifest_number} onChange={e => set('manifest_number', e.target.value)} className="w-full p-2 border rounded-lg text-sm dark:bg-dark-background dark:border-dark-border dark:text-white" placeholder="e.g. MAN-2024-0342" />
           </div>
@@ -167,7 +144,8 @@ const NewWasteModal: React.FC<{ onClose: () => void; onSave: (r: WasteRecord) =>
 
 export const WasteManagement: React.FC = () => {
   const { can } = useAppContext();
-  const [records, setRecords]     = useState<WasteRecord[]>(MOCK_RECORDS);
+  const { wasteRecordList, handleCreateWasteRecord } = useDataContext();
+  const records = wasteRecordList;
   const [showNew, setShowNew]     = useState(false);
   const [typeFilter, setTypeFilter] = useState<WasteType | 'all'>('all');
 
@@ -303,7 +281,7 @@ export const WasteManagement: React.FC = () => {
         })}
       </div>
 
-      {showNew && <NewWasteModal onClose={() => setShowNew(false)} onSave={r => setRecords(p => [r, ...p])} />}
+      {showNew && <NewWasteModal onClose={() => setShowNew(false)} onSave={handleCreateWasteRecord} />}
     </div>
   );
 };

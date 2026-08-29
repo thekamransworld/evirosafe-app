@@ -155,6 +155,18 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = (pr
         setEditingFinding(null);
     };
 
+    // "Pass" had no onClick at all before this fix — clicking it did nothing,
+    // silently leaving the checklist item in the same "not yet reviewed"
+    // state as if the inspector had never looked at it. Findings only ever
+    // represented failures, so passing an item needed its own field rather
+    // than reusing the findings array.
+    const handlePassItem = (itemId: string) => {
+        setCurrentInspection(prev => ({
+            ...prev,
+            passed_item_ids: [...(prev.passed_item_ids || []), itemId],
+        }));
+    };
+
     if (!isOpen || !template) return null;
 
   return (
@@ -207,9 +219,10 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = (pr
                             {template.items.map((item, index) => {
                                 const finding = itemFindings.find(f => f.checklist_item_id === item.id);
                                 const isEditingThis = editingFinding?.checklist_item_id === item.id;
+                                const isPassed = (currentInspection.passed_item_ids || []).includes(item.id);
                                 
                                 return (
-                                    <div key={item.id} className={`p-4 border rounded-lg transition-all ${finding ? 'border-red-300 bg-red-50/30 dark:border-red-900/50' : 'border-gray-200 dark:border-gray-700'}`}>
+                                    <div key={item.id} className={`p-4 border rounded-lg transition-all ${finding ? 'border-red-300 bg-red-50/30 dark:border-red-900/50' : isPassed ? 'border-green-300 bg-green-50/30 dark:border-green-900/50' : 'border-gray-200 dark:border-gray-700'}`}>
                                         <div className="flex justify-between items-start">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2">
@@ -221,9 +234,14 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = (pr
                                                 <p className="text-xs text-gray-500 dark:text-gray-400 ml-8 mt-1">{getTranslated(item.description)}</p>
                                             </div>
                                             
-                                            {!finding && !isEditingThis && !isSubmitted && (
+                                            {!finding && !isPassed && !isEditingThis && !isSubmitted && (
                                                 <div className="flex gap-2">
-                                                    <button className="px-3 py-1 rounded border border-green-200 bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100">Pass</button>
+                                                    <button
+                                                        onClick={() => handlePassItem(item.id)}
+                                                        className="px-3 py-1 rounded border border-green-200 bg-green-50 text-green-700 text-xs font-medium hover:bg-green-100"
+                                                    >
+                                                        Pass
+                                                    </button>
                                                     <button 
                                                         onClick={() => setEditingFinding({ checklist_item_id: item.id })}
                                                         className="px-3 py-1 rounded border border-red-200 bg-red-50 text-red-700 text-xs font-medium hover:bg-red-100 flex items-center gap-1"
@@ -231,6 +249,11 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = (pr
                                                         <AlertTriangle className="w-3 h-3"/> Fail / Finding
                                                     </button>
                                                 </div>
+                                            )}
+                                            {isPassed && !finding && (
+                                                <span className="flex items-center gap-1 text-xs font-medium text-green-700 dark:text-green-400 flex-shrink-0">
+                                                    <CheckCircle className="w-3.5 h-3.5" /> Passed
+                                                </span>
                                             )}
                                         </div>
                                         

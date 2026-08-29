@@ -117,6 +117,8 @@ import { RiskMatrix }      from './components/risk-matrix/RiskMatrix';
 import { AuditLog }            from './components/audit/AuditLog';
 import { BbsObservations }     from './components/bbs/BbsObservations';
 import { EnvironmentalMonitor } from './components/environment/EnvironmentalMonitor';
+import { LegalCompliance } from './components/LegalCompliance';
+import { WasteManagement } from './components/WasteManagement';
 import { ContractorManager }   from './components/contractors/ContractorManager';
 import { PpeInventory }        from './components/ppe/PpeInventory';
 import { DocumentControl }     from './components/documents/DocumentControl';
@@ -599,6 +601,24 @@ const AppContent: React.FC = () => {
               onDenied={() => setCurrentView('dashboard')}
             >
               <EnvironmentalMonitor />
+            </PageGuard>
+          )}
+
+          {currentView === 'legal-compliance' && (
+            <PageGuard
+              permission="legal:view"
+              onDenied={() => setCurrentView('dashboard')}
+            >
+              <LegalCompliance />
+            </PageGuard>
+          )}
+
+          {currentView === 'waste-management' && (
+            <PageGuard
+              permission="waste:view"
+              onDenied={() => setCurrentView('dashboard')}
+            >
+              <WasteManagement />
             </PageGuard>
           )}
 

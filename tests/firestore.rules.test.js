@@ -230,6 +230,7 @@ const ORG_SCOPED_COLLECTIONS = [
   'controlled_documents', 'dsar_requests', 'retention_policies', 'processing_activities',
   'data_breaches', 'compliance_tracking', 'rca_records', 'site_access_logs',
   'corrective_actions', 'man_hours_entries', 'audits', 'emergency_drills',
+  'legal_compliance_items', 'waste_records',
 ];
 
 for (const col of ORG_SCOPED_COLLECTIONS) {

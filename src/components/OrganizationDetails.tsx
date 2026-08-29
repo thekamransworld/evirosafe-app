@@ -9,7 +9,7 @@ import { ProjectDetails } from './ProjectDetails';
 import { AddUserModal } from './AddUserModal';
 import { 
   Plus, Search, UserPlus, ArrowLeft, 
-  MoreVertical, Mail, Phone, MapPin, Globe, Users 
+  MoreVertical, Mail, Phone, MapPin, Globe, Users, UserMinus
 } from 'lucide-react';
 
 // --- Main Component ---
@@ -21,8 +21,51 @@ interface OrganizationDetailsProps {
 
 type Tab = 'Overview' | 'Projects' | 'People' | 'Settings';
 
+// This was previously a dead "..." button with no onClick at all. Kept
+// deliberately minimal here rather than rebuilding People.tsx's full
+// role-change/delete/impersonate menu a second time in a different file -
+// this reuses the same handleDeleteUser the People page already uses,
+// just from a second convenient entry point.
+const UserRowMenu: React.FC<{ user: User; canManage: boolean; onRemove: (userId: string) => void }> = ({ user, canManage, onRemove }) => {
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(v => !v)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+        <MoreVertical className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-6 z-10 w-48 rounded-lg shadow-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 py-1">
+          <a href={`mailto:${user.email}`}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <Mail className="w-3.5 h-3.5" /> Email {user.name?.split(' ')[0] || 'user'}
+          </a>
+          {canManage && (
+            confirming ? (
+              <div className="px-3 py-2">
+                <p className="text-xs text-gray-500 mb-1.5">Remove from organization?</p>
+                <div className="flex gap-2">
+                  <button onClick={() => { onRemove(user.id); setOpen(false); setConfirming(false); }}
+                    className="text-xs font-semibold text-red-600 hover:text-red-700">Confirm</button>
+                  <button onClick={() => setConfirming(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setConfirming(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
+                <UserMinus className="w-3.5 h-3.5" /> Remove from Organization
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, onBack }) => {
-  const { usersList, invitedEmails, activeUser } = useAppContext();
+  const { usersList, invitedEmails, activeUser, handleDeleteUser } = useAppContext();
   const { projects, handleCreateProject } = useDataContext();
   
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
@@ -241,9 +284,11 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
                                     </div>
                                 </div>
                             </div>
-                            <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                                <MoreVertical className="w-4 h-4" />
-                            </button>
+                            <UserRowMenu
+                                user={u}
+                                canManage={u.id !== activeUser?.id && (activeUser?.role === 'ADMIN' || activeUser?.role === 'ORG_ADMIN')}
+                                onRemove={handleDeleteUser}
+                            />
                         </Card>
                     ))}
                     {filteredUsers.length === 0 && (

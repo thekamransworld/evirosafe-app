@@ -1,19 +1,19 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useAppContext, useDataContext } from '../contexts';
 import { useTheme } from '../contexts/ThemeContext';
+import { useToast } from './ui/Toast';
 import { Shield, Award, Download, Share2, CheckCircle, Calendar, Building2, Star } from 'lucide-react';
 
 // ─── Cert card ────────────────────────────────────────────────────────────────
 
-const CertCard: React.FC<{ cert: any; onClick: () => void }> = ({ cert, onClick }) => {
+const CertCard: React.FC<{ cert: any }> = ({ cert }) => {
   const isValid   = cert.expiryDate ? new Date(cert.expiryDate) > new Date() : true;
   const daysLeft  = cert.expiryDate
     ? Math.ceil((new Date(cert.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
 
   return (
-    <div onClick={onClick}
-      className="giq-card p-4 cursor-pointer transition-all hover:-translate-y-0.5">
+    <div className="giq-card p-4">
       <div className="flex items-start justify-between mb-3">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center"
           style={{ background: isValid ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)' }}>
@@ -54,7 +54,9 @@ export const CertifiedProfile: React.FC = () => {
   const { activeUser, activeOrg } = useAppContext();
   const { reportList, ptwList, inspectionList } = useDataContext();
   const { theme } = useTheme();
+  const { success, error: toastError } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   if (!activeUser) return null;
 
@@ -78,6 +80,34 @@ export const CertifiedProfile: React.FC = () => {
 
   const handlePrint = () => window.print();
 
+  // There's no public profile URL to share (nothing in this app is
+  // publicly hosted per-user), so this shares a text summary instead —
+  // via the native share sheet where available, falling back to copying
+  // the same text to the clipboard. AbortError just means the user
+  // closed the share sheet, not a real failure, so it's ignored.
+  const handleShare = async () => {
+    const shareText = `${activeUser.name} — ${activeUser.role?.replace('_', ' ')} at ${activeOrg?.name ?? 'their organisation'}. ${stats.validCerts} valid certification${stats.validCerts === 1 ? '' : 's'}. ID: GIQ-${activeUser.id?.slice(0, 8).toUpperCase()}`;
+
+    setIsSharing(true);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'HSE Certification Profile', text: shareText });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareText);
+        success('Profile summary copied to clipboard.');
+      } else {
+        toastError('Sharing is not supported in this browser.');
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('[CertifiedProfile] Share failed:', err);
+        toastError('Could not share this profile.');
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
 
@@ -91,14 +121,15 @@ export const CertifiedProfile: React.FC = () => {
           <button onClick={handlePrint} className="giq-btn-secondary flex items-center gap-2">
             <Download className="w-3.5 h-3.5" />Export PDF
           </button>
-          <button className="giq-btn-secondary flex items-center gap-2">
-            <Share2 className="w-3.5 h-3.5" />Share
+          <button onClick={handleShare} disabled={isSharing} className="giq-btn-secondary flex items-center gap-2 disabled:opacity-60">
+            <Share2 className="w-3.5 h-3.5" />{isSharing ? 'Sharing…' : 'Share'}
           </button>
         </div>
       </div>
 
+      <div ref={printRef} id="certified-profile-printable-area" className="space-y-6">
       {/* Profile hero card */}
-      <div ref={printRef} className="giq-card overflow-hidden">
+      <div className="giq-card overflow-hidden">
         {/* Banner */}
         <div className="h-24 relative"
           style={{ background: `linear-gradient(135deg, #064e3b 0%, #10b981 50%, #34d399 100%)` }}>
@@ -183,7 +214,7 @@ export const CertifiedProfile: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {certs.map((cert: any, i: number) => (
-              <CertCard key={i} cert={cert} onClick={() => {}} />
+              <CertCard key={i} cert={cert} />
             ))}
           </div>
         )}
@@ -206,6 +237,16 @@ export const CertifiedProfile: React.FC = () => {
           <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>ID: GIQ-{activeUser.id?.slice(0, 8).toUpperCase()}</p>
         </div>
       </div>
+      </div>
+
+      <style>{`
+          @media print {
+              body * { visibility: hidden; }
+              #certified-profile-printable-area, #certified-profile-printable-area * { visibility: visible; }
+              #certified-profile-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+              @page { size: A4; margin: 1.5cm; }
+          }
+      `}</style>
     </div>
   );
 };

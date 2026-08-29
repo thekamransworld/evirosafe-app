@@ -890,6 +890,8 @@ export interface Report {
     lessons_learned?: string;
     prevention_strategy?: string;
     compliance?: { oshaReportable: boolean; rinaReportable: boolean; insuranceNotified: boolean; };
+    witnesses?: Witness[];
+    timeline?: { time: string; event: string }[];
 }
 
 // --- INSPECTIONS (ENHANCED) ---
@@ -989,6 +991,7 @@ export interface Inspection {
     team_member_ids: string[];
     observers: string[];
     findings: InspectionFinding[];
+    passed_item_ids?: string[];
     overall_comments?: string;
     audit_trail: AuditLogEntry[];
     inspection_id?: string;
@@ -1197,3 +1200,57 @@ export interface Evidence {
 export type HSEInspection = Inspection;
 export type HSEFinding = InspectionFinding;
 export type InspectionType = Inspection['type'];
+
+// ─── Legal Compliance Register ─────────────────────────────────────────────
+// Named "Legal*" specifically to avoid colliding with the existing
+// ComplianceStatus/ComplianceRegister types above, which track a different
+// concept (internal/ISO standards tracking, not jurisdiction-specific law).
+export type LegalComplianceStatus = 'compliant' | 'partial' | 'non_compliant' | 'not_applicable';
+export type LegalComplianceCategory =
+  | 'health_safety' | 'environment' | 'fire' | 'electrical'
+  | 'pressure_vessel' | 'lifting' | 'construction' | 'chemical' | 'other';
+
+export interface LegalComplianceItem {
+  id:                 string;
+  org_id:             string;
+  title:              string;
+  regulation_ref:     string;
+  jurisdiction:       string;
+  category:           LegalComplianceCategory;
+  requirement:        string;
+  compliance_status:  LegalComplianceStatus;
+  evidence:           string;
+  responsible:        string;
+  next_review:        string;
+  notes:              string;
+  last_assessed:      string;
+  created_at:         string;
+  created_by:         string;
+}
+
+// ─── Waste Management ──────────────────────────────────────────────────────
+export type WasteType =
+  | 'general' | 'hazardous' | 'recyclable' | 'electronic'
+  | 'chemical' | 'construction' | 'organic' | 'medical' | 'other';
+
+export type DisposalMethod =
+  | 'landfill' | 'recycling' | 'incineration'
+  | 'treatment' | 'storage' | 'reuse';
+
+export interface WasteRecord {
+  id:                  string;
+  org_id:              string;
+  waste_date:          string;
+  waste_type:          WasteType;
+  description:         string;
+  quantity:            number;
+  unit:                string;
+  disposal_method:     DisposalMethod;
+  disposal_contractor: string;
+  manifest_number:     string;
+  recorded_by:         string;
+  project_id:          string;
+  project_name:        string;
+  notes:               string;
+  created_at:          string;
+}

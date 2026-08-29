@@ -296,6 +296,43 @@ export async function exportReportToPdf(
   }
   y += 4;
 
+  // Witness statements
+  if (report.witnesses?.length) {
+    ensureSpace(9);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+    doc.text('Witness Statements', margin, y); y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+    for (const w of report.witnesses) {
+      ensureSpace(5);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${w.name}${w.contact ? ` (${w.contact})` : ''}`, margin, y);
+      y += 4;
+      doc.setFont('helvetica', 'normal');
+      const statementLines = doc.splitTextToSize(`"${w.statement}"`, pageW - margin * 2 - 4);
+      for (const line of statementLines) {
+        ensureSpace(4);
+        doc.text(line, margin + 4, y);
+        y += 4;
+      }
+      y += 2;
+    }
+    y += 2;
+  }
+
+  // Sequence of events
+  if (report.timeline?.length) {
+    ensureSpace(9);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+    doc.text('Sequence of Events', margin, y); y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+    for (const t of report.timeline) {
+      ensureSpace(4);
+      doc.text(`${t.time}  —  ${t.event}`, margin, y);
+      y += 4;
+    }
+    y += 4;
+  }
+
   // CAPA
   if (report.capa?.length) {
     ensureSpace(10); // header + divider need room before autoTable takes over

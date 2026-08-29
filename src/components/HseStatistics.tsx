@@ -5,6 +5,8 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { useDataContext, useAppContext } from '../contexts';
+import { exportTableToPdf } from '../lib/exportUtils';
+import { useToast } from './ui/Toast';
 import {
   TrendingUp, TrendingDown, AlertTriangle,
   CheckCircle, Clock, Shield, Activity,
@@ -119,8 +121,10 @@ const PeriodSelector: React.FC<{
 
 export const HseStatistics: React.FC = () => {
   const { reportList: allReports, inspectionList: allInspections, ptwList: allPtws, projects } = useDataContext();
-  const { usersList } = useAppContext();
+  const { usersList, activeOrg } = useAppContext();
+  const { error: toastError } = useToast();
   const [scopeProjectId, setScopeProjectId] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
 
   const reportList     = useMemo(() => scopeProjectId === 'all' ? allReports     : allReports.filter(r => r.project_id === scopeProjectId), [allReports, scopeProjectId]);
   const inspectionList = useMemo(() => scopeProjectId === 'all' ? allInspections : allInspections.filter(i => i.project_id === scopeProjectId), [allInspections, scopeProjectId]);
@@ -144,6 +148,42 @@ export const HseStatistics: React.FC = () => {
     const safetyScore    = Math.max(0, Math.round(100 - ltir * 10 - trir * 4 - (reportList.filter(r => r.status !== 'closed').length * 2)));
     return { totalHours, lti, recordable, nearMiss, ltir, trir, dart, inspRate, safetyScore, totalReports: reportList.length };
   }, [reportList, inspectionList, usersList]);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const rows = [
+        { metric: 'LTIR',              value: metrics.ltir,      unit: 'Target ≤ 0.50' },
+        { metric: 'TRIR',              value: metrics.trir,      unit: 'Target ≤ 1.00' },
+        { metric: 'DART Rate',         value: metrics.dart,      unit: 'Days away / restricted' },
+        { metric: 'Safety Score',      value: `${metrics.safetyScore}%`, unit: 'Composite index' },
+        { metric: 'Total Reports',     value: metrics.totalReports, unit: '' },
+        { metric: 'Near Misses',       value: metrics.nearMiss,  unit: '' },
+        { metric: 'Inspection Rate',   value: `${metrics.inspRate}%`, unit: '' },
+        { metric: 'LTIs',              value: metrics.lti,       unit: '' },
+      ];
+      await exportTableToPdf(
+        rows,
+        [
+          { key: 'metric', label: 'KPI',   width: 30 },
+          { key: 'value',  label: 'Value', width: 15 },
+          { key: 'unit',   label: 'Note',  width: 30 },
+        ],
+        `hse-statistics-${new Date().toISOString().slice(0, 10)}`,
+        {
+          title: 'HSE Statistics',
+          orgName: activeOrg?.name ?? 'EviroSafe',
+          subtitle: `${scopeLabel} · Last ${period}`,
+          footerText: 'CONFIDENTIAL — HSE Management System',
+        },
+      );
+    } catch (err) {
+      console.error('[HseStatistics] Export failed:', err);
+      toastError('Could not export the statistics. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // ── Monthly trend ──────────────────────────────────────────────────────────
 
@@ -207,11 +247,11 @@ export const HseStatistics: React.FC = () => {
             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <PeriodSelector period={period} onChange={setPeriod} />
-          <button className="giq-btn-secondary flex items-center gap-2">
+          <button onClick={() => window.location.reload()} className="giq-btn-secondary flex items-center gap-2">
             <RefreshCw className="w-3.5 h-3.5" />Refresh
           </button>
-          <button className="giq-btn-secondary flex items-center gap-2">
-            <Download className="w-3.5 h-3.5" />Export
+          <button onClick={handleExport} disabled={isExporting} className="giq-btn-secondary flex items-center gap-2 disabled:opacity-60">
+            <Download className="w-3.5 h-3.5" />{isExporting ? 'Exporting…' : 'Export'}
           </button>
         </div>
       </div>

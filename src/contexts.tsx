@@ -15,7 +15,7 @@ import type {
   Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical, BbsObservation,
   Hazard, ContractorCompany, ContractorWorker, PpeItem, PpeAssignment, ShiftLog, FfdAssessment, EnvReading, SafetyMeeting,
   EmergencyPlan, EmergencyDrill, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord,
-  SiteAccessLog, CorrectiveAction, ManHoursEntry, Audit
+  SiteAccessLog, CorrectiveAction, ManHoursEntry, Audit, LegalComplianceItem, WasteRecord
 } from './types';
 import { useToast } from './components/ui/Toast';
 
@@ -353,6 +353,8 @@ interface DataContextType {
   actionItems: ActionItem[];
   chemicalList: Chemical[];
   bbsObservations: BbsObservation[];
+  legalComplianceList: LegalComplianceItem[];
+  wasteRecordList: WasteRecord[];
   hazardList: Hazard[];
   contractorCompanies: ContractorCompany[];
   contractorWorkers: ContractorWorker[];
@@ -409,6 +411,9 @@ interface DataContextType {
   handleUpdateChemical: (data: Chemical) => void;
   handleCreateBbsObservation: (data: BbsObservation) => void;
   handleUpdateBbsObservation: (data: BbsObservation) => void;
+  handleCreateLegalComplianceItem: (data: LegalComplianceItem) => void;
+  handleUpdateLegalComplianceItem: (data: LegalComplianceItem) => void;
+  handleCreateWasteRecord: (data: WasteRecord) => void;
   handleCreateHazard: (data: Hazard) => void;
   handleUpdateHazard: (data: Hazard) => void;
   handleCreateContractorCompany: (data: ContractorCompany) => void;
@@ -483,6 +488,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
     const [chemicalList, setChemicalList] = useState<Chemical[]>([]);
     const [bbsObservations, setBbsObservations] = useState<BbsObservation[]>([]);
+    const [legalComplianceList, setLegalComplianceList] = useState<LegalComplianceItem[]>([]);
+    const [wasteRecordList, setWasteRecordList] = useState<WasteRecord[]>([]);
     const [hazardList, setHazardList] = useState<Hazard[]>([]);
     const [contractorCompanies, setContractorCompanies] = useState<ContractorCompany[]>([]);
     const [contractorWorkers, setContractorWorkers] = useState<ContractorWorker[]>([]);
@@ -598,6 +605,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('shift_logs', setShiftLogs),
             fetchCol('ffd_assessments', setFfdAssessments),
             fetchCol('env_readings', setEnvReadings),
+            fetchCol('legal_compliance_items', setLegalComplianceList),
+            fetchCol('waste_records', setWasteRecordList),
             fetchCol('safety_meetings', setSafetyMeetings),
             fetchCol('emergency_plans', setEmergencyPlans),
             fetchCol('emergency_drills', setEmergencyDrills),
@@ -778,6 +787,40 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error(e);
             toast.error("Failed to update observation.");
             if (previous) setBbsObservations(prev => prev.map(o => o.id === updated.id ? previous : o));
+        }
+    };
+
+    const handleCreateLegalComplianceItem = async (item: LegalComplianceItem) => {
+        setLegalComplianceList(prev => [item, ...prev]);
+        try {
+            await setDoc(doc(db, 'legal_compliance_items', item.id), item);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to save compliance item.");
+            setLegalComplianceList(prev => prev.filter(i => i.id !== item.id));
+        }
+    };
+
+    const handleUpdateLegalComplianceItem = async (updated: LegalComplianceItem) => {
+        const previous = legalComplianceList.find(i => i.id === updated.id);
+        setLegalComplianceList(prev => prev.map(i => i.id === updated.id ? updated : i));
+        try {
+            await updateDoc(doc(db, 'legal_compliance_items', updated.id), updated as any);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to update compliance assessment.");
+            if (previous) setLegalComplianceList(prev => prev.map(i => i.id === updated.id ? previous : i));
+        }
+    };
+
+    const handleCreateWasteRecord = async (record: WasteRecord) => {
+        setWasteRecordList(prev => [record, ...prev]);
+        try {
+            await setDoc(doc(db, 'waste_records', record.id), record);
+        } catch (e) {
+            console.error(e);
+            toast.error("Failed to save waste record.");
+            setWasteRecordList(prev => prev.filter(r => r.id !== record.id));
         }
     };
 
@@ -1466,7 +1509,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
         trainingCourseList, trainingRecordList, trainingSessionList, notifications, signs, checklistTemplates, ptwList,
-        actionItems, chemicalList, bbsObservations,
+        actionItems, chemicalList, bbsObservations, legalComplianceList, wasteRecordList,
         hazardList, contractorCompanies, contractorWorkers, ppeItems, ppeAssignments, shiftLogs, ffdAssessments,
         envReadings, safetyMeetings, emergencyPlans, emergencyDrills, controlledDocuments, dataRequests, retentionPolicies,
         processingActivities, dataBreaches, complianceTracking, rcaRecords, siteAccessLogs,
@@ -1478,6 +1521,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
         handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical, handleCreateBbsObservation, handleUpdateBbsObservation,
+        handleCreateLegalComplianceItem, handleUpdateLegalComplianceItem, handleCreateWasteRecord,
         handleCreateHazard, handleUpdateHazard, handleCreateContractorCompany, handleUpdateContractorCompany,
         handleCreateContractorWorker, handleUpdateContractorWorker, handleCreatePpeItem, handleUpdatePpeItem,
         handleCreatePpeAssignment, handleUpdatePpeAssignment, handleCreateShiftLog, handleCreateFfdAssessment,
