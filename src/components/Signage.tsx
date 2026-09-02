@@ -128,7 +128,8 @@ export const Signage: React.FC = () => {
       <style>{`
         @media print {
             body { background: white; }
-            #root { display: none; }
+            body * { visibility: hidden; }
+            .print-overlay, .print-overlay * { visibility: visible; }
             .print-overlay {
                 display: flex !important;
                 position: fixed;

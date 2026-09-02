@@ -560,7 +560,7 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4 print:hidden" onClick={onClose} aria-modal="true" role="dialog" aria-labelledby="ptw-title">
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4" onClick={onClose} aria-modal="true" role="dialog" aria-labelledby="ptw-title">
         <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
           <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0 print:hidden">
             <div>
