@@ -276,7 +276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newUser: User = {
       id: newUserId,
       org_id: userData.org_id || activeOrg?.id || '',
-      email: userData.email,
+      email: userData.email.trim().toLowerCase(),
       name: userData.name,
       avatar_url: '',
       role: userData.role,

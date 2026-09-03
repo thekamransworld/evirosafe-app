@@ -48,46 +48,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // --- MODIFIED SIGNUP LOGIC ---
-  async function signup(email: string, pass: string, name: string) {
-    // 1. Check if email exists in Firestore and is 'invited'
-    const q = query(collection(db, "users"), where("email", "==", email));
-    const querySnapshot = await getDocs(q);
+  async function signup(rawEmail: string, pass: string, name: string) {
+    // Normalize casing: Firebase Auth always lowercases the token email
+    // internally, and invited-user records are now stored lowercase too, so
+    // comparisons only work reliably if this side matches.
+    const email = rawEmail.trim().toLowerCase();
 
-    if (querySnapshot.empty) {
-        throw new Error("This email has not been invited to EviroSafe.");
-    }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-
-    if (userData.status === 'active') {
-        throw new Error("This account is already active. Please log in.");
-    }
-
-    // 2. Create Authentication Account
+    // 1. Create the Authentication account FIRST. Firestore's security rules
+    // require an authenticated request to read the `users` collection (correctly —
+    // we don't want unauthenticated clients able to query/enumerate user records),
+    // so the invite lookup below can only succeed once this exists.
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    
-    // 3. Update Display Name
-    await updateProfile(userCredential.user, { displayName: name });
 
-    // 4. Activate the user in Firestore
-    // We keep the original Document ID to preserve relationships (projects, reports, etc.)
-    await updateDoc(doc(db, "users", userDoc.id), {
-        status: 'active',
-        auth_uid: userCredential.user.uid, // Link Auth UID for future reference
-        name: name // Ensure name matches what they typed
-    });
+    try {
+      // 2. Check if this email was actually invited. Firestore can approve this
+      // query because it filters on the same email as the caller's own auth
+      // token — see the `resource.data.email == request.auth.token.email`
+      // clause in firestore.rules.
+      const q = query(collection(db, "users"), where("email", "==", email));
+      const querySnapshot = await getDocs(q);
 
-    // 5. Write a small pointer doc keyed by the real Auth UID. Firestore security rules
-    // can only look up a document by its exact known path, not by querying a field like
-    // auth_uid — so without this, rules have no reliable way to find a user's org_id/role.
-    // This is what security rules will actually read; keep it in sync with anything that
-    // changes a user's role or org_id after this point.
-    await setDoc(doc(db, "users_by_uid", userCredential.user.uid), {
-        docId: userDoc.id,
-        org_id: userData.org_id,
-        role: userData.role,
-    });
+      if (querySnapshot.empty) {
+          throw new Error("This email has not been invited to EviroSafe.");
+      }
+
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+
+      if (userData.status === 'active') {
+          throw new Error("This account is already active. Please log in.");
+      }
+
+      // 3. Update Display Name
+      await updateProfile(userCredential.user, { displayName: name });
+
+      // 4. Activate the user in Firestore
+      // We keep the original Document ID to preserve relationships (projects, reports, etc.)
+      await updateDoc(doc(db, "users", userDoc.id), {
+          status: 'active',
+          auth_uid: userCredential.user.uid, // Link Auth UID for future reference
+          name: name // Ensure name matches what they typed
+      });
+
+      // 5. Write a small pointer doc keyed by the real Auth UID. Firestore security rules
+      // can only look up a document by its exact known path, not by querying a field like
+      // auth_uid — so without this, rules have no reliable way to find a user's org_id/role.
+      // This is what security rules will actually read; keep it in sync with anything that
+      // changes a user's role or org_id after this point.
+      await setDoc(doc(db, "users_by_uid", userCredential.user.uid), {
+          docId: userDoc.id,
+          org_id: userData.org_id,
+          role: userData.role,
+      });
+    } catch (err) {
+      // Something after account creation failed (not invited, already active,
+      // or a rules/network error) — delete the orphaned Auth account so a
+      // corrected retry isn't blocked by "email already in use".
+      await userCredential.user.delete().catch(() => {});
+      throw err;
+    }
   }
 
   async function login(email: string, pass: string) {
