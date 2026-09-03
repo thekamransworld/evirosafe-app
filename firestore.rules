@@ -81,6 +81,30 @@ service cloud.firestore {
       allow delete: if isAdmin() && isOrgScoped(resource.data);
     }
 
+    function myProjectIds() {
+      return myPointer().get('project_ids', []);
+    }
+
+    // Every role except ADMIN and ORG_ADMIN only sees data within their own
+    // assigned project(s), not everything in the org. New roles added later
+    // default to restricted too, unless explicitly added to the org-wide list
+    // here — the safer default.
+    function isProjectRestricted() {
+      return !(myRole() in ['ADMIN', 'ORG_ADMIN']);
+    }
+
+    // Like isOrgScoped, but for project-restricted roles also requires the
+    // document's project_id to be one of the caller's assigned projects.
+    // Documents with no project_id field at all (org-wide catalog data, e.g.
+    // a training course template) are unaffected — only documents that are
+    // actually tied to a specific project get restricted.
+    function isAccessible(data) {
+      return isOrgScoped(data) &&
+        (!isProjectRestricted() ||
+         !('project_id' in data) ||
+         data.project_id in myProjectIds());
+    }
+
     // ---- Organizations ----
     // Orgs aren't org_id-scoped themselves (they ARE the org) — scoped by
     // the document's own ID matching the caller's org_id instead.
@@ -95,34 +119,34 @@ service cloud.firestore {
 
     // ---- Every other collection: same rule, org_id must match ----
     match /projects/{docId}            { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /reports/{docId}             { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /inspections/{docId}         { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /ptws/{docId}                { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /reports/{docId}             { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /inspections/{docId}         { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /ptws/{docId}                { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /checklist_templates/{docId} { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /checklist_runs/{docId}      { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /plans/{docId}               { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /rams/{docId}                { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /checklist_runs/{docId}      { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /plans/{docId}               { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /rams/{docId}                { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /signs/{docId}               { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /actions/{docId}             { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /tbt_sessions/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /actions/{docId}             { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /tbt_sessions/{docId}        { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /training_courses/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /training_records/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /training_sessions/{docId}   { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /training_sessions/{docId}   { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /notifications/{docId}       { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /chemicals/{docId}           { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /audit_logs/{docId}          { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /bbs_observations/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /hazards/{docId}                { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /bbs_observations/{docId}    { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /hazards/{docId}                { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /contractor_companies/{docId}   { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /contractor_workers/{docId}     { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /contractor_workers/{docId}     { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /ppe_items/{docId}              { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /ppe_assignments/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /shift_logs/{docId}             { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /ppe_assignments/{docId}        { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /shift_logs/{docId}             { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /ffd_assessments/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /env_readings/{docId}           { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /env_readings/{docId}           { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /legal_compliance_items/{docId} { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /waste_records/{docId}          { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /safety_meetings/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /waste_records/{docId}          { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
+    match /safety_meetings/{docId}        { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /emergency_plans/{docId}        { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /emergency_drills/{docId}       { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /controlled_documents/{docId}   { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
@@ -132,9 +156,9 @@ service cloud.firestore {
     match /data_breaches/{docId}          { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /compliance_tracking/{docId}    { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
     match /rca_records/{docId}            { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /site_access_logs/{docId}       { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /site_access_logs/{docId}       { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /corrective_actions/{docId}     { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
-    match /man_hours_entries/{docId}      { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
+    match /man_hours_entries/{docId}      { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /audits/{docId}                 { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
 
     // Everything not explicitly matched above is denied by default — this is

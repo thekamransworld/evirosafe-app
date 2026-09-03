@@ -219,12 +219,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (
         (updatedUser as any).auth_uid &&
         previous &&
-        (previous.role !== updatedUser.role || previous.org_id !== updatedUser.org_id)
+        (previous.role !== updatedUser.role ||
+         previous.org_id !== updatedUser.org_id ||
+         JSON.stringify(previous.project_ids || []) !== JSON.stringify(updatedUser.project_ids || []))
       ) {
         await setDoc(doc(db, 'users_by_uid', (updatedUser as any).auth_uid), {
           docId: updatedUser.id,
           org_id: updatedUser.org_id,
           role: updatedUser.role,
+          project_ids: updatedUser.project_ids || [],
         });
       }
     } catch (e) {
@@ -521,16 +524,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const fetchData = async () => {
         try {
-          // Resolve this user's org_id BEFORE fetching anything else, so every query below
-          // can be scoped to it. Previously every fetchCol pulled entire collections with
-          // no filter at all — every organization's data, into every browser, every load.
-          const resolveMyOrgId = async (): Promise<string | null> => {
+          // Resolve org_id, role, and project_ids BEFORE fetching anything else, so
+          // every query below can be scoped correctly. Previously every fetchCol
+          // pulled entire collections with no filter at all — every organization's
+          // data, into every browser, every load.
+          const resolveMyIdentity = async (): Promise<{ orgId: string | null; role: string | null; projectIds: string[] }> => {
             // Tier 1: the pointer doc — fast, reliable, what new activations create.
             try {
               const ptrSnap = await getDoc(doc(db, 'users_by_uid', currentUser.uid));
               if (ptrSnap.exists()) {
-                const org = (ptrSnap.data() as any).org_id;
-                if (org) return org;
+                const ptr = ptrSnap.data() as any;
+                if (ptr.org_id) {
+                  // Pointers written before project-level scoping existed have no
+                  // project_ids key at all (distinct from a real, explicit empty
+                  // array). Backfill from the real user doc so existing activated
+                  // users don't silently lose all project-scoped visibility the
+                  // moment this ships.
+                  if (ptr.project_ids === undefined && ptr.docId) {
+                    try {
+                      const userSnap = await getDoc(doc(db, 'users', ptr.docId));
+                      const projectIds = userSnap.exists() ? ((userSnap.data() as any).project_ids || []) : [];
+                      await setDoc(doc(db, 'users_by_uid', currentUser.uid), { ...ptr, project_ids: projectIds });
+                      return { orgId: ptr.org_id, role: ptr.role || null, projectIds };
+                    } catch (e) { console.error('Pointer project_ids backfill failed:', e); }
+                  }
+                  return { orgId: ptr.org_id, role: ptr.role || null, projectIds: ptr.project_ids || [] };
+                }
               }
             } catch (e) { console.error('Pointer lookup failed:', e); }
 
@@ -550,21 +569,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     try {
                       await setDoc(doc(db, 'users_by_uid', currentUser.uid), {
                         docId: emailSnap.docs[0].id, org_id: data.org_id, role: data.role || null,
+                        project_ids: data.project_ids || [],
                       });
                     } catch (e) { console.error('Pointer backfill failed:', e); }
-                    return data.org_id;
+                    return { orgId: data.org_id, role: data.role || null, projectIds: data.project_ids || [] };
                   }
                 }
               } catch (e) { console.error('Email fallback lookup failed:', e); }
             }
-            return null;
+            return { orgId: null, role: null, projectIds: [] };
           };
 
-          const myOrgId = await resolveMyOrgId();
+          const { orgId: myOrgId, role: myRole, projectIds: myProjectIds } = await resolveMyIdentity();
+          const isProjectRestricted = myRole != null && !['ADMIN', 'ORG_ADMIN'].includes(myRole);
+          // Confirmed from types.ts: exactly these collections carry a project_id
+          // field. Everything else (training catalog, chemicals register, legal
+          // compliance, etc.) is genuinely org-wide and must not be filtered here —
+          // doing so would silently hide data Firestore rules would otherwise allow.
+          const PROJECT_SCOPED_COLLECTIONS = new Set([
+            'reports', 'inspections', 'ptws', 'checklist_runs', 'plans', 'rams',
+            'actions', 'tbt_sessions', 'training_sessions', 'bbs_observations',
+            'hazards', 'contractor_workers', 'ppe_assignments', 'shift_logs',
+            'env_readings', 'waste_records', 'safety_meetings', 'site_access_logs',
+            'man_hours_entries',
+          ]);
 
           const fetchCol = async (name: string, setter: any, initialData: any[] = []) => {
             if (!myOrgId) { setter(initialData); return; }
-            const snap = await getDocs(query(collection(db, name), where('org_id', '==', myOrgId)));
+            const needsProjectFilter = isProjectRestricted && PROJECT_SCOPED_COLLECTIONS.has(name);
+            if (needsProjectFilter && myProjectIds.length === 0) {
+              // Firestore's 'in' operator requires a non-empty array — a restricted
+              // user assigned to zero projects should just see nothing here, not
+              // hit an invalid-query error.
+              setter(initialData);
+              return;
+            }
+            const constraints = [where('org_id', '==', myOrgId)];
+            if (needsProjectFilter) {
+              // Firestore's 'in' filter caps at 30 values.
+              constraints.push(where('project_id', 'in', myProjectIds.slice(0, 30)));
+            }
+            const snap = await getDocs(query(collection(db, name), ...constraints));
             // Spread the document's data first, then force `id` to the actual Firestore
             // document ID. .data() alone never includes it — it only came through before
             // for documents that happened to also store a matching `id` field manually.

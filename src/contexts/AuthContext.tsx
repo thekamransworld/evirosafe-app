@@ -99,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           docId: userDoc.id,
           org_id: userData.org_id,
           role: userData.role,
+          project_ids: userData.project_ids || [],
       });
     } catch (err) {
       // Something after account creation failed (not invited, already active,
