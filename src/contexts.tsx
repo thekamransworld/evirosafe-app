@@ -245,11 +245,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = usersList.find(u => u.id === userId);
     setUsersList(prev => prev.filter(u => u.id !== userId));
     try {
+      // Re-fetch fresh rather than trusting the in-memory usersList, which is a
+      // one-time snapshot from whenever this session loaded — if this person
+      // activated their account after that, the local copy still shows no
+      // auth_uid, and the pointer cleanup below would silently never run.
+      let authUid = (target as any)?.auth_uid;
+      try {
+        const freshSnap = await getDoc(doc(db, 'users', userId));
+        if (freshSnap.exists()) authUid = (freshSnap.data() as any)?.auth_uid || authUid;
+      } catch (e) { console.error('Fresh user lookup before delete failed:', e); }
+
       await deleteDoc(doc(db, 'users', userId));
       // Clean up the pointer doc too, if this user had one — an orphaned pointer
       // with no real user doc behind it is exactly the kind of stale record that
       // cost hours of confusion earlier in this project.
-      const authUid = (target as any)?.auth_uid;
       if (authUid) {
         await deleteDoc(doc(db, 'users_by_uid', authUid)).catch((e) => console.error('Pointer cleanup failed:', e));
       }
