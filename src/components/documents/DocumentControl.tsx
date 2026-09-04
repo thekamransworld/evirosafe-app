@@ -44,84 +44,6 @@ const daysUntil = (d: string) =>
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const MOCK_DOCS: Omit<ControlledDocument, 'org_id'>[] = [
-  {
-    id: 'doc-001', doc_number: 'POL-HSE-001', title: 'HSE Policy Statement',
-    category: 'policy', current_version: '3.1', status: 'approved',
-    owner: 'HSE Manager', approved_by: 'Site Director', approved_at: '2024-01-15',
-    review_date: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Company HSE Policy signed by CEO. Describes commitment to safety.',
-    revisions: [
-      { version: '3.1', revised_by: 'Ahmed Al-Rashid', revised_at: '2024-01-15', change_notes: 'Updated to reflect new organisational structure.' },
-      { version: '3.0', revised_by: 'Sarah Mitchell',  revised_at: '2023-07-01', change_notes: 'Annual review — no substantive changes.' },
-      { version: '2.0', revised_by: 'Ahmed Al-Rashid', revised_at: '2022-01-10', change_notes: 'Added environmental policy section.' },
-    ],
-  },
-  {
-    id: 'doc-002', doc_number: 'PRO-PTW-001', title: 'Permit to Work Procedure',
-    category: 'procedure', current_version: '2.3', status: 'approved',
-    owner: 'HSE Manager', approved_by: 'HSE Director', approved_at: '2024-03-01',
-    review_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Procedure for issuing, managing and closing all permits to work on site.',
-    revisions: [
-      { version: '2.3', revised_by: 'Ahmed Al-Rashid', revised_at: '2024-03-01', change_notes: 'Added gas detector calibration requirement to hot work permits.' },
-      { version: '2.2', revised_by: 'Sarah Mitchell',  revised_at: '2023-11-15', change_notes: 'Updated authorised signatories list.' },
-    ],
-  },
-  {
-    id: 'doc-003', doc_number: 'RA-WAH-001', title: 'Working at Height Risk Assessment',
-    category: 'risk_assessment', current_version: '1.4', status: 'approved',
-    owner: 'Supervisor', approved_by: 'HSE Manager', approved_at: '2024-05-20',
-    review_date: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Risk assessment covering all working at height activities above 1.8m.',
-    revisions: [
-      { version: '1.4', revised_by: 'Carlos Rivera',   revised_at: '2024-05-20', change_notes: 'Added MEWP pre-use inspection checklist reference.' },
-      { version: '1.3', revised_by: 'Ahmed Al-Rashid', revised_at: '2024-01-08', change_notes: 'Updated following near-miss investigation.' },
-    ],
-  },
-  {
-    id: 'doc-004', doc_number: 'MS-EXCAV-001', title: 'Excavation Method Statement',
-    category: 'method_statement', current_version: '1.0', status: 'under_review',
-    owner: 'Site Engineer', approved_by: null, approved_at: null,
-    review_date: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Method statement for all excavation works below 1.2m depth.',
-    revisions: [
-      { version: '1.0', revised_by: 'James Okafor', revised_at: '2024-09-01', change_notes: 'Initial issue.' },
-    ],
-  },
-  {
-    id: 'doc-005', doc_number: 'FORM-INC-001', title: 'Incident Report Form',
-    category: 'form', current_version: '4.0', status: 'approved',
-    owner: 'HSE Manager', approved_by: 'HSE Manager', approved_at: '2024-02-01',
-    review_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Standard form for reporting all incidents, near misses and observations.',
-    revisions: [
-      { version: '4.0', revised_by: 'Sarah Mitchell',  revised_at: '2024-02-01', change_notes: 'Added root cause analysis section.' },
-      { version: '3.0', revised_by: 'Ahmed Al-Rashid', revised_at: '2023-06-01', change_notes: 'Restructured to OSHA recordable criteria.' },
-    ],
-  },
-  {
-    id: 'doc-006', doc_number: 'PLAN-ERP-001', title: 'Emergency Response Plan',
-    category: 'plan', current_version: '2.1', status: 'approved',
-    owner: 'HSE Manager', approved_by: 'Site Director', approved_at: '2024-04-15',
-    review_date: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Comprehensive emergency response plan covering fire, medical and environmental incidents.',
-    revisions: [
-      { version: '2.1', revised_by: 'Ahmed Al-Rashid', revised_at: '2024-04-15', change_notes: 'Updated assembly point and emergency contacts.' },
-    ],
-  },
-  {
-    id: 'doc-007', doc_number: 'PRO-COSHH-001', title: 'COSHH Control Procedure',
-    category: 'procedure', current_version: '1.2', status: 'draft',
-    owner: 'HSE Officer', approved_by: null, approved_at: null,
-    review_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    file_url: '', description: 'Procedure for assessment and control of hazardous substances on site.',
-    revisions: [
-      { version: '1.2', revised_by: 'Sarah Mitchell', revised_at: '2024-09-10', change_notes: 'Draft update — added new chemical assessment forms.' },
-    ],
-  },
-];
-
 // ─── Document Detail Modal ────────────────────────────────────────────────────
 
 const DocDetailModal: React.FC<{
@@ -248,7 +170,7 @@ export const DocumentControl: React.FC = () => {
   const { controlledDocuments, handleCreateControlledDocument } = useDataContext();
   const { activeUser } = useAppContext();
   const [showCreate, setShowCreate] = useState(false);
-  const docs = controlledDocuments.length > 0 ? controlledDocuments : (MOCK_DOCS as ControlledDocument[]);
+  const docs = controlledDocuments;
   const [selected, setSelected]     = useState<ControlledDocument | null>(null);
   const [search, setSearch]         = useState('');
   const [catFilter, setCatFilter]   = useState<DocCategory | 'all'>('all');

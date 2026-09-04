@@ -10,11 +10,7 @@ const FEATURES = [
   { icon: Users,      text: 'Training matrix & competency tracking' },
 ];
 
-const DEMO_ACCOUNTS = [
-  { label: 'Admin',       email: 'admin@guardiq.com',       role: 'Full access' },
-  { label: 'HSE Manager', email: 'hse@guardiq.com',         role: 'HSE operations' },
-  { label: 'Supervisor',  email: 'supervisor@guardiq.com',  role: 'Site level' },
-];
+// DEMO_ACCOUNTS removed along with the panel that used them — see LoginScreen below.
 
 export const LoginScreen: React.FC = () => {
   const { login, signup, loading } = useAuth();
@@ -89,14 +85,7 @@ export const LoginScreen: React.FC = () => {
     setLocalError('Google sign-in is not configured yet. Please use email and password.');
   };
 
-  const handleDemo = async (demoEmail: string) => {
-    setIsLoading(true);
-    setEmail(demoEmail);
-    setPassword('demo1234');
-    try { await login(demoEmail, 'demo1234'); }
-    catch { setLocalError('Demo login unavailable — enter credentials manually.'); }
-    finally { setIsLoading(false); }
-  };
+  // handleDemo removed along with the demo-accounts panel that called it.
 
   const busy = isLoading || loading;
 
@@ -294,22 +283,11 @@ export const LoginScreen: React.FC = () => {
             )}
           </p>
 
-          {/* Demo accounts */}
-          {mode === 'signin' && (
-          <div className="mt-6 rounded-xl p-4" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)' }}>
-            <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>DEMO ACCOUNTS</p>
-            <div className="space-y-2">
-              {DEMO_ACCOUNTS.map(d => (
-                <button key={d.email} onClick={() => handleDemo(d.email)} disabled={busy}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all hover:opacity-80 disabled:opacity-50"
-                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border-default)', color: 'var(--text-secondary)' }}>
-                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{d.label}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{d.role}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-          )}
+          {/* Demo accounts panel removed — it exposed working hardcoded admin
+              credentials (admin@guardiq.com / demo1234) to any visitor, no
+              invite or account required. See handleDemo() history if this
+              needs to be reintroduced properly (e.g. gated behind an env
+              var that's never set in production, with rotated passwords). */}
         </div>
       </div>
     </div>
