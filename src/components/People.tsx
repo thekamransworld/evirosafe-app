@@ -127,10 +127,12 @@ export const People: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
 
   const canManage = activeUser?.role === 'ADMIN' || activeUser?.role === 'ORG_ADMIN';
-  // Only a real (not already-impersonated) ADMIN can start impersonating — matches
-  // the guard inside impersonateUser() itself. Blocking it while already
-  // impersonating avoids confusing nested "view as" chains; use Exit first.
-  const canImpersonate = activeUser?.role === 'ADMIN' && !impersonatedUser;
+  // Only a real (not already-impersonated) admin-tier user can start impersonating —
+  // matches the guard inside impersonateUser() itself, and matches canManage above
+  // (ADMIN and ORG_ADMIN are equally privileged everywhere else in this app).
+  // Blocking it while already impersonating avoids confusing nested "view as"
+  // chains; use Exit first.
+  const canImpersonate = (activeUser?.role === 'ADMIN' || activeUser?.role === 'ORG_ADMIN') && !impersonatedUser;
 
   const handleChangeRole = (userId: string, role: string) => {
     const target = usersList.find(u => u.id === userId);

@@ -173,7 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Store current admin before switching
     // Note: In a real app, you'd store this in a separate state variable
     // For now, we assume the current activeUser is the admin
-    if (activeUser && activeUser.role === 'ADMIN') {
+    if (activeUser && (activeUser.role === 'ADMIN' || activeUser.role === 'ORG_ADMIN')) {
         // We need to find the user we want to be
         const targetUser = usersList.find(u => u.id === userId);
         if (targetUser) {

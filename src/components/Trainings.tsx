@@ -43,6 +43,21 @@ export const Trainings: React.FC<TrainingsProps> = ({
   const [tab, setTab]       = useState<'courses' | 'sessions' | 'records' | 'matrix'>('courses');
   const [search, setSearch] = useState('');
 
+  const { activeUser } = useAppContext();
+  // Same project-restriction model as everywhere else: ADMIN/ORG_ADMIN see the
+  // whole org's roster, everyone else only sees employees who share at least
+  // one of their own assigned projects. Without this, a project-restricted
+  // worker could see every other employee's name and certification status
+  // company-wide through this page, even though every other module now
+  // correctly hides other projects' data from them.
+  const visibleUsers = useMemo(() => {
+    if (!activeUser) return [];
+    if (activeUser.role === 'ADMIN' || activeUser.role === 'ORG_ADMIN') return users;
+    const myProjectIds = activeUser.project_ids || [];
+    if (myProjectIds.length === 0) return [];
+    return users.filter(u => (u.project_ids || []).some(p => myProjectIds.includes(p)));
+  }, [users, activeUser]);
+
   const stats = useMemo(() => ({
     courses:    courses.length,
     sessions:   sessions.filter(s => s.status === 'scheduled').length,
@@ -58,13 +73,17 @@ export const Trainings: React.FC<TrainingsProps> = ({
       return (course?.title ?? '').toLowerCase().includes(search.toLowerCase());
     });
   }, [sessions, search, courses]);
-  const filteredRecords  = useMemo(() => records.filter(r => {
-    if (!search) return true;
-    const u = users.find(u => u.id === r.user_id);
-    return (u?.name ?? '').toLowerCase().includes(search.toLowerCase());
-  }), [records, search, users]);
+  const filteredRecords  = useMemo(() => {
+    const visibleIds = new Set(visibleUsers.map(u => u.id));
+    return records.filter(r => {
+      if (!visibleIds.has(r.user_id)) return false;
+      if (!search) return true;
+      const u = visibleUsers.find(u => u.id === r.user_id);
+      return (u?.name ?? '').toLowerCase().includes(search.toLowerCase());
+    });
+  }, [records, search, visibleUsers]);
 
-  const filteredUsers = useMemo(() => users.filter(u =>
+  const filteredUsers = useMemo(() => visibleUsers.filter(u =>
     !search || (u.name ?? '').toLowerCase().includes(search.toLowerCase())
   ), [users, search]);
 
@@ -231,7 +250,7 @@ export const Trainings: React.FC<TrainingsProps> = ({
             const days     = daysLeft(record.expires_at);
             const isExpired = days !== null && days < 0;
             const isExpiring = days !== null && days >= 0 && days <= 30;
-            const recUser  = users.find(u => u.id === record.user_id);
+            const recUser  = visibleUsers.find(u => u.id === record.user_id);
             const recCourse = courses.find(c => c.id === record.course_id);
             return (
               <div key={record.id} className="giq-card p-4 flex items-center gap-4">
