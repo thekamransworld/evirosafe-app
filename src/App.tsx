@@ -48,7 +48,6 @@ import { ToastProvider }  from './components/ui/Toast';
 import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LoginScreen }    from './components/LoginScreen';
-import { DemoBanner }     from './components/DemoBanner';
 import { ImpersonationBanner } from './components/ImpersonationBanner';
 import { Sidebar }        from './components/Sidebar';
 import { roles as rolesConfig } from './config';
@@ -408,7 +407,9 @@ const AppContent: React.FC = () => {
         className="flex-1 min-h-screen flex flex-col transition-all duration-300"
         style={{ paddingBottom: isMobile ? '72px' : '0' }}
       >
-        <DemoBanner />
+        {/* DemoBanner removed — it was rendering unconditionally for every user
+            on every page, which is wrong the moment a real customer or buyer
+            is looking at this, not just internal testing. */}
 
         {/* Top bar — notification bell + network status */}
         <div className="flex items-center justify-end gap-3 px-6 pt-3 pb-1">
