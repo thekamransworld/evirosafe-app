@@ -73,8 +73,9 @@ service cloud.firestore {
       );
       // Invites create new user docs before that person has ever signed in,
       // so this can't require the pointer to exist — only that the creator
-      // is a real admin of the org they're inviting into.
-      allow create: if isAdmin() && request.resource.data.org_id == myOrgId();
+      // is a real admin of the org they're inviting into, UNLESS that admin
+      // is the platform-level ADMIN role, who can invite into any org.
+      allow create: if isAdmin() && (myRole() == 'ADMIN' || request.resource.data.org_id == myOrgId());
       // You can always update your own record (self-service profile changes);
       // admins can update anyone in their own org. Nobody can move a record
       // to a different org_id than it already had via this path.
