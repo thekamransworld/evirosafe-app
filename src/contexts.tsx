@@ -88,15 +88,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       try {
         const ptrSnap = await getDoc(doc(db, 'users_by_uid', currentUser.uid));
-        const myOrgId = ptrSnap.exists() ? (ptrSnap.data() as any).org_id : null;
+        const ptr = ptrSnap.exists() ? (ptrSnap.data() as any) : null;
+        const myOrgId = ptr?.org_id || null;
         if (!myOrgId) return; // Not linked yet — DataProvider's fallback will backfill this shortly.
-        const orgSnap = await getDoc(doc(db, 'organizations', myOrgId));
-        if (orgSnap.exists()) {
-          const org = { ...orgSnap.data(), id: orgSnap.id } as Organization;
-          setOrganizations(prev => {
-            const exists = prev.some(o => o.id === org.id);
-            return exists ? prev.map(o => o.id === org.id ? org : o) : [...prev, org];
-          });
+
+        if (ptr?.role === 'ADMIN') {
+          // Platform-level ADMIN sees every organization, not just their own —
+          // matches the same exception in firestore.rules' isOrgScoped/organizations
+          // rules. Without this, a newly-created org would never appear here even
+          // though the rules now allow reading it.
+          const allSnap = await getDocs(collection(db, 'organizations'));
+          setOrganizations(allSnap.docs.map(d => ({ ...d.data(), id: d.id } as Organization)));
+        } else {
+          const orgSnap = await getDoc(doc(db, 'organizations', myOrgId));
+          if (orgSnap.exists()) {
+            const org = { ...orgSnap.data(), id: orgSnap.id } as Organization;
+            setOrganizations(prev => {
+              const exists = prev.some(o => o.id === org.id);
+              return exists ? prev.map(o => o.id === org.id ? org : o) : [...prev, org];
+            });
+          }
         }
       } catch (e) {
         console.error('Error fetching organization:', e);
@@ -306,7 +317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error(e);
       toast.error('Failed to save invited user.');
       setUsersList(prev => prev.filter(u => u.id !== newUserId));
-      return;
+      throw e; // caller must know this failed, not just this function's own toast
     }
 
     try {

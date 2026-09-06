@@ -4,7 +4,6 @@ import { Button } from './ui/Button';
 import { FormField } from './ui/FormField';
 import { useAppContext, useDataContext } from '../contexts';
 import { roles as rolesData } from '../config';
-import { sendInviteEmail } from '../services/emailService';
 import { useToast } from './ui/Toast';
 
 /**
@@ -65,22 +64,9 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, def
     setError('');
 
     try {
-      // 1. Send invitation email
-      try {
-        await sendInviteEmail(
-          formData.email,
-          formData.name,
-          formData.role,
-          orgName,
-          activeUser?.name || '',
-        );
-      } catch (emailErr) {
-        // Email delivery failing shouldn't block the actual invite record
-        // from being created — log it but continue.
-        console.warn('[AddUserModal] Invite email failed to send:', emailErr);
-      }
-
-      // 2. Create the invited-user record (Firestore stub + local state)
+      // handleInviteUser saves the Firestore record AND sends the invite email
+      // internally — this used to also send the email directly here first,
+      // which meant every invite went out twice.
       await handleInviteUser({
         org_id: orgId,
         name: formData.name,
@@ -94,8 +80,10 @@ export const AddUserModal: React.FC<AddUserModalProps> = ({ isOpen, onClose, def
       setFormData({ name: '', email: '', role: 'WORKER', project_id: defaultProjectId || '' });
     } catch (err) {
       console.error(err);
+      // handleInviteUser already shows its own specific toast (e.g. "Failed to
+      // save invited user") before throwing — showing another generic one here
+      // on top of it is just noise, not new information.
       setError('Failed to send invitation. Please try again.');
-      toast.error('Invitation failed to send.');
     } finally {
       setIsSending(false);
     }

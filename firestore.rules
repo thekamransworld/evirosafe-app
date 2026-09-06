@@ -38,13 +38,17 @@ service cloud.firestore {
       return isSignedIn() && myRole() in ['ADMIN', 'ORG_ADMIN'];
     }
 
-    // True if `data` (a resource's fields) belongs to the caller's own org.
-    // Evaluates to false (not an error) if the caller has no pointer doc yet —
-    // covers the brief window between signup and the pointer being written.
+    // True if `data` (a resource's fields) belongs to the caller's own org —
+    // UNLESS the caller is the platform-level ADMIN role, which is allowed to
+    // act across every org. ORG_ADMIN (a real customer's own administrator)
+    // is intentionally NOT included here — they should only ever manage
+    // their own org, same as everyone else. Evaluates to false (not an
+    // error) if the caller has no pointer doc yet — covers the brief window
+    // between signup and the pointer being written.
     function isOrgScoped(data) {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users_by_uid/$(request.auth.uid)) &&
-        data.org_id == myOrgId();
+        (myRole() == 'ADMIN' || data.org_id == myOrgId());
     }
 
     // ---- Pointer collection ----
@@ -107,14 +111,17 @@ service cloud.firestore {
 
     // ---- Organizations ----
     // Orgs aren't org_id-scoped themselves (they ARE the org) — scoped by
-    // the document's own ID matching the caller's org_id instead.
+    // the document's own ID matching the caller's org_id instead, UNLESS
+    // the caller is the platform-level ADMIN role, who can see and manage
+    // every organization, not just their own.
     match /organizations/{orgId} {
-      allow read: if isSignedIn() && orgId == myOrgId();
+      allow read: if isSignedIn() && (myRole() == 'ADMIN' || orgId == myOrgId());
       // Creating a brand-new org has no existing pointer to check against yet
       // — this is the bootstrap path. Anyone signed in can create one; update
-      // and delete require already being an admin of that specific org.
+      // and delete require already being an admin of that specific org, or
+      // being the platform-level ADMIN role.
       allow create: if isSignedIn();
-      allow update, delete: if isAdmin() && orgId == myOrgId();
+      allow update, delete: if isAdmin() && (myRole() == 'ADMIN' || orgId == myOrgId());
     }
 
     // ---- Every other collection: same rule, org_id must match ----
