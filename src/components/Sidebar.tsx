@@ -161,8 +161,8 @@ const SectionHeader: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, setOpen }) => {
   const { logout, currentUser }   = useAuth();
-  const { notifications }         = useDataContext();
-  const { activeUser }            = useAppContext();
+  const { notifications }                          = useDataContext();
+  const { activeUser, activeOrg, organizations }    = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
   const [search, setSearch]       = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -226,6 +226,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
             </span>
           )}
         </div>
+
+        {/* ── Org switcher — ADMIN only ──────────────────────────────────── */}
+        {/* Regular ORG_ADMIN/etc. users only ever belong to one org, so this
+            would be pointless (and confusing) for them — it's scoped to the
+            platform-level ADMIN role specifically, matching the same
+            exception built into firestore.rules and the data-fetching layer. */}
+        {isOpen && activeUser?.role === 'ADMIN' && organizations.length > 1 && (
+          <div style={{ padding: '10px 12px 0', flexShrink: 0 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              Managing
+            </label>
+            <select
+              value={activeOrg?.id || ''}
+              onChange={(e) => {
+                localStorage.setItem('adminActiveOrgId', e.target.value);
+                window.location.reload();
+              }}
+              style={{
+                width: '100%', marginTop: 4, padding: '6px 8px', fontSize: 13, fontWeight: 600,
+                borderRadius: 8, border: '1px solid var(--border-default)',
+                background: 'var(--bg-elevated)', color: 'var(--text-primary)',
+              }}
+            >
+              {organizations.map(org => (
+                <option key={org.id} value={org.id}>{org.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* ── Search ─────────────────────────────────────────────────────── */}
         {isOpen && (

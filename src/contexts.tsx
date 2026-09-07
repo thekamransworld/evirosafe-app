@@ -98,7 +98,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // rules. Without this, a newly-created org would never appear here even
           // though the rules now allow reading it.
           const allSnap = await getDocs(collection(db, 'organizations'));
-          setOrganizations(allSnap.docs.map(d => ({ ...d.data(), id: d.id } as Organization)));
+          const allOrgs = allSnap.docs.map(d => ({ ...d.data(), id: d.id } as Organization));
+          setOrganizations(allOrgs);
+          // Keep activeOrg in sync with whichever org the switcher has selected
+          // (or the admin's own org if nothing's selected) — otherwise it stays
+          // stuck on whatever organizations[0] happened to default to.
+          const overrideOrgId = localStorage.getItem('adminActiveOrgId');
+          const targetOrg = allOrgs.find(o => o.id === (overrideOrgId || myOrgId));
+          if (targetOrg) setActiveOrg(targetOrg);
         } else {
           const orgSnap = await getDoc(doc(db, 'organizations', myOrgId));
           if (orgSnap.exists()) {
@@ -600,7 +607,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return { orgId: null, role: null, projectIds: [] };
           };
 
-          const { orgId: myOrgId, role: myRole, projectIds: myProjectIds } = await resolveMyIdentity();
+          const { orgId: resolvedOrgId, role: myRole, projectIds: myProjectIds } = await resolveMyIdentity();
+          // A platform-level ADMIN can choose to work within a different org
+          // than their own (e.g. to manage a customer's organization) via the
+          // org switcher. This lives in localStorage, completely separate from
+          // their actual account — switching never touches their real org_id,
+          // unlike the manual Firestore edits this replaces.
+          const adminOverrideOrgId = myRole === 'ADMIN' ? localStorage.getItem('adminActiveOrgId') : null;
+          const myOrgId = adminOverrideOrgId || resolvedOrgId;
           const isProjectRestricted = myRole != null && !['ADMIN', 'ORG_ADMIN'].includes(myRole);
           // Confirmed from types.ts: exactly these collections carry a project_id
           // field. Everything else (training catalog, chemicals register, legal
