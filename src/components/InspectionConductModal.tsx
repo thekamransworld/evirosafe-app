@@ -376,7 +376,6 @@ export const InspectionConductModal: React.FC<InspectionConductModalProps> = (pr
                     findings={currentInspection.findings}
                     openingMeeting={openingMeetingData}
                     closingMeeting={closingMeetingData}
-                    onEmail={(emailData) => console.log("Emailing report:", emailData)}
                 />
             )}
 

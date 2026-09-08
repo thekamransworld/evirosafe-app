@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // Initialize Gemini
 // AI features are intentionally paused (product decision, not a missing-key bug) —
 // flip AI_FEATURES_ENABLED back to true once the server-side proxy work is done.
-const AI_FEATURES_ENABLED = false;
+export const AI_FEATURES_ENABLED = false;
 const apiKey = AI_FEATURES_ENABLED ? ((import.meta as any).env.VITE_GEMINI_API_KEY || "") : "";
 const genAI = new GoogleGenerativeAI(apiKey);
 

@@ -117,7 +117,6 @@ export const OrganizationDetails: React.FC<OrganizationDetailsProps> = ({ org, o
           <ProjectDetails 
               project={selectedProject} 
               onBack={() => setSelectedProject(null)}
-              onEdit={() => console.log("Edit project clicked")}
           />
       );
   }

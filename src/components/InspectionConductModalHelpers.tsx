@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Button } from './ui/Button';
+import { AI_FEATURES_ENABLED } from '../services/geminiService';
 import { 
   CheckCircle, XCircle, Clock, AlertCircle, Calendar, 
   Users, AlertTriangle, TrendingUp, FileText, BarChart3, 
@@ -684,23 +685,22 @@ export const AiRiskAnalysis: React.FC<{
 }> = ({ findings, onAnalysisComplete }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<any | null>(null);
+  const [pausedNotice, setPausedNotice] = useState(false);
 
   const analyzeFindings = async () => {
+    // This used to return a hardcoded canned result unconditionally, with a
+    // fake delay to simulate a real call — regardless of what the actual
+    // findings said. That's honest nowhere else AI status is shown in this
+    // app (the pitch deck, the AI Insights panel), so it shouldn't be
+    // dishonest here either. Once AI_FEATURES_ENABLED flips back on, this
+    // is where a real call using the actual `findings` data should go.
+    if (!AI_FEATURES_ENABLED) {
+      setPausedNotice(true);
+      return;
+    }
     setIsAnalyzing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockAnalysis = {
-        primaryCategory: 'People & Behaviors',
-        trend: 'Increasing unsafe acts in high-risk areas',
-        priorityArea: 'PPE Compliance',
-        recommendations: [
-          'Conduct refresher training on PPE usage',
-          'Increase supervision during shift changes',
-          'Implement positive reinforcement program'
-        ]
-      };
-      setAnalysis(mockAnalysis);
-      onAnalysisComplete(mockAnalysis);
+      // Real analysis of `findings` goes here once AI features are back on.
     } catch (error) {
       console.error('AI analysis failed:', error);
     } finally {
@@ -723,7 +723,13 @@ export const AiRiskAnalysis: React.FC<{
           {isAnalyzing ? 'Analyzing...' : 'Analyze Trends'}
         </Button>
       </div>
-      
+
+      {pausedNotice && !analysis && (
+        <p className="text-sm text-purple-800 dark:text-purple-300">
+          AI-powered analysis is switched off for this account right now — not broken, just paused by design.
+        </p>
+      )}
+
       {analysis && (
         <div className="space-y-3 animate-fade-in">
           <div className="grid grid-cols-3 gap-3">
