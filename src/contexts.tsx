@@ -555,7 +555,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // every query below can be scoped correctly. Previously every fetchCol
           // pulled entire collections with no filter at all — every organization's
           // data, into every browser, every load.
-          const resolveMyIdentity = async (): Promise<{ orgId: string | null; role: string | null; projectIds: string[] }> => {
+          const resolveMyIdentity = async (): Promise<{ orgId: string | null; role: string | null; projectIds: string[]; docId: string | null }> => {
             // Tier 1: the pointer doc — fast, reliable, what new activations create.
             try {
               const ptrSnap = await getDoc(doc(db, 'users_by_uid', currentUser.uid));
@@ -572,10 +572,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                       const userSnap = await getDoc(doc(db, 'users', ptr.docId));
                       const projectIds = userSnap.exists() ? ((userSnap.data() as any).project_ids || []) : [];
                       await setDoc(doc(db, 'users_by_uid', currentUser.uid), { ...ptr, project_ids: projectIds });
-                      return { orgId: ptr.org_id, role: ptr.role || null, projectIds };
+                      return { orgId: ptr.org_id, role: ptr.role || null, projectIds, docId: ptr.docId || null };
                     } catch (e) { console.error('Pointer project_ids backfill failed:', e); }
                   }
-                  return { orgId: ptr.org_id, role: ptr.role || null, projectIds: ptr.project_ids || [] };
+                  return { orgId: ptr.org_id, role: ptr.role || null, projectIds: ptr.project_ids || [], docId: ptr.docId || null };
                 }
               }
             } catch (e) { console.error('Pointer lookup failed:', e); }
@@ -599,15 +599,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         project_ids: data.project_ids || [],
                       });
                     } catch (e) { console.error('Pointer backfill failed:', e); }
-                    return { orgId: data.org_id, role: data.role || null, projectIds: data.project_ids || [] };
+                    return { orgId: data.org_id, role: data.role || null, projectIds: data.project_ids || [], docId: emailSnap.docs[0].id };
                   }
                 }
               } catch (e) { console.error('Email fallback lookup failed:', e); }
             }
-            return { orgId: null, role: null, projectIds: [] };
+            return { orgId: null, role: null, projectIds: [], docId: null };
           };
 
-          const { orgId: resolvedOrgId, role: myRole, projectIds: myProjectIds } = await resolveMyIdentity();
+          const { orgId: resolvedOrgId, role: myRole, projectIds: myProjectIds, docId: myDocId } = await resolveMyIdentity();
           // A platform-level ADMIN can choose to work within a different org
           // than their own (e.g. to manage a customer's organization) via the
           // org switcher. This lives in localStorage, completely separate from
@@ -701,6 +701,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('man_hours_entries', setManHoursEntries),
             fetchCol('audits', setAudits),
           ]);
+
+          // If managing a different org than their own, the ADMIN's own record
+          // won't be in the org-scoped usersList above — they don't belong to
+          // that org. Left alone, that breaks activeUser resolution and
+          // silently drops them to the WORKER safety fallback. Their own
+          // identity must never depend on which org they're currently viewing.
+          if (adminOverrideOrgId && myDocId) {
+            try {
+              const ownDocSnap = await getDoc(doc(db, 'users', myDocId));
+              if (ownDocSnap.exists()) {
+                const ownUser = { ...ownDocSnap.data(), id: ownDocSnap.id } as User;
+                setUsersList(prev => prev.some(u => u.id === ownUser.id) ? prev : [...prev, ownUser]);
+              }
+            } catch (e) { console.error('Failed to ensure own user record stays present:', e); }
+          }
         } catch (e) {
           console.error("Error fetching data:", e);
         } finally {
