@@ -39,8 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // which threw a permission-denied error on every load and populated
   // userRole/userStatus, neither of which anything in the app read.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Firebase caches email/displayName on the local User object and only
+        // refreshes them on an explicit reload() or a full sign-in — not on a
+        // page reload and not on the SDK's background token refresh. Without
+        // this, a same-UID email edit made in the console keeps showing the
+        // old email in already-open (or freshly opened) tabs indefinitely.
+        await user.reload().catch(() => {});
+      }
+      setCurrentUser(auth.currentUser);
       setLoading(false);
     });
 
