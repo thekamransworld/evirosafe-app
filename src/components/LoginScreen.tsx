@@ -132,7 +132,7 @@ export const LoginScreen: React.FC = () => {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { value: '16+', label: 'HSE Modules' },
+            { value: '35+', label: 'HSE Modules' },
             { value: 'AI', label: 'Powered RAMS' },
             { value: 'ISO', label: '45001 Aligned' },
           ].map(s => (
