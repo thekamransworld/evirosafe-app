@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext, useDataContext } from '../contexts';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -74,6 +74,39 @@ export const Settings: React.FC = () => {
   const [language, setLanguage] = useState(activeUser?.preferences?.language || 'en');
 
   const [saved, setSaved] = useState(false);
+
+  // `activeUser` resolves asynchronously (AuthSync matches the Firebase Auth
+  // session to a Firestore profile after this component has already
+  // mounted). Without this, every piece of state above stays frozen on
+  // whatever activeUser looked like at the very first render — which is how
+  // the profile card (reads activeUser live) and this form (reads the
+  // frozen state above) can end up showing two different identities at
+  // once. Re-sync whenever the resolved profile's id actually changes, not
+  // on every activeUser reference change, so we don't clobber unsaved edits.
+  useEffect(() => {
+    if (!activeUser) return;
+    setProfile({
+      name:       activeUser.name || '',
+      email:      activeUser.email || '',
+      phone:      (activeUser as any).phone || '',
+      department: (activeUser as any).department || '',
+    });
+    setNotifs({
+      incidents:    activeUser.preferences?.notifications?.incidents    ?? true,
+      permits:      activeUser.preferences?.notifications?.permits      ?? true,
+      inspections:  activeUser.preferences?.notifications?.inspections  ?? true,
+      training:     activeUser.preferences?.notifications?.training     ?? false,
+      digest:       activeUser.preferences?.notifications?.digest       ?? true,
+    });
+    setPrivacy({
+      twoFactor:     activeUser.preferences?.privacy?.twoFactor     ?? false,
+      sessionAlerts: activeUser.preferences?.privacy?.sessionAlerts ?? true,
+      dataExport:    activeUser.preferences?.privacy?.dataExport    ?? true,
+    });
+    setLanguage(activeUser.preferences?.language || 'en');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUser?.id]);
+
 
   const handleSave = () => {
     if (!activeUser) return;
