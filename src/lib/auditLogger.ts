@@ -51,6 +51,7 @@ import {
   orderBy,
   limit,
   getDocs,
+  onSnapshot,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -244,6 +245,72 @@ export async function fetchResourceAuditTrail(
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Live subscription (for the dashboard's real-time activity feed)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Live counterpart to fetchAuditLogs() — same org-scoped, newest-first query,
+ * but pushed via onSnapshot instead of fetched once. Returns an unsubscribe
+ * function; callers must invoke it on unmount to stop the listener.
+ *
+ * Read cost note: unlike fetchAuditLogs(), this keeps a connection open and
+ * re-delivers the full result set on every matching write, not just new
+ * documents. Fine for a small limit() on a dashboard widget; do not reuse
+ * this pattern for a large, unbounded collection.
+ */
+export function subscribeToAuditLogs(
+  orgId: string,
+  onData: (entries: AuditLogEntry[]) => void,
+  limitCount = 15,
+): () => void {
+  const q = query(
+    collection(db, 'audit_logs'),
+    where('org_id', '==', orgId),
+    orderBy('timestamp', 'desc'),
+    limit(limitCount),
+  );
+
+  const unsubscribe = onSnapshot(
+    q,
+    (snap) => {
+      onData(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry)));
+    },
+    (error) => {
+      // Never let a listener failure crash the dashboard — log and leave
+      // the widget showing its last-known (or empty) state.
+      console.error('[auditLogger] Live feed subscription failed:', error);
+    },
+  );
+
+  return unsubscribe;
+}
+
+/**
+ * "2 min ago" / "3 hrs ago" / "Yesterday" style formatting for a stored
+ * ISO timestamp string. Falls back to a plain date once it's a week old.
+ */
+export function formatRelativeTime(timestamp: string): string {
+  const then = new Date(timestamp).getTime();
+  if (Number.isNaN(then)) return '';
+
+  const diffSec = Math.floor((Date.now() - then) / 1000);
+  if (diffSec < 5) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} min ago`;
+
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hr${diffHr === 1 ? '' : 's'} ago`;
+
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay === 1) return 'Yesterday';
+  if (diffDay < 7) return `${diffDay} days ago`;
+
+  return new Date(then).toLocaleDateString();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

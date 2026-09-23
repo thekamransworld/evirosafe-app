@@ -46,6 +46,7 @@ import { useDataContext } from '../../contexts';
 import { useAppContext } from '../../contexts';
 import { calculateKpiSnapshot } from '../../lib/kpiCalculations';
 import { getExpiryAlerts, buildAlertSummary } from '../../lib/certificationAlerts';
+import { subscribeToAuditLogs, formatRelativeTime, type AuditLogEntry } from '../../lib/auditLogger';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Widget registry — every available widget type
@@ -55,7 +56,7 @@ type WidgetId =
   | 'ltifr' | 'trifr' | 'near_miss' | 'severity_rate'
   | 'open_actions' | 'overdue_actions' | 'incident_trend'
   | 'ptw_status' | 'cert_alerts' | 'training_compliance'
-  | 'env_alerts' | 'quick_actions';
+  | 'env_alerts' | 'quick_actions' | 'live_activity';
 
 type WidgetSize = '1x1' | '2x1' | '3x1' | '1x2' | '2x2';
 
@@ -81,6 +82,7 @@ const WIDGET_REGISTRY: WidgetDef[] = [
   { id: 'training_compliance',title: 'Training Compliance',     description: 'Workforce training status',        icon: BookOpen,       defaultSize: '1x1', minSize: '1x1' },
   { id: 'env_alerts',        title: 'Environmental Alerts',     description: 'Threshold breaches this month',    icon: Leaf,           defaultSize: '1x1', minSize: '1x1' },
   { id: 'quick_actions',     title: 'Quick Actions',            description: 'One-tap navigation shortcuts',     icon: Zap,            defaultSize: '1x1', minSize: '1x1' },
+  { id: 'live_activity',     title: 'Live Activity',            description: 'Real-time feed of org activity',   icon: Activity,       defaultSize: '1x2', minSize: '1x1' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,6 +185,70 @@ const KpiMetricWidget: React.FC<KpiMetricWidgetProps> = ({
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Live activity feed — the one widget with its own independent subscription
+// (mounts/unmounts with the widget, rather than flowing through the shared
+// dashboard `data` snapshot, since it updates on a different cadence)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ACTIVITY_ICON: Partial<Record<AuditLogEntry['action'], React.ElementType>> = {
+  APPROVE: CheckCircle2, COMPLETE: CheckCircle2, SIGN: CheckCircle2, ACKNOWLEDGE: CheckCircle2,
+  REJECT: AlertTriangle, CANCEL: AlertTriangle,
+  CREATE: Plus, SUBMIT: Plus,
+  LOGIN: Users, LOGOUT: Users, PERMISSION_CHANGE: Users,
+};
+
+const LiveActivityFeedWidget: React.FC<{ orgId?: string }> = ({ orgId }) => {
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!orgId) return;
+    setReady(false);
+    const unsubscribe = subscribeToAuditLogs(orgId, (live) => {
+      setEntries(live);
+      setReady(true);
+    });
+    return unsubscribe;
+  }, [orgId]);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+        <span className="animate-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B6D11', flexShrink: 0 }} />
+        <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          Live Activity
+        </p>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {!ready && (
+          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Connecting…</p>
+        )}
+        {ready && entries.length === 0 && (
+          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No recent activity</p>
+        )}
+        {entries.map((entry) => {
+          const Icon = ACTIVITY_ICON[entry.action] ?? Clock;
+          return (
+            <div key={entry.id} style={{ display: 'flex', gap: 8, padding: '6px 0', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
+              <Icon style={{ width: 13, height: 13, marginTop: 2, color: 'var(--color-text-secondary)', flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 12, color: 'var(--color-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {entry.description}
+                </p>
+                <p style={{ fontSize: 10.5, color: 'var(--color-text-tertiary)', margin: 0 }}>
+                  {entry.user_name || 'System'} &middot; {formatRelativeTime(entry.timestamp)}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Widget content router
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -191,10 +257,14 @@ interface WidgetContentProps {
   snapshot: any;
   data: any;
   onNavigate: (page: string) => void;
+  orgId?: string;
 }
 
-const WidgetContent: React.FC<WidgetContentProps> = ({ id, snapshot, data, onNavigate }) => {
+const WidgetContent: React.FC<WidgetContentProps> = ({ id, snapshot, data, onNavigate, orgId }) => {
   switch (id) {
+
+    case 'live_activity':
+      return <LiveActivityFeedWidget orgId={orgId} />;
 
     case 'ltifr':
       return <KpiMetricWidget label="LTIFR" value={snapshot.ltifr} unit="per 1M hrs"
@@ -650,6 +720,7 @@ export const DragDropDashboard: React.FC<DragDropDashboardProps> = ({ onNavigate
                 snapshot={snapshot}
                 data={widgetData}
                 onNavigate={navigate}
+                orgId={activeOrg?.id}
               />
             </WidgetCard>
           );
