@@ -11,7 +11,7 @@ import { EmailModal } from './ui/EmailModal';
 interface RamsDetailModalProps {
   rams: RamsType;
   onClose: () => void;
-  onStatusChange: (ramsId: string, newStatus: RamsStatus) => void;
+  onStatusChange: (ramsId: string, newStatus: RamsStatus, reason?: string) => void;
 }
 
 const getStatusColor = (status: RamsStatus): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
@@ -42,15 +42,21 @@ const PersonDetail: React.FC<{ person?: { name: string; email: string; signed_at
     );
 }
 
-const WorkflowActions: React.FC<{ status: RamsStatus, onAction: (newStatus: RamsStatus) => void }> = ({ status, onAction }) => {
+const WorkflowActions: React.FC<{ status: RamsStatus, onAction: (newStatus: RamsStatus, reason?: string) => void }> = ({ status, onAction }) => {
     const { can } = useAppContext();
     const canApprove = can('approve', 'rams');
+    const handleRequestChanges = () => {
+        const reason = window.prompt('What needs to change before this can be approved? This will be shown to whoever submitted it.');
+        if (reason === null) return; // cancelled
+        if (!reason.trim()) { window.alert('A reason is required so the submitter knows what to fix.'); return; }
+        onAction('draft', reason.trim());
+    };
     return (
         <div className="flex items-center space-x-2">
             {status === 'draft' && <Button onClick={() => onAction('under_review')}>Submit for Review</Button>}
             {status === 'under_review' && canApprove && (
                 <>
-                    <Button variant="secondary" onClick={() => onAction('draft')}>Request Changes</Button>
+                    <Button variant="secondary" onClick={handleRequestChanges}>Request Changes</Button>
                     <Button onClick={() => onAction('approved')}>Approve</Button>
                 </>
             )}
@@ -116,6 +122,22 @@ export const RamsDetailModal: React.FC<RamsDetailModalProps> = ({ rams, onClose,
 
         <div className="flex-grow flex overflow-hidden" id="rams-printable-area">
             <main className="flex-1 p-8 overflow-y-auto">
+                {rams.status === 'draft' && (() => {
+                    const lastChangeRequest = [...(rams.audit_log || [])]
+                        .filter(e => e.action === 'REQUEST_CHANGES')
+                        .pop();
+                    if (!lastChangeRequest) return null;
+                    return (
+                        <div className="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                                Changes requested
+                            </p>
+                            <p className="text-sm text-amber-900 dark:text-amber-200 mt-1">
+                                {lastChangeRequest.details}
+                            </p>
+                        </div>
+                    );
+                })()}
                 <h3 className="text-lg font-bold">Method Statement</h3>
                 <div className="prose dark:prose-invert max-w-none text-sm my-4"><ReactMarkdown>{rams.method_statement.overview}</ReactMarkdown></div>
                 
@@ -154,7 +176,7 @@ export const RamsDetailModal: React.FC<RamsDetailModalProps> = ({ rams, onClose,
         </div>
 
         <footer className="p-4 border-t bg-gray-100 dark:bg-dark-background dark:border-dark-border flex justify-end items-center flex-shrink-0">
-            <WorkflowActions status={rams.status} onAction={(newStatus) => onStatusChange(rams.id, newStatus)} />
+            <WorkflowActions status={rams.status} onAction={(newStatus, reason) => onStatusChange(rams.id, newStatus, reason)} />
         </footer>
       </div>
     </div>

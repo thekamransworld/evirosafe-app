@@ -617,10 +617,12 @@ export const DataExportHub: React.FC = () => {
               onChange={(e) => setEmailAddress(e.target.value)}
               placeholder="recipient@company.com"
               type="email"
-              className="flex-1 px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-200"
+              disabled
+              className="flex-1 px-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-200 disabled:opacity-50"
             />
             <button
-              disabled={!emailAddress}
+              disabled
+              title="Requires the scheduledReports Cloud Function to be deployed first"
               className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
               onClick={() => {
                 alert(`Email delivery not yet wired — add the recipient in scheduledReports.ts and redeploy.`);

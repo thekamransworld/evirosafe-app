@@ -424,10 +424,10 @@ interface DataContextType {
   handleUpdatePtw: (data: any, action?: any) => void;
   handleCreatePlan: (data: any) => void;
   handleUpdatePlan: (data: any) => void;
-  handlePlanStatusChange: (id: string, status: any) => void;
+  handlePlanStatusChange: (id: string, status: any, reason?: string) => void;
   handleCreateRams: (data: any) => void;
   handleUpdateRams: (data: any) => void;
-  handleRamsStatusChange: (id: string, status: any) => void;
+  handleRamsStatusChange: (id: string, status: any, reason?: string) => void;
   handleCreateTbt: (data: any) => void;
   handleUpdateTbt: (data: any) => void;
   handleCreateOrUpdateCourse: (data: any) => void;
@@ -1377,11 +1377,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const handlePlanStatusChange = async (id: string, status: any) => {
+    const handlePlanStatusChange = async (id: string, status: any, reason?: string) => {
         const previous = planList.find(p => p.id === id);
-        setPlanList(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+        // "Request Changes" sends a plan back to draft — without a reason attached
+        // here, the person revising it has no idea what to fix. Only touches
+        // audit_log when a reason is actually given, so every other caller of
+        // this function (Submit for Review, Approve, Publish, Archive) is
+        // unaffected.
+        const auditEntry = reason ? {
+            user_id: activeUser?.id || '',
+            timestamp: new Date().toISOString(),
+            action: 'REQUEST_CHANGES',
+            details: reason,
+        } : null;
+        const updatedAuditLog = auditEntry ? [...(previous?.audit_trail || []), auditEntry] : undefined;
+        setPlanList(prev => prev.map(p => p.id === id ? { ...p, status, ...(updatedAuditLog ? { audit_trail: updatedAuditLog } : {}) } : p));
         try {
-            await updateDB('plans', id, { status });
+            await updateDB('plans', id, { status, ...(updatedAuditLog ? { audit_trail: updatedAuditLog } : {}) });
         } catch (e) {
             toast.error("Failed to update plan status.");
             if (previous) setPlanList(prev => prev.map(p => p.id === id ? previous : p));
@@ -1400,11 +1412,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const handleRamsStatusChange = async (id: string, status: any) => {
+    const handleRamsStatusChange = async (id: string, status: any, reason?: string) => {
         const previous = ramsList.find(r => r.id === id);
-        setRamsList(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+        const auditEntry = reason ? {
+            user_id: activeUser?.id || '',
+            timestamp: new Date().toISOString(),
+            action: 'REQUEST_CHANGES',
+            details: reason,
+        } : null;
+        const updatedAuditLog = auditEntry ? [...(previous?.audit_log || []), auditEntry] : undefined;
+        setRamsList(prev => prev.map(r => r.id === id ? { ...r, status, ...(updatedAuditLog ? { audit_log: updatedAuditLog } : {}) } : r));
         try {
-            await updateDB('rams', id, { status });
+            await updateDB('rams', id, { status, ...(updatedAuditLog ? { audit_log: updatedAuditLog } : {}) });
         } catch (e) {
             toast.error("Failed to update RAMS status.");
             if (previous) setRamsList(prev => prev.map(r => r.id === id ? previous : r));

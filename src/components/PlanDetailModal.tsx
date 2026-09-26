@@ -10,7 +10,7 @@ import { EmailModal } from './ui/EmailModal';
 interface PlanDetailModalProps {
   plan: Plan;
   onClose: () => void;
-  onStatusChange: (planId: string, newStatus: PlanStatus) => void;
+  onStatusChange: (planId: string, newStatus: PlanStatus, reason?: string) => void;
 }
 
 const getStatusColor = (status: PlanStatus | undefined): 'green' | 'blue' | 'yellow' | 'red' | 'gray' => {
@@ -42,15 +42,21 @@ const PersonDetail: React.FC<{ person?: { name: string, email: string, signed_at
     );
 }
 
-const WorkflowActions: React.FC<{ status: PlanStatus, onAction: (newStatus: PlanStatus) => void }> = ({ status, onAction }) => {
+const WorkflowActions: React.FC<{ status: PlanStatus, onAction: (newStatus: PlanStatus, reason?: string) => void }> = ({ status, onAction }) => {
     const { can } = useAppContext();
     const canApprove = can('approve', 'plans');
+    const handleRequestChanges = () => {
+        const reason = window.prompt('What needs to change before this can be approved? This will be shown to whoever submitted it.');
+        if (reason === null) return; // cancelled
+        if (!reason.trim()) { window.alert('A reason is required so the submitter knows what to fix.'); return; }
+        onAction('draft', reason.trim());
+    };
     return (
         <div className="flex items-center space-x-2">
             {status === 'draft' && <Button onClick={() => onAction('under_review')}>Submit for Review</Button>}
             {status === 'under_review' && canApprove && (
                 <>
-                    <Button variant="secondary" onClick={() => onAction('draft')}>Request Changes</Button>
+                    <Button variant="secondary" onClick={handleRequestChanges}>Request Changes</Button>
                     <Button onClick={() => onAction('approved')}>Approve</Button>
                 </>
             )}
@@ -110,6 +116,22 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
             </nav>
 
             <main className="flex-1 p-8 overflow-y-auto plan-printable-area">
+                {status === 'draft' && (() => {
+                    const lastChangeRequest = [...(plan.audit_trail || [])]
+                        .filter(e => e.action === 'REQUEST_CHANGES')
+                        .pop();
+                    if (!lastChangeRequest) return null;
+                    return (
+                        <div className="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+                            <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                                Changes requested
+                            </p>
+                            <p className="text-sm text-amber-900 dark:text-amber-200 mt-1">
+                                {lastChangeRequest.details}
+                            </p>
+                        </div>
+                    );
+                })()}
                  {status === 'under_review' && (
                     <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg">
                         <div className="flex">
@@ -163,7 +185,7 @@ export const PlanDetailModal: React.FC<PlanDetailModalProps> = ({ plan, onClose,
         </div>
 
         <footer className="p-4 border-t bg-gray-100 dark:bg-dark-card dark:border-dark-border flex justify-end items-center flex-shrink-0">
-            <WorkflowActions status={status} onAction={(newStatus) => onStatusChange(plan.id, newStatus)} />
+            <WorkflowActions status={status} onAction={(newStatus, reason) => onStatusChange(plan.id, newStatus, reason)} />
         </footer>
       </div>
     </div>
