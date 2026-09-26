@@ -217,6 +217,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return false;
     }
 
+    // ADMIN's permission list (config/permissions.ts) only actually enumerates
+    // 'organizations' and 'chemicals' — its own comment says "has access to
+    // everything," but nothing here ever implemented that beyond those two
+    // resources, so every other approve/publish/etc. action was silently
+    // denied for the one role meant to bypass this check entirely. This only
+    // fires once a role has genuinely resolved to 'ADMIN' via the lookup
+    // above — it does not touch the unresolved/fallback case handled just
+    // above it, so it doesn't reopen the privilege-escalation bug that check
+    // exists to prevent.
+    if (userRole.key === 'ADMIN') return true;
+
     // Check specific resource permission
     const permission = userRole.permissions.find(p => p.resource === resource);
     return permission ? permission.actions.includes(action) : false;
