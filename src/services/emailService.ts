@@ -1,7 +1,7 @@
 import emailjs from '@emailjs/browser';
 
 // --- CONFIGURATION FROM YOUR SCREENSHOTS ---
-const SERVICE_ID = "service_eqrbs0v";       // From Email Services screen
+const SERVICE_ID = "service_up28jhf";       // From Email Services screen
 const TEMPLATE_ID_INVITE = "template_usz6c6u"; // From Email Templates screen
 const TEMPLATE_ID_DOC = "template_usz6c6u";    // Using the same template for now
 const PUBLIC_KEY = "W0kvh4Mc_PKDX4AQf";     // From Account screen
