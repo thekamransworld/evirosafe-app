@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { logoSrc } from '../config';
 import { useAuth } from '../contexts/AuthContext';
 import { useAppContext, useDataContext } from '../contexts';
@@ -11,7 +11,7 @@ import {
   Siren, Leaf, Users2, PackageCheck, FolderOpen, Activity,
   Handshake, FileText, Download, Lock, Bell, Signpost,
   Wrench, UsersRound, Building2, Settings2, Search, X, ChevronDown,
-  LogOut, ChevronsLeft, ChevronsRight,
+  LogOut, ChevronsLeft, ChevronsRight, ChevronsUpDown, ChevronsDownUp,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -120,8 +120,10 @@ const NavItem: React.FC<{
     <button
       onClick={() => setCurrentView(view)}
       className={`giq-nav-item w-full ${isActive ? 'active' : ''}`}
+      aria-current={isActive ? 'page' : undefined}
       style={{ justifyContent: isOpen ? 'flex-start' : 'center', margin: '0 8px', width: isOpen ? 'calc(100% - 16px)' : 32 }}
       title={!isOpen ? label : undefined}
+      aria-label={!isOpen ? label : undefined}
     >
       <Icon size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
       {isOpen && <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
@@ -146,9 +148,11 @@ const SectionHeader: React.FC<{
 }> = ({ label, isOpen, isExpanded, onToggle }) => {
   if (!isOpen) return <div style={{ margin: '10px auto', width: 20, borderTop: '1px solid var(--border-default)' }} />;
   return (
-    <button onClick={onToggle} className="giq-section-label" style={{
+    <button onClick={onToggle} className="giq-section-label giq-section-sticky"
+      aria-expanded={isExpanded}
+      style={{
       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      background: 'none', border: 'none', cursor: 'pointer',
+      border: 'none', cursor: 'pointer',
     }}>
       <span>{label}</span>
       <ChevronDown size={12} style={{ transition: 'transform 0.15s', transform: isExpanded ? 'none' : 'rotate(-90deg)' }} />
@@ -159,16 +163,71 @@ const SectionHeader: React.FC<{
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Sidebar
 // ─────────────────────────────────────────────────────────────────────────────
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, setOpen }) => {
+const SECTIONS_KEY  = 'evirosafe.sidebar.sections';
+const COLLAPSED_KEY = 'evirosafe.sidebar.collapsed';
+
+// Remember which sections the user opened/closed across reloads (previously
+// they reset to DEFAULT_OPEN every visit, so the long list kept coming back).
+const loadSections = (): Record<string, boolean> => {
+  try {
+    const raw = localStorage.getItem(SECTIONS_KEY);
+    if (raw) return { ...DEFAULT_OPEN, ...JSON.parse(raw) };
+  } catch { /* storage blocked or corrupt — fall back to defaults */ }
+  return DEFAULT_OPEN;
+};
+
+// Things inline styles can't express: pseudo-element scrollbars, and a sticky
+// header background that must match the sidebar in both light and dark mode.
+// Scoped to classes only this component uses.
+const SIDEBAR_CSS = `
+.giq-nav-scroll{scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.5) transparent;overscroll-behavior:contain}
+.giq-nav-scroll::-webkit-scrollbar{width:8px}
+.giq-nav-scroll::-webkit-scrollbar-track{background:transparent}
+.giq-nav-scroll::-webkit-scrollbar-thumb{background:rgba(148,163,184,.45);border-radius:8px}
+.giq-nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.8)}
+.giq-section-sticky{position:sticky;top:0;z-index:2;background:var(--bg-surface)}
+.dark .giq-section-sticky{background:#13151a}
+.giq-nav-fade{position:absolute;left:0;right:8px;bottom:0;height:28px;pointer-events:none;transition:opacity .15s;background:linear-gradient(to top,var(--bg-surface),rgba(0,0,0,0))}
+.dark .giq-nav-fade{background:linear-gradient(to top,#13151a,rgba(19,21,26,0))}
+`;
+
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen: isOpenProp, setOpen }) => {
   const { logout, currentUser }   = useAuth();
   const { notifications }                          = useDataContext();
   const { activeUser, activeOrg, organizations }    = useAppContext();
   const [showNotifications, setShowNotifications] = useState(false);
   const [search, setSearch]       = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const navRef    = useRef<HTMLElement>(null);
 
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(DEFAULT_OPEN);
-  const toggleSection = (id: string) => setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  // App.tsx passes isOpen={true} and a no-op setOpen, so the Collapse button
+  // never did anything. Keep the collapsed state here (and remember it) so it
+  // works regardless; a parent that starts controlling isOpen still wins.
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(COLLAPSED_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0'); } catch { /* ignore */ }
+  }, [collapsed]);
+  const isOpen = isOpenProp && !collapsed;
+
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(loadSections);
+  useEffect(() => {
+    try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(expandedSections)); } catch { /* ignore */ }
+  }, [expandedSections]);
+  const toggleSection = (id: string) => setExpandedSections((prev) => ({ ...prev, [id]: !(prev[id] ?? true) }));
+
+  // Bottom fade = "there is more below" cue, since the scrollbar alone is easy to miss.
+  const [canScrollDown, setCanScrollDown] = useState(false);
+  const updateScrollHint = useCallback(() => {
+    const el = navRef.current;
+    if (!el) return;
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }, []);
+  useEffect(() => {
+    window.addEventListener('resize', updateScrollHint);
+    return () => window.removeEventListener('resize', updateScrollHint);
+  }, [updateScrollHint]);
 
   const unreadCount = notifications.filter(
     (n) => n.user_id === activeUser?.id && !n.is_read,
@@ -196,19 +255,66 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
   const isSearching = search.trim().length > 0;
   const matchesSearch = (item: MenuItem) => item.label.toLowerCase().includes(search.trim().toLowerCase());
 
+  // Recompute the "more below" hint whenever the list's height can change.
+  useEffect(() => { updateScrollHint(); }, [expandedSections, search, isOpen, userRole, updateScrollHint]);
+
+  // Keep the user oriented: when the page changes (a click here, a dashboard
+  // shortcut, a deep link), open the section that holds it and bring it into
+  // view inside the nav. Scrolls only the nav, never the page, and keeps the
+  // item clear of the sticky section header and the bottom fade.
+  const revealRef = useRef(true);
+  useEffect(() => {
+    revealRef.current = true;
+    const section = MENU_SECTIONS.find((s) => s.items.some((i) => i.view === currentView));
+    if (section) {
+      setExpandedSections((prev) => (prev[section.id] === false ? { ...prev, [section.id]: true } : prev));
+    }
+  }, [currentView]);
+  useEffect(() => {
+    if (!revealRef.current) return;
+    const nav = navRef.current;
+    const el = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !el) return;             // section may still be opening; runs again when it has
+    revealRef.current = false;
+    const n = nav.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.top < n.top + 44)          nav.scrollTop -= n.top + 44 - r.top;
+    else if (r.bottom > n.bottom - 28) nav.scrollTop += r.bottom - (n.bottom - 28);
+  }, [currentView, expandedSections, isOpen]);
+
+  // One control to tame the long list: collapse everything except the section
+  // you are in, or open everything again.
+  const visibleSections = MENU_SECTIONS.filter((s) => s.items.some(canSee));
+  const activeSectionId = MENU_SECTIONS.find((s) => s.items.some((i) => i.view === currentView))?.id;
+  const allExpanded = visibleSections.every((s) => expandedSections[s.id] ?? true);
+  const toggleAllSections = () =>
+    setExpandedSections(
+      Object.fromEntries(MENU_SECTIONS.map((s) => [s.id, allExpanded ? s.id === activeSectionId : true])),
+    );
+
   return (
     <>
+      <style>{SIDEBAR_CSS}</style>
       <div
         className="giq-sidebar"
         style={{
           width: isOpen ? 'var(--sidebar-width)' : 64,
-          // App.tsx already lays this component out as a normal flex child
-          // (sibling to the main content area) — override .giq-sidebar's
-          // `position: fixed` so it stays in-flow instead of floating over
-          // the page content.
-          position: 'relative',
-          top: 'auto',
+          // App.tsx lays this component out as a normal flex child (sibling
+          // to the main content area), so .giq-sidebar's `position: fixed`
+          // is overridden to keep it in-flow instead of floating over the
+          // page. `relative` fixed that overlap but let the page scroll the
+          // whole sidebar away (search, notifications and sign-out went with
+          // it). `sticky` keeps it in-flow AND pinned to the viewport.
+          position: 'sticky',
+          top: 0,
           left: 'auto',
+          alignSelf: 'flex-start',
+          height: '100vh',
+          // The class sets z-index 50, which put the sidebar ABOVE the nine
+          // modals that use z-40 (PTW, RAMS, Plans, Toolbox Talks, Training…),
+          // clipping their left edge. 30 sits above page content and below
+          // every modal/overlay (40+).
+          zIndex: 30,
           flexShrink: 0,
         }}
       >
@@ -258,8 +364,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
 
         {/* ── Search ─────────────────────────────────────────────────────── */}
         {isOpen && (
-          <div style={{ padding: '10px 12px 4px', flexShrink: 0 }}>
-            <div style={{ position: 'relative' }}>
+          <div style={{ padding: '10px 12px 4px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 ref={searchRef}
@@ -278,11 +384,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
                 </button>
               )}
             </div>
+            <button
+              onClick={toggleAllSections}
+              title={allExpanded ? 'Collapse other sections' : 'Expand all sections'}
+              aria-label={allExpanded ? 'Collapse other sections' : 'Expand all sections'}
+              style={{
+                flexShrink: 0, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 8, cursor: 'pointer', color: 'var(--text-muted)',
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
+              }}
+            >
+              {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
+            </button>
           </div>
         )}
 
         {/* ── Navigation ────────────────────────────────────────────────── */}
-        <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '4px 0 8px' }}>
+        <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <nav
+          ref={navRef}
+          className="giq-nav-scroll"
+          aria-label="Main navigation"
+          onScroll={updateScrollHint}
+          style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '4px 0 8px' }}
+        >
           {MENU_SECTIONS.map((section) => {
             const visibleItems = section.items.filter(canSee).filter((item) => !isSearching || matchesSearch(item));
             if (visibleItems.length === 0) return null;
@@ -321,13 +446,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
             </p>
           )}
         </nav>
+        <div className="giq-nav-fade" aria-hidden="true" style={{ opacity: canScrollDown ? 1 : 0 }} />
+        </div>
 
-        {/* ── Notification bell + collapse toggle ───────────────────────── */}
-        <div style={{ padding: 8, borderTop: '1px solid var(--border-default)', display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+        {/* ── Notification bell + collapse toggle ─────────────────────────
+            One row when expanded (gives the nav list a full row of height back);
+            stacked icons when collapsed to the 64px rail. */}
+        <div style={{
+          padding: 8, borderTop: '1px solid var(--border-default)', flexShrink: 0,
+          display: 'flex', flexDirection: isOpen ? 'row' : 'column', gap: 4,
+        }}>
           <button
             onClick={() => setShowNotifications(true)}
             className="giq-nav-item"
-            style={{ justifyContent: isOpen ? 'flex-start' : 'center', position: 'relative', width: '100%' }}
+            aria-label="Notifications"
+            title={!isOpen ? 'Notifications' : undefined}
+            style={{
+              justifyContent: isOpen ? 'flex-start' : 'center', position: 'relative',
+              width: isOpen ? 'auto' : '100%', flex: isOpen ? 1 : undefined, minWidth: 0,
+            }}
           >
             <Bell size={16} strokeWidth={2} style={{ flexShrink: 0 }} />
             {isOpen && <span style={{ flex: 1, textAlign: 'left' }}>Notifications</span>}
@@ -340,12 +477,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
           </button>
 
           <button
-            onClick={() => setOpen(!isOpen)}
+            onClick={() => { setCollapsed(!collapsed); setOpen(!isOpen); }}
             className="giq-nav-item"
-            style={{ justifyContent: isOpen ? 'flex-start' : 'center', width: '100%' }}
+            aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+            style={{
+              justifyContent: 'center', width: isOpen ? 38 : '100%',
+              flex: isOpen ? 'none' : undefined, padding: isOpen ? 0 : undefined,
+            }}
           >
             {isOpen ? <ChevronsLeft size={16} /> : <ChevronsRight size={16} />}
-            {isOpen && <span style={{ flex: 1, textAlign: 'left' }}>Collapse</span>}
           </button>
         </div>
 
