@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { logoSrc } from '../config';
 import { Loader2, Sun, Moon, Eye, EyeOff, Shield, TrendingUp, FileText, Users } from 'lucide-react';
 
 const FEATURES = [
@@ -98,9 +99,7 @@ export const LoginScreen: React.FC = () => {
 
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: '#10b981' }}>
-            <Shield className="w-5 h-5 text-white" />
-          </div>
+          <img src={logoSrc} alt="EviroSafe" className="h-10 w-auto flex-shrink-0 rounded-lg bg-white px-1 py-0.5" />
           <div>
             <span className="text-xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>EviroSafe</span>
             <span className="text-xs ml-2 font-medium" style={{ color: '#10b981' }}>HSE Platform</span>
@@ -168,9 +167,7 @@ export const LoginScreen: React.FC = () => {
 
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: '#10b981' }}>
-            <Shield className="w-4 h-4 text-white" />
-          </div>
+          <img src={logoSrc} alt="EviroSafe" className="h-9 w-auto flex-shrink-0 rounded-lg bg-white px-1 py-0.5" />
           <span className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>EviroSafe</span>
         </div>
 

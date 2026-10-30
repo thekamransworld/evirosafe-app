@@ -325,7 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, i
           padding: isOpen ? '0 16px' : '0', justifyContent: isOpen ? 'flex-start' : 'center',
           borderBottom: '1px solid var(--border-default)',
         }}>
-          <img src={logoSrc} alt="Logo" style={{ width: 28, height: 28, borderRadius: 8, flexShrink: 0 }} />
+          <img src={logoSrc} alt="EviroSafe" style={{ height: 32, width: 'auto', padding: '3px 4px', borderRadius: 8, background: '#ffffff', flexShrink: 0 }} />
           {isOpen && (
             <span style={{ marginLeft: 10, fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
               EviroSafe
