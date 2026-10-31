@@ -169,6 +169,37 @@ service cloud.firestore {
     match /man_hours_entries/{docId}      { allow read: if isAccessible(resource.data); allow create: if isAccessible(request.resource.data); allow update, delete: if isAccessible(resource.data); }
     match /audits/{docId}                 { allow read: if isOrgScoped(resource.data); allow create: if isOrgScoped(request.resource.data); allow update, delete: if isOrgScoped(resource.data); }
 
+    // ---- Public certificate verification ----
+    // The QR code on a training certificate opens a page that anyone can view
+    // without signing in, so this ONE collection is publicly readable - but
+    // only a single document at a time, by its exact code. The code is a random
+    // 100-bit string nobody can guess, and `list` is denied so the collection
+    // can never be enumerated. Documents hold only name, course, issuer, dates
+    // and status: no email, ID numbers, scores or project data.
+    //
+    // Writes are limited to the roles that can run training sessions in the app
+    // (the same four that hold the training update permission). Training
+    // records themselves are writable by any org member, so the public document
+    // - not the private record - is what a verifier trusts, and it gets the
+    // tighter rule. A custom role not listed here cannot issue certificates.
+    function canIssueCertificates() {
+      return isSignedIn() && myRole() in ['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'SUPERVISOR'];
+    }
+
+    match /certificate_verifications/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if canIssueCertificates()
+                    && isOrgScoped(request.resource.data)
+                    && request.resource.data.code == code
+                    && request.resource.data.status == 'valid';
+      allow update: if canIssueCertificates()
+                    && isOrgScoped(resource.data)
+                    && request.resource.data.org_id == resource.data.org_id
+                    && request.resource.data.code == resource.data.code;
+      allow delete: if canIssueCertificates() && isOrgScoped(resource.data);
+    }
+
     // Everything not explicitly matched above is denied by default — this is
     // Firestore's normal behavior, not something this file has to state.
   }

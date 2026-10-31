@@ -1069,7 +1069,16 @@ export interface TbtSession {
 
 export interface TrainingCourse { id: string; org_id: string; title: string; category: string; validity_months: number; syllabus: string; learning_objectives: string[]; requires_assessment: boolean; }
 export interface TrainingSession { id: string; course_id: string; project_id: string; scheduled_at: string; trainer_id: string; status: 'scheduled' | 'completed' | 'cancelled'; roster: string[]; attendance: { user_id: string; attended: boolean; score?: number; }[]; }
-export interface TrainingRecord { id: string; org_id: string; user_id: string; course_id: string; session_id: string; issued_at: string; expires_at: string; score?: number; status: 'valid' | 'expiring_soon' | 'expired'; }
+export interface TrainingRecord {
+  id: string; org_id: string; user_id: string; course_id: string; session_id: string;
+  issued_at: string; expires_at: string; score?: number;
+  status: 'valid' | 'expiring_soon' | 'expired';
+  // Verifiable-certificate fields. Optional so records created before
+  // certificates existed keep working; see src/lib/certificates.ts.
+  certificate_no?: string;
+  verification_code?: string;
+  revoked_at?: string;
+}
 
 export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work' | 'Mechanical Work' | 'Chemical Handling';
 export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';

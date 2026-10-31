@@ -1,12 +1,15 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useAppContext, useDataContext } from '../contexts';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToast } from './ui/Toast';
-import { Shield, Award, Download, Share2, CheckCircle, Calendar, Building2, Star } from 'lucide-react';
+import { Shield, Award, Download, Share2, CheckCircle, Calendar, Building2, Star, QrCode } from 'lucide-react';
+import { useCertificateActions } from '../hooks/useCertificateActions';
+import { CertificateCard } from './CertificateCard';
+import { getPublicBaseUrl, getRecordCertificateStatus } from '../lib/certificates';
 
-// ─── Cert card ────────────────────────────────────────────────────────────────
+// ─── Legacy cert card (free-text certifications stored on the user) ──────────
 
-const CertCard: React.FC<{ cert: any }> = ({ cert }) => {
+const LegacyCertCard: React.FC<{ cert: any }> = ({ cert }) => {
   const isValid   = cert.expiryDate ? new Date(cert.expiryDate) > new Date() : true;
   const daysLeft  = cert.expiryDate
     ? Math.ceil((new Date(cert.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -52,21 +55,34 @@ const CertCard: React.FC<{ cert: any }> = ({ cert }) => {
 
 export const CertifiedProfile: React.FC = () => {
   const { activeUser, activeOrg } = useAppContext();
-  const { reportList, ptwList, inspectionList } = useDataContext();
+  const { reportList, ptwList, inspectionList, trainingRecordList, trainingCourseList } = useDataContext();
   const { theme } = useTheme();
   const { success, error: toastError } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const actions = useCertificateActions();
+
+  // Newest first. These come from finalised training sessions and carry a
+  // QR code + verification page; `certs` below is the older free-text list.
+  const myRecords = useMemo(
+    () => trainingRecordList
+      .filter(r => r.user_id === activeUser?.id)
+      .sort((a, b) => new Date(b.issued_at).getTime() - new Date(a.issued_at).getTime()),
+    [trainingRecordList, activeUser?.id],
+  );
 
   if (!activeUser) return null;
 
   const certs: any[] = (activeUser as any).certifications || [];
+  const courseTitle = (id: string) => trainingCourseList.find(c => c.id === id)?.title || 'Training course';
 
   const stats = {
     reports:     reportList.filter(r => r.reporter_id === activeUser.id || r.creator_id === activeUser.id).length,
     ptws:        ptwList.filter(p => (p as any).issuer_id === activeUser.id || p.payload?.requester?.id === activeUser.id).length,
     inspections: inspectionList.filter(i => (i as any).conducted_by_id === activeUser.id).length,
-    validCerts:  certs.filter(c => !c.expiryDate || new Date(c.expiryDate) > new Date()).length,
+    validCerts:
+      myRecords.filter(r => { const st = getRecordCertificateStatus(r); return st === 'valid' || st === 'expiring'; }).length +
+      certs.filter(c => !c.expiryDate || new Date(c.expiryDate) > new Date()).length,
   };
 
   const roleColors: Record<string, string> = {
@@ -198,24 +214,44 @@ export const CertifiedProfile: React.FC = () => {
         </div>
       </div>
 
-      {/* Certifications */}
+      {/* Certificates */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Certifications ({stats.validCerts} valid)
+            Certificates ({stats.validCerts} valid)
           </h2>
         </div>
-        {certs.length === 0 ? (
+        {myRecords.length === 0 && certs.length === 0 ? (
           <div className="giq-card py-16 text-center">
             <Award className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
-            <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>No certifications recorded</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Certifications added by your HSE Manager will appear here</p>
+            <p className="font-semibold" style={{ color: 'var(--text-secondary)' }}>No certificates yet</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              A certificate is issued automatically when a training session you attended is finalised
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {certs.map((cert: any, i: number) => (
-              <CertCard key={i} cert={cert} />
-            ))}
+          <div className="space-y-6">
+            {myRecords.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myRecords.map(r => (
+                  <CertificateCard key={r.id} record={r} title={courseTitle(r.course_id)} actions={actions} />
+                ))}
+              </div>
+            )}
+            {certs.length > 0 && (
+              <div>
+                {myRecords.length > 0 && (
+                  <h3 className="text-xs font-semibold mb-3 uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Other certifications
+                  </h3>
+                )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {certs.map((cert: any, i: number) => (
+                    <LegacyCertCard key={i} cert={cert} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -224,13 +260,13 @@ export const CertifiedProfile: React.FC = () => {
       <div className="giq-card p-4 flex items-center gap-4">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: 'rgba(16,185,129,0.1)' }}>
-          <CheckCircle className="w-5 h-5" style={{ color: '#10b981' }} />
+          <QrCode className="w-5 h-5" style={{ color: '#10b981' }} />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>EviroSafe Verified Profile</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Verifiable certificates</p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            This profile is managed by {activeOrg?.name || 'your organisation'} on the EviroSafe HSE Platform.
-            Verified on {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}.
+            Certificates issued by {activeOrg?.name || 'your organisation'} on EviroSafe carry a QR code and a verification code.
+            Anyone can check one at {getPublicBaseUrl().replace(/^https?:\/\//, '')}/verify without signing in.
           </p>
         </div>
         <div className="text-right flex-shrink-0">

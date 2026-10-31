@@ -30,6 +30,10 @@ export const SessionAttendanceModal: React.FC<SessionAttendanceModalProps> = ({ 
 
   const handleSubmit = () => {
     onSubmit(session.id, attendance);
+    // Close right away: finalising issues certificates in the background and
+    // reports the outcome by toast. Leaving the dialog open invited a second
+    // click while issuance was still running.
+    onClose();
   };
 
   if (!isOpen) return null;

@@ -116,6 +116,9 @@ export function getExpiryAlerts(
     // Only process records that have an expiry date
     if (!record.expires_at) continue;
 
+    // A revoked certificate is no longer valid, so it has nothing left to expire
+    if (record.revoked_at) continue;
+
     // Skip records that have already been renewed (status check)
     if ((record as any).status === 'renewed' || (record as any).status === 'superseded') continue;
 

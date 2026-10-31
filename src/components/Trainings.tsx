@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import type { TrainingCourse, TrainingRecord, TrainingSession, Project, User } from '../types';
-import { useAppContext } from '../contexts';
-import { Plus, BookOpen, Award, Clock, Users, ChevronRight, Calendar, AlertTriangle, CheckCircle, Search } from 'lucide-react';
+import { useAppContext, useDataContext } from '../contexts';
+import { Plus, BookOpen, Award, Clock, Users, ChevronRight, Calendar, AlertTriangle, CheckCircle, Search, Download, Link2, Loader2, Ban } from 'lucide-react';
+import { useCertificateActions } from '../hooks/useCertificateActions';
+import { planSessionCertificates } from '../lib/certificates';
 
 interface TrainingsProps {
   courses:               TrainingCourse[];
@@ -27,19 +29,28 @@ const daysLeft = (d: string | null | undefined) => {
 
 // Same four-state classification the Records tab already uses (computed from
 // expires_at, not the stored status field, so the two tabs never disagree).
-type MatrixStatus = 'current' | 'expiring' | 'expired' | 'not_started';
+type MatrixStatus = 'current' | 'expiring' | 'expired' | 'revoked' | 'not_started';
 
 const MATRIX_STATUS_CFG: Record<MatrixStatus, { label: string; color: string }> = {
   current:     { label: 'Current',      color: '#10b981' },
   expiring:    { label: 'Expiring ≤30d',color: '#f59e0b' },
   expired:     { label: 'Expired',      color: '#ef4444' },
+  revoked:     { label: 'Revoked',      color: '#b91c1c' },
   not_started: { label: 'Not started',  color: '#9ca3af' },
+};
+
+const ICON_BTN_CLASS = 'p-2 rounded-lg transition-colors disabled:opacity-40';
+const ICON_BTN_STYLE: React.CSSProperties = {
+  background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', color: 'var(--text-secondary)',
 };
 
 export const Trainings: React.FC<TrainingsProps> = ({
   courses, records, sessions, users, projects, onManageCourses, onScheduleSession, onManageAttendance,
 }) => {
   const { can } = useAppContext();
+  const certActions = useCertificateActions();
+  const { handleIssueSessionCertificates } = useDataContext();
+  const [issuingSessionId, setIssuingSessionId] = useState<string | null>(null);
   const [tab, setTab]       = useState<'courses' | 'sessions' | 'records' | 'matrix'>('courses');
   const [search, setSearch] = useState('');
 
@@ -61,8 +72,8 @@ export const Trainings: React.FC<TrainingsProps> = ({
   const stats = useMemo(() => ({
     courses:    courses.length,
     sessions:   sessions.filter(s => s.status === 'scheduled').length,
-    expiring:   records.filter(r => { const d = daysLeft(r.expires_at); return d !== null && d >= 0 && d <= 30; }).length,
-    expired:    records.filter(r => { const d = daysLeft(r.expires_at); return d !== null && d < 0; }).length,
+    expiring:   records.filter(r => { if (r.revoked_at) return false; const d = daysLeft(r.expires_at); return d !== null && d >= 0 && d <= 30; }).length,
+    expired:    records.filter(r => { if (r.revoked_at) return false; const d = daysLeft(r.expires_at); return d !== null && d < 0; }).length,
   }), [courses, sessions, records]);
 
   const filteredCourses  = useMemo(() => courses.filter(c => !search || (c.title ?? '').toLowerCase().includes(search.toLowerCase())), [courses, search]);
@@ -89,9 +100,16 @@ export const Trainings: React.FC<TrainingsProps> = ({
 
   // Most recent record per (user, course) pair — a retake shouldn't leave an
   // old expired record shadowing a newer valid one.
+  // A revoked certificate never counts as current compliance, so it's left out
+  // here; if that was the person's only record for the course it shows as Revoked.
+  const revokedKeys = useMemo(
+    () => new Set(records.filter(r => r.revoked_at).map(r => `${r.user_id}::${r.course_id}`)),
+    [records],
+  );
   const latestRecordByUserCourse = useMemo(() => {
     const map = new Map<string, TrainingRecord>();
     for (const r of records) {
+      if (r.revoked_at) continue;
       const key = `${r.user_id}::${r.course_id}`;
       const existing = map.get(key);
       if (!existing || new Date(r.issued_at).getTime() > new Date(existing.issued_at).getTime()) {
@@ -101,9 +119,27 @@ export const Trainings: React.FC<TrainingsProps> = ({
     return map;
   }, [records]);
 
+  // How many attendees of a COMPLETED session earned a certificate but don't
+  // have one yet (e.g. the session was closed before certificates existed).
+  const pendingCertificates = (session: TrainingSession): number => {
+    if (session.status !== 'completed') return 0;
+    const course = courses.find(c => c.id === session.course_id);
+    if (!course) return 0;
+    return planSessionCertificates({
+      session, attendance: session.attendance ?? [], course, users,
+      orgId: '', orgName: '', existingRecords: records,
+    }).issue.length;
+  };
+
+  const issueForSession = async (sessionId: string) => {
+    setIssuingSessionId(sessionId);
+    try { await handleIssueSessionCertificates(sessionId); } finally { setIssuingSessionId(null); }
+  };
+
   const getMatrixStatus = (userId: string, courseId: string): MatrixStatus => {
-    const record = latestRecordByUserCourse.get(`${userId}::${courseId}`);
-    if (!record) return 'not_started';
+    const key = `${userId}::${courseId}`;
+    const record = latestRecordByUserCourse.get(key);
+    if (!record) return revokedKeys.has(key) ? 'revoked' : 'not_started';
     const days = daysLeft(record.expires_at);
     if (days !== null && days < 0) return 'expired';
     if (days !== null && days <= 30) return 'expiring';
@@ -224,6 +260,15 @@ export const Trainings: React.FC<TrainingsProps> = ({
                     <span className="flex items-center gap-1"><Users className="w-3 h-3" />{enrolled} enrolled</span>
                   </div>
                 </div>
+                {certActions.canManage && pendingCertificates(session) > 0 && (
+                  <button onClick={() => issueForSession(session.id)}
+                    disabled={issuingSessionId === session.id}
+                    title="Issue verifiable certificates to attendees who earned one but don't have one yet"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 disabled:opacity-60"
+                    style={{ ...ICON_BTN_STYLE, color: 'var(--text-primary)' }}>
+                    {issuingSessionId === session.id ? 'Issuing…' : `Issue certificates (${pendingCertificates(session)})`}
+                  </button>
+                )}
                 {can('create', 'reports') && session.status !== 'cancelled' && (
                   <button onClick={() => onManageAttendance(session)}
                     className="text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0"
@@ -248,28 +293,80 @@ export const Trainings: React.FC<TrainingsProps> = ({
         <div className="space-y-2">
           {filteredRecords.map(record => {
             const days     = daysLeft(record.expires_at);
-            const isExpired = days !== null && days < 0;
-            const isExpiring = days !== null && days >= 0 && days <= 30;
+            const isRevoked = !!record.revoked_at;
+            const isExpired = !isRevoked && days !== null && days < 0;
+            const isExpiring = !isRevoked && days !== null && days >= 0 && days <= 30;
             const recUser  = visibleUsers.find(u => u.id === record.user_id);
             const recCourse = courses.find(c => c.id === record.course_id);
+            const busy = certActions.busyId === record.id;
             return (
-              <div key={record.id} className="giq-card p-4 flex items-center gap-4">
+              <div key={record.id} className="giq-card p-4 flex items-center gap-4 flex-wrap sm:flex-nowrap">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                   style={{ background: '#10b981' }}>
                   {(recUser?.name || 'U').charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{recUser?.name || 'Unknown'}</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{recCourse?.title || record.course_id}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {recCourse?.title || record.course_id}
+                    {record.certificate_no && <span className="font-mono"> · {record.certificate_no}</span>}
+                  </p>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  {isExpired ? (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {isRevoked ? (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(185,28,28,0.1)', color: '#b91c1c' }}>Revoked</span>
+                  ) : isExpired ? (
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Expired</span>
                   ) : isExpiring ? (
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>{days}d left</span>
                   ) : (
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>Current</span>
                   )}
+                  {record.verification_code ? (
+                    <>
+                      <button
+                        onClick={() => certActions.download(record)}
+                        disabled={busy || isRevoked}
+                        title="Download certificate (PDF)"
+                        aria-label="Download certificate (PDF)"
+                        className={ICON_BTN_CLASS}
+                        style={ICON_BTN_STYLE}
+                      >
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => certActions.copyLink(record)}
+                        title="Copy verification link"
+                        aria-label="Copy verification link"
+                        className={ICON_BTN_CLASS}
+                        style={ICON_BTN_STYLE}
+                      >
+                        <Link2 className="w-4 h-4" />
+                      </button>
+                      {certActions.canManage && !isRevoked && (
+                        <button
+                          onClick={() => certActions.revoke(record)}
+                          disabled={busy}
+                          title="Revoke certificate"
+                          aria-label="Revoke certificate"
+                          className={ICON_BTN_CLASS}
+                          style={{ ...ICON_BTN_STYLE, color: '#b91c1c' }}
+                        >
+                          <Ban className="w-4 h-4" />
+                        </button>
+                      )}
+                    </>
+                  ) : certActions.canManage ? (
+                    <button
+                      onClick={() => certActions.issue(record)}
+                      disabled={busy}
+                      title="Create a verifiable certificate (QR code + verification page) for this record"
+                      className="text-xs font-semibold px-2.5 py-1.5 rounded-lg disabled:opacity-50"
+                      style={ICON_BTN_STYLE}
+                    >
+                      {busy ? 'Issuing…' : 'Issue certificate'}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             );

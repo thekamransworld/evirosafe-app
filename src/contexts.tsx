@@ -1,4 +1,4 @@
-import React, { createContext, useState, useMemo, useContext, useEffect } from 'react';
+import React, { createContext, useState, useMemo, useContext, useEffect, useRef } from 'react';
 import { 
   organizations as initialOrganizations, 
   users as initialUsers,
@@ -29,6 +29,11 @@ import { sendNotification, notifyRole } from './services/notificationService';
 
 // --- EMAIL SERVICE ---
 import { sendInviteEmail } from './services/emailService';
+
+// --- CERTIFICATES ---
+import {
+  closeSessionAndIssueCertificates, issueCertificatesForSession, issueCertificateForExistingRecord, revokeCertificate, describeCertificateError,
+} from './services/certificateService';
 
 // --- APP CONTEXT ---
 type InvitedUser = { name: string; email: string; role: User['role']; org_id: string };
@@ -444,6 +449,9 @@ interface DataContextType {
   handleCreateOrUpdateCourse: (data: any) => void;
   handleScheduleSession: (data: any) => void;
   handleCloseSession: (id: string, attendance: any) => void;
+  handleIssueSessionCertificates: (sessionId: string) => Promise<boolean>;
+  handleIssueCertificate: (recordId: string) => Promise<boolean>;
+  handleRevokeCertificate: (recordId: string) => Promise<boolean>;
   handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
   handleCreateStandaloneAction: (data: any) => void;
@@ -506,7 +514,7 @@ interface DataContextType {
 const DataContext = createContext<DataContextType>(null!);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { activeOrg, activeUser, setUsersList } = useAppContext();
+    const { activeOrg, activeUser, setUsersList, usersList } = useAppContext();
     const { currentUser } = useAuth();
     const toast = useToast();
     
@@ -1497,16 +1505,164 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // Sessions currently being finalised. Guards against a double-click (or a
+    // second submit) running certificate issuance twice for the same session.
+    const closingSessions = useRef<Set<string>>(new Set());
+
+    // Finalising a session issues a verifiable certificate to everyone who
+    // attended (and, for assessed courses, reached the pass mark), then marks
+    // the session completed. See src/services/certificateService.ts.
     const handleCloseSession = async (id: string, att: any) => {
+        if (closingSessions.current.has(id)) return;
+        closingSessions.current.add(id);
+
         const previous = trainingSessionList.find(s => s.id === id);
+        const course = previous ? trainingCourseList.find(c => c.id === previous.course_id) : undefined;
         setTrainingSessionList(prev => prev.map(s => s.id === id ? { ...s, status: 'completed', attendance: att } : s));
+        const revert = () => {
+            if (previous) setTrainingSessionList(prev => prev.map(s => s.id === id ? previous : s));
+        };
+
         try {
-            await updateDoc(doc(db, 'training_sessions', id), { status: 'completed', attendance: att });
-            toast.success("Session closed.");
+            if (!previous || !course) {
+                // Without the course there is nothing to certify (e.g. it was deleted):
+                // close the session exactly as before and say why nothing was issued.
+                await updateDoc(doc(db, 'training_sessions', id), { status: 'completed', attendance: att });
+                toast.success("Session closed.");
+                if (previous && !course) toast.error("This session's course no longer exists, so no certificates were issued.");
+                return;
+            }
+
+            const trainer = usersList.find(u => u.id === previous.trainer_id);
+            const result = await closeSessionAndIssueCertificates({
+                session: previous,
+                attendance: att,
+                course,
+                users: usersList,
+                orgId: activeOrg.id,
+                orgName: activeOrg.name,
+                trainerName: trainer?.name,
+                existingRecords: trainingRecordList,
+            });
+
+            // Keep whatever WAS issued in state even if something else failed,
+            // so a retry sees it and skips it instead of re-issuing.
+            if (result.issued.length > 0) {
+                const created = result.issued.map(i => i.record);
+                setTrainingRecordList(prev => [...created, ...prev.filter(r => !created.some(n => n.id === r.id))]);
+            }
+
+            if (result.sessionClosed) {
+                const n = result.issued.length;
+                toast.success(n > 0 ? `Session closed. ${n} certificate${n === 1 ? '' : 's'} issued.` : "Session closed. No certificates were issued.");
+                const belowMark = result.skipped.filter(x => x.reason === 'below_pass_mark').length;
+                if (belowMark > 0) {
+                    toast.info(`${belowMark} attendee${belowMark === 1 ? '' : 's'} did not reach the pass mark and ${belowMark === 1 ? 'was' : 'were'} not certified.`);
+                }
+            } else {
+                revert();
+                const problem = result.failed.length > 0
+                    ? `${result.failed.length} certificate${result.failed.length === 1 ? '' : 's'} could not be issued. ${result.failed[0].message}`
+                    : (result.sessionError || 'The session could not be saved.');
+                toast.error(`Session not closed. ${problem} Press Finalize again once it's fixed; certificates already issued won't be duplicated.`);
+            }
         } catch (e) {
             console.error('Failed to close session:', e);
             toast.error("Failed to close session.");
-            if (previous) setTrainingSessionList(prev => prev.map(s => s.id === id ? previous : s));
+            revert();
+        } finally {
+            closingSessions.current.delete(id);
+        }
+    };
+
+    // Backfill for a session that was already closed (for example before this
+    // feature existed, when "Finalize & Issue Certificates" didn't issue
+    // anything): issues certificates to attendees who earned one and don't have
+    // one. Idempotent, and it never touches the session itself.
+    const handleIssueSessionCertificates = async (sessionId: string): Promise<boolean> => {
+        if (closingSessions.current.has(sessionId)) return false;
+        closingSessions.current.add(sessionId);
+        try {
+            const session = trainingSessionList.find(s => s.id === sessionId);
+            const course = session ? trainingCourseList.find(c => c.id === session.course_id) : undefined;
+            if (!session || !course) {
+                toast.error("Can't issue certificates: this session's course no longer exists.");
+                return false;
+            }
+            const trainer = usersList.find(u => u.id === session.trainer_id);
+            const result = await issueCertificatesForSession({
+                session,
+                attendance: session.attendance ?? [],
+                course,
+                users: usersList,
+                orgId: activeOrg.id,
+                orgName: activeOrg.name,
+                trainerName: trainer?.name,
+                existingRecords: trainingRecordList,
+            });
+            if (result.issued.length > 0) {
+                const created = result.issued.map(i => i.record);
+                setTrainingRecordList(prev => [...created, ...prev.filter(r => !created.some(n => n.id === r.id))]);
+            }
+            if (result.failed.length > 0) {
+                toast.error(`${result.failed.length} certificate${result.failed.length === 1 ? '' : 's'} could not be issued. ${result.failed[0].message}`);
+                return false;
+            }
+            const n = result.issued.length;
+            toast.success(n > 0 ? `${n} certificate${n === 1 ? '' : 's'} issued.` : 'Nothing to issue: everyone eligible already has a certificate.');
+            return true;
+        } catch (e) {
+            console.error('Failed to issue session certificates:', e);
+            toast.error(describeCertificateError(e));
+            return false;
+        } finally {
+            closingSessions.current.delete(sessionId);
+        }
+    };
+
+    // For training records created before certificates were verifiable (or added
+    // outside the app): mints the verification code + public record for them.
+    const handleIssueCertificate = async (recordId: string): Promise<boolean> => {
+        const record = trainingRecordList.find(r => r.id === recordId);
+        if (!record) return false;
+        const course = trainingCourseList.find(c => c.id === record.course_id);
+        const holder = usersList.find(u => u.id === record.user_id);
+        if (!course || !holder) {
+            toast.error("Can't issue this certificate: its course or person no longer exists.");
+            return false;
+        }
+        const session = trainingSessionList.find(s => s.id === record.session_id);
+        const trainer = session ? usersList.find(u => u.id === session.trainer_id) : undefined;
+        try {
+            const issued = await issueCertificateForExistingRecord({
+                record,
+                courseTitle: course.title,
+                holderName: holder.name,
+                orgName: activeOrg.name,
+                trainerName: trainer?.name,
+            });
+            setTrainingRecordList(prev => prev.map(r => r.id === record.id ? issued.record : r));
+            toast.success("Certificate issued.");
+            return true;
+        } catch (e) {
+            console.error('Failed to issue certificate:', e);
+            toast.error(describeCertificateError(e));
+            return false;
+        }
+    };
+
+    const handleRevokeCertificate = async (recordId: string): Promise<boolean> => {
+        const record = trainingRecordList.find(r => r.id === recordId);
+        if (!record) return false;
+        try {
+            const revoked_at = await revokeCertificate(record);
+            setTrainingRecordList(prev => prev.map(r => r.id === recordId ? { ...r, revoked_at } : r));
+            toast.success("Certificate revoked. Its verification page now shows it as revoked.");
+            return true;
+        } catch (e) {
+            console.error('Failed to revoke certificate:', e);
+            toast.error(describeCertificateError(e));
+            return false;
         }
     };
 
@@ -1642,7 +1798,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
-        handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
+        handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleIssueSessionCertificates, handleIssueCertificate, handleRevokeCertificate,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
         handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical, handleCreateBbsObservation, handleUpdateBbsObservation,
         handleCreateLegalComplianceItem, handleUpdateLegalComplianceItem, handleCreateWasteRecord,
