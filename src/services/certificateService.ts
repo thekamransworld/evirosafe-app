@@ -17,6 +17,7 @@ import type { TrainingRecord } from '../types';
 import {
   buildCertificateForExistingRecord,
   buildVerifyUrl,
+  cleanAttendance,
   planSessionCertificates,
   type IssuedCertificate,
   type SessionPlan,
@@ -105,7 +106,7 @@ export async function closeSessionAndIssueCertificates(
   try {
     await updateDoc(doc(db, 'training_sessions', input.session.id), {
       status: 'completed',
-      attendance: input.attendance,
+      attendance: cleanAttendance(input.attendance),
     });
     return { ...result, sessionClosed: true };
   } catch (e) {

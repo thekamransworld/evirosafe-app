@@ -219,6 +219,21 @@ export interface SessionPlan {
   skipped: { user_id: string; reason: SkipReason }[];
 }
 
+/**
+ * Firestore rejects `undefined` anywhere in a document, including inside array
+ * items, so a missing score must be left out rather than stored as undefined.
+ * Also tolerates legacy sessions that have no attendance field at all.
+ */
+export function cleanAttendance(
+  attendance: TrainingSession['attendance'] | null | undefined,
+): TrainingSession['attendance'] {
+  return (attendance ?? []).map(a => ({
+    user_id: a.user_id,
+    attended: !!a.attended,
+    ...(typeof a.score === 'number' && !isNaN(a.score) ? { score: a.score } : {}),
+  }));
+}
+
 /** Deterministic, so re-finalising a session can never create duplicates. */
 export function recordIdFor(sessionId: string, userId: string): string {
   return `tr_${sessionId}_${userId}`;

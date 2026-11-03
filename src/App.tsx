@@ -189,7 +189,7 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
     handleCreatePlan, handlePlanStatusChange, handleUpdatePlan,
     handleCreateRams, handleRamsStatusChange, handleUpdateRams,
     handleCreateTbt, handleUpdateTbt,
-    handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession,
+    handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleSaveSessionAttendance,
     handleCreateStandaloneAction, handleCreateInspection,
     projects, trainingCourseList, checklistTemplates,
   } = useDataContext();
@@ -309,6 +309,7 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
           isOpen={isAttendanceModalOpen}
           onClose={() => setAttendanceModalOpen(false)}
           onSubmit={handleCloseSession}
+          onSave={handleSaveSessionAttendance}
           session={sessionForAttendance}
           users={usersList}
         />

@@ -5,7 +5,9 @@ import { useToast } from './ui/Toast';
 import { Shield, Award, Download, Share2, CheckCircle, Calendar, Building2, Star, QrCode } from 'lucide-react';
 import { useCertificateActions } from '../hooks/useCertificateActions';
 import { CertificateCard } from './CertificateCard';
-import { getPublicBaseUrl, getRecordCertificateStatus } from '../lib/certificates';
+import { getPublicBaseUrl, getRecordCertificateStatus, toDateOnly } from '../lib/certificates';
+import { downloadCompetencyRecordPdf, type CompetencyRow } from '../lib/competencyRecordPdf';
+import { describeCertificateError } from '../services/certificateService';
 
 // ─── Legacy cert card (free-text certifications stored on the user) ──────────
 
@@ -60,6 +62,7 @@ export const CertifiedProfile: React.FC = () => {
   const { success, error: toastError } = useToast();
   const printRef = useRef<HTMLDivElement>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const actions = useCertificateActions();
 
   // Newest first. These come from finalised training sessions and carry a
@@ -94,7 +97,60 @@ export const CertifiedProfile: React.FC = () => {
   };
   const roleColor = roleColors[activeUser.role] || '#10b981';
 
-  const handlePrint = () => window.print();
+  // A generated document, not a print of the screen: printing the page came
+  // out shifted, clipped to one page and (in dark theme) with invisible text.
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const asDate = (v: unknown) => {
+        const d = v ? new Date(v as string) : null;
+        return d && !isNaN(d.getTime()) ? toDateOnly(d) : '';
+      };
+      const today = toDateOnly(new Date());
+      const realEmployeeId = (activeUser as any).employee_id as string | undefined;
+      const rows: CompetencyRow[] = [
+        ...myRecords.map(r => ({
+          title: courseTitle(r.course_id),
+          certificateNo: r.certificate_no,
+          code: r.verification_code,
+          issuedOn: asDate(r.issued_at),
+          expiresOn: asDate(r.expires_at),
+          status: getRecordCertificateStatus(r),
+        })),
+        // Older free-text entries can't be verified online, so they're labelled
+        // "recorded" (or "expired" once their date has passed).
+        ...certs.map((c: any) => {
+          const expiresOn = asDate(c.expiryDate);
+          return {
+            title: c.issuedBy ? `${c.title} (${c.issuedBy})` : (c.title || 'Certification'),
+            issuedOn: asDate(c.issueDate),
+            expiresOn,
+            status: (expiresOn && expiresOn < today ? 'expired' : 'recorded') as CompetencyRow['status'],
+          };
+        }),
+      ];
+      await downloadCompetencyRecordPdf({
+        holderName: activeUser.name,
+        email: activeUser.email,
+        role: activeUser.role,
+        department: activeUser.department,
+        // Same value as the profile tile: a real employee_id if one is stored, otherwise
+        // a generated reference, which must not be passed off as an employee number.
+        employeeId: realEmployeeId || `GIQ-${activeUser.id?.slice(0, 6).toUpperCase()}`,
+        idLabel: realEmployeeId ? 'EMPLOYEE ID' : 'PROFILE ID',
+        orgName: activeOrg?.name || 'EviroSafe',
+        generatedOn: today,
+        verifyHost: getPublicBaseUrl().replace(/^https?:\/\//, ''),
+        rows,
+      });
+      success('Competency record downloaded.');
+    } catch (e) {
+      console.error('[competency record] export failed:', e);
+      toastError(describeCertificateError(e));
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   // There's no public profile URL to share (nothing in this app is
   // publicly hosted per-user), so this shares a text summary instead —
@@ -134,8 +190,8 @@ export const CertifiedProfile: React.FC = () => {
           <p className="giq-page-subtitle mt-1">Professional profile and certifications</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handlePrint} className="giq-btn-secondary flex items-center gap-2">
-            <Download className="w-3.5 h-3.5" />Export PDF
+          <button onClick={handleExport} disabled={isExporting} className="giq-btn-secondary flex items-center gap-2 disabled:opacity-60">
+            <Download className="w-3.5 h-3.5" />{isExporting ? 'Preparing…' : 'Export PDF'}
           </button>
           <button onClick={handleShare} disabled={isSharing} className="giq-btn-secondary flex items-center gap-2 disabled:opacity-60">
             <Share2 className="w-3.5 h-3.5" />{isSharing ? 'Sharing…' : 'Share'}
@@ -280,6 +336,18 @@ export const CertifiedProfile: React.FC = () => {
               body * { visibility: hidden; }
               #certified-profile-printable-area, #certified-profile-printable-area * { visibility: visible; }
               #certified-profile-printable-area { position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none; }
+              /* Paper is white. In the dark theme these tokens resolve to light-on-dark
+                 colours, which printed as invisible text (the name vanished), so force the
+                 light palette here and keep the gradient banner (browsers drop background
+                 colours when printing unless told otherwise). */
+              #certified-profile-printable-area {
+                  --bg-card: #ffffff; --bg-surface: #ffffff; --bg-elevated: #fafafa;
+                  --border-default: #e4e4e7; --border-strong: #d4d4d8;
+                  --text-primary: #18181b; --text-secondary: #52525b; --text-muted: #71717a;
+              }
+              #certified-profile-printable-area, #certified-profile-printable-area * {
+                  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+              }
               @page { size: A4; margin: 1.5cm; }
           }
       `}</style>

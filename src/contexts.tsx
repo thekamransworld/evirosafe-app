@@ -31,6 +31,7 @@ import { sendNotification, notifyRole } from './services/notificationService';
 import { sendInviteEmail } from './services/emailService';
 
 // --- CERTIFICATES ---
+import { cleanAttendance } from './lib/certificates';
 import {
   closeSessionAndIssueCertificates, issueCertificatesForSession, issueCertificateForExistingRecord, revokeCertificate, describeCertificateError,
 } from './services/certificateService';
@@ -449,6 +450,7 @@ interface DataContextType {
   handleCreateOrUpdateCourse: (data: any) => void;
   handleScheduleSession: (data: any) => void;
   handleCloseSession: (id: string, attendance: any) => void;
+  handleSaveSessionAttendance: (sessionId: string, attendance: any) => Promise<boolean>;
   handleIssueSessionCertificates: (sessionId: string) => Promise<boolean>;
   handleIssueCertificate: (recordId: string) => Promise<boolean>;
   handleRevokeCertificate: (recordId: string) => Promise<boolean>;
@@ -1493,7 +1495,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const handleScheduleSession = async (d: any) => {
-        const newSession = { ...d, org_id: activeOrg.id, id: `ts_${Date.now()}`, roster: [] } as any;
+        // status + attendance must exist from the start: the attendance dialog and the
+        // 'Upcoming sessions' count both read them, and a session saved without them crashed.
+        const newSession = { ...d, org_id: activeOrg.id, id: `ts_${Date.now()}`, status: 'scheduled', roster: [], attendance: [] } as any;
         setTrainingSessionList(prev => [newSession, ...prev]);
         try {
             await setDoc(doc(db, 'training_sessions', newSession.id), newSession);
@@ -1502,6 +1506,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error('Failed to schedule session:', e);
             toast.error("Failed to schedule session.");
             setTrainingSessionList(prev => prev.filter(s => s.id !== newSession.id));
+        }
+    };
+
+    // Saves who is on a session (and who attended) WITHOUT finalising it, so the
+    // list can be built up before the training and completed afterwards.
+    const handleSaveSessionAttendance = async (sessionId: string, att: any): Promise<boolean> => {
+        const attendance = cleanAttendance(att);
+        const roster = attendance.map(a => a.user_id);
+        const previous = trainingSessionList.find(s => s.id === sessionId);
+        setTrainingSessionList(prev => prev.map(s => s.id === sessionId ? { ...s, roster, attendance } : s));
+        try {
+            await updateDoc(doc(db, 'training_sessions', sessionId), { roster, attendance });
+            toast.success('Attendance saved.');
+            return true;
+        } catch (e) {
+            console.error('Failed to save attendance:', e);
+            toast.error('Failed to save attendance.');
+            if (previous) setTrainingSessionList(prev => prev.map(s => s.id === sessionId ? previous : s));
+            return false;
         }
     };
 
@@ -1798,7 +1821,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
         handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
-        handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleIssueSessionCertificates, handleIssueCertificate, handleRevokeCertificate,
+        handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleSaveSessionAttendance, handleIssueSessionCertificates, handleIssueCertificate, handleRevokeCertificate,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
         handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical, handleCreateBbsObservation, handleUpdateBbsObservation,
         handleCreateLegalComplianceItem, handleUpdateLegalComplianceItem, handleCreateWasteRecord,

@@ -71,7 +71,7 @@ export const Trainings: React.FC<TrainingsProps> = ({
 
   const stats = useMemo(() => ({
     courses:    courses.length,
-    sessions:   sessions.filter(s => s.status === 'scheduled').length,
+    sessions:   sessions.filter(s => (s.status ?? 'scheduled') === 'scheduled').length,
     expiring:   records.filter(r => { if (r.revoked_at) return false; const d = daysLeft(r.expires_at); return d !== null && d >= 0 && d <= 30; }).length,
     expired:    records.filter(r => { if (r.revoked_at) return false; const d = daysLeft(r.expires_at); return d !== null && d < 0; }).length,
   }), [courses, sessions, records]);
@@ -242,7 +242,7 @@ export const Trainings: React.FC<TrainingsProps> = ({
         <div className="space-y-3">
           {filteredSessions.map(session => {
             const sCfg = SESSION_STATUS[session.status] || SESSION_STATUS.scheduled;
-            const enrolled = session.attendance?.length || 0;
+            const enrolled = session.attendance?.length || session.roster?.length || 0;
             const sessCourse = courses.find(c => c.id === session.course_id);
             return (
               <div key={session.id} className="giq-card p-4 flex items-center gap-4">
