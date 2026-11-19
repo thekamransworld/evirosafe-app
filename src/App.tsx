@@ -44,8 +44,7 @@ import {
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // ── UI primitives ─────────────────────────────────────────────────────────────
-import { ToastProvider }  from './components/ui/Toast';
-import { PtwWorkflowProvider } from './contexts/PtwWorkflowContext';
+import { ToastProvider, useToast } from './components/ui/Toast';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LoginScreen }    from './components/LoginScreen';
 import { ImpersonationBanner } from './components/ImpersonationBanner';
@@ -129,6 +128,8 @@ import { SafetyMeetings }      from './components/meetings/SafetyMeetings';
 // ─────────────────────────────────────────────────────────────────────────────
 import { DragDropDashboard }  from './components/dashboard/DragDropDashboard';
 import { IncidentWizard, PtwWizard } from './components/wizards/GuidedWizards';
+import { wizardToPermitData } from './lib/ptw/payloadApp';
+import { requesterFromUser } from './lib/ptw/payload';
 import DataExportHub          from './components/export/DataExportHub';
 import GdprControls           from './components/settings/GdprControls';
 
@@ -185,7 +186,7 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
 
   const {
     handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
-    handleCreatePtw, handleUpdatePtw,
+    ptwList,
     handleCreatePlan, handlePlanStatusChange, handleUpdatePlan,
     handleCreateRams, handleRamsStatusChange, handleUpdateRams,
     handleCreateTbt, handleUpdateTbt,
@@ -193,6 +194,12 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
     handleCreateStandaloneAction, handleCreateInspection,
     projects, trainingCourseList, checklistTemplates,
   } = useDataContext();
+
+  // The permit on screen is looked up LIVE in the permit list; if it disappears (deleted elsewhere), close it.
+  const livePtw = selectedPtw ? ptwList.find(p => p.id === selectedPtw.id) : undefined;
+  useEffect(() => {
+    if (selectedPtw && ptwList.length > 0 && !livePtw) setSelectedPtw(null);
+  }, [selectedPtw, livePtw, ptwList.length, setSelectedPtw]);
 
   if (!activeUser) return null;
 
@@ -219,15 +226,13 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
       <PtwCreationModal
         isOpen={isPtwCreationModalOpen}
         onClose={() => setIsPtwCreationModalOpen(false)}
-        onSubmit={handleCreatePtw}
         mode={ptwCreationMode}
       />
-      {/* Phase 1 fix B1: PtwDetailModal now receives onUpdate without action string */}
-      {selectedPtw && (
+      {/* The permit is read LIVE from the permit list (kept current by a live listener), never from a snapshot. */}
+      {livePtw && (
         <PtwDetailModal
-          ptw={selectedPtw}
+          ptw={livePtw}
           onClose={() => setSelectedPtw(null)}
-          onUpdate={(ptw) => handleUpdatePtw(ptw)}
         />
       )}
       <PlanCreationModal
@@ -370,7 +375,8 @@ const AppContent: React.FC = () => {
   // Notification unread count (placeholder — wire to NotificationCenter state)
   const [unreadNotifCount] = useState(0);
 
-  const { handleCreateReport, handleCreatePtw } = useDataContext();
+  const { handleCreateReport, handleCreatePtw, ptwActor } = useDataContext();
+  const toast = useToast();
 
   // ── Loading state ────────────────────────────────────────────────────────
   if (authLoading || (currentUser && dataLoading)) {
@@ -719,9 +725,14 @@ const AppContent: React.FC = () => {
       {/* Phase 4: Guided PTW Wizard */}
       {showPtwWizard && (
         <PtwWizard
-          onComplete={(data) => {
-            handleCreatePtw(data);
-            setShowPtwWizard(false);
+          onComplete={async (data) => {
+            // The wizard's flat answers go through the same builder as the form, so one permit shape exists.
+            const me = usersList.find(u => u.id === ptwActor?.id) ?? activeUser;
+            if (!me) { toast.error('Your profile is still loading. Try again in a moment.'); return; }
+            const mapped = wizardToPermitData(data, requesterFromUser(me as any), { now: Date.now() });
+            if (mapped.ok === false) { toast.error(mapped.reason); return; }
+            const r = await handleCreatePtw(mapped.data);
+            if (r.ok === true) { setShowPtwWizard(false); setSelectedPtw(r.permit); }
           }}
           onCancel={() => setShowPtwWizard(false)}
         />
@@ -746,9 +757,7 @@ export default function App() {
               {/* Phase 3: Offline sync wraps everything that needs queueWrite */}
               <OfflineSyncProvider>
                 <ThemeProvider>
-                  <PtwWorkflowProvider>
-                    <AppContent />
-                  </PtwWorkflowProvider>
+                  <AppContent />
                 </ThemeProvider>
               </OfflineSyncProvider>
             </ModalProvider>

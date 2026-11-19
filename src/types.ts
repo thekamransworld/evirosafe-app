@@ -1067,7 +1067,10 @@ export interface TbtSession {
     status: 'draft' | 'scheduled' | 'delivered' | 'closed' | 'archived'; audit_log: AuditLogEntry[];
 }
 
-export interface TrainingCourse { id: string; org_id: string; title: string; category: string; validity_months: number; syllabus: string; learning_objectives: string[]; requires_assessment: boolean; }
+export interface TrainingCourse { id: string; org_id: string; title: string; category: string; validity_months: number; syllabus: string; learning_objectives: string[]; requires_assessment: boolean;
+  /** Competency keys this course proves (see COMPETENCY_KEYS in src/lib/ptw/model.ts). */
+  competencies?: string[];
+}
 export interface TrainingSession { id: string; course_id: string; project_id: string; scheduled_at: string; trainer_id: string; status: 'scheduled' | 'completed' | 'cancelled'; roster: string[]; attendance: { user_id: string; attended: boolean; score?: number; }[]; }
 export interface TrainingRecord {
   id: string; org_id: string; user_id: string; course_id: string; session_id: string;
@@ -1081,7 +1084,7 @@ export interface TrainingRecord {
 }
 
 export type PtwType = 'General Work' | 'Hot Work' | 'Electrical Work' | 'Excavation' | 'Lifting' | 'Work at Height' | 'Confined Space Entry' | 'Night Work' | 'Road Closure' | 'Utility Work' | 'Mechanical Work' | 'Chemical Handling';
-export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED';
+export type PtwStatus = 'DRAFT' | 'SUBMITTED' | 'PRE_SCREEN' | 'SITE_INSPECTION' | 'APPROVAL' | 'ACTIVE' | 'HOLD' | 'COMPLETED' | 'CLOSED' | 'REQUESTED' | 'ISSUER_REVIEW' | 'ISSUER_SIGNED' | 'IV_REVIEW' | 'PENDING_APPROVAL' | 'APPROVER_SIGNED' | 'AUTHORIZATION' | 'HANDOVER_PENDING' | 'SITE_HANDOVER' | 'SUSPENDED' | 'COMPLETION_PENDING' | 'JOINT_INSPECTION' | 'CANCELLED' | 'ARCHIVED' | 'REJECTED' | 'EXPIRED';
 export type PtwCategory = 'standard' | 'high_risk' | 'operational' | 'emergency' | 'urgent';
 export type PtwWorkflowStage = PtwStatus;
 
@@ -1092,15 +1095,34 @@ export interface PtwWorkflowLog {
   timestamp: string;
   comments?: string;
   signoff_type?: string;
+  // Written by the permit engine (src/lib/ptw). Absent on legacy entries.
+  from?: PtwWorkflowStage;
+  user_name?: string;
+  role?: string;
+  override?: boolean;
+  override_items?: string[];
+  justification?: string;
 }
 
 export interface PtwPpe { hard_hat: boolean; safety_shoes: boolean; goggles: boolean; safety_harness: boolean; coverall: boolean; respirator: boolean; safety_gloves: boolean; vest: boolean; other?: string; }
-export interface PtwSafetyRequirement { id: string; text: string; response: 'Yes' | 'No' | 'N/A'; is_critical?: boolean; comment?: string; evidence_urls?: string[]; }
+export interface PtwSafetyRequirement { id: string; text: string; response: 'Yes' | 'No' | 'N/A' | ''; is_critical?: boolean; comment?: string; evidence_urls?: string[]; }
 export interface PtwSignature { signature: string; signed_at: string; }
 export interface PtwSignoff { name: string; designation: string; email: string; mobile: string; remarks: string; signature: string; signed_at: string; }
-export interface PtwStoppage { time: string; reason: string; stopped_by: string; informed_to: string; restarted_time: string; signature: string; }
+export interface PtwStoppage { time: string; reason: string; stopped_by: string; informed_to: string; restarted_time: string; signature: string; stopped_by_id?: string; resumed_by?: string; resume_note?: string; }
 export interface PtwExtension { is_requested: boolean; reason: string; days: { from: string; to: string }; hours: { from: string; to: string }; requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; }
 export interface PtwClosure { note: string; permit_requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; }
+export interface PtwIsolationPoint {
+  id: string; point: string; method: string; lock_no?: string;
+  applied_by?: string; applied_at?: string;
+  verified_by?: string; verified_at?: string;
+  removed_by?: string; removed_at?: string;
+}
+export interface PtwTeamMember {
+  id: string; name: string;
+  role: 'worker' | 'supervisor' | 'standby' | 'rigger' | 'fire_watch' | 'gas_tester' | 'crane_operator';
+  /** Set when the person has an EviroSafe account, so training can be verified. */
+  user_id?: string; company?: string; mobile?: string;
+}
 export interface CanonicalPtwPayload {
     creator_id: string; permit_no: string; category: PtwCategory;
     requester: any; contractor_safety_personnel?: any;
@@ -1110,6 +1132,8 @@ export interface CanonicalPtwPayload {
     joint_inspection?: { remarks: string; requester: PtwSignature; client_proponent: PtwSignature; client_hs: PtwSignature; };
     holding_or_stoppage?: PtwStoppage[]; extension?: PtwExtension; closure?: PtwClosure; attachments?: { name: string; url: string }[]; audit?: AuditLogEntry[];
     global_compliance?: { standards: string[] };
+    isolation?: PtwIsolationPoint[];
+    team?: PtwTeamMember[];
 }
 export interface PtwHotWorkPayload extends CanonicalPtwPayload { fire_watcher: { name: string; mobile: string; }; post_watch_minutes: number; }
 export interface PtwWorkAtHeightPayload extends CanonicalPtwPayload { access_equipment: any; }
@@ -1139,7 +1163,17 @@ export interface PtwUtilityWorkPayload extends CanonicalPtwPayload {}
 export interface PtwGeneralWorkPayload extends CanonicalPtwPayload {}
 
 export type PtwPayload = CanonicalPtwPayload | PtwHotWorkPayload | PtwWorkAtHeightPayload | PtwConfinedSpacePayload | PtwExcavationPayload | PtwRoadClosurePayload | PtwLiftingPayload;
-export interface Ptw { id: string; org_id: string; project_id: string; type: PtwType; status: PtwStatus; title: string; payload: PtwPayload; approvals: any[]; audit_log: AuditLogEntry[]; compliance_level?: 'FULL' | 'PARTIAL' | 'NONE'; updated_at: string; workflow_log?: PtwWorkflowLog[]; }
+export interface Ptw { id: string; org_id: string; project_id: string; type: PtwType; status: PtwStatus; title: string; payload: PtwPayload; approvals: any[]; audit_log: AuditLogEntry[]; compliance_level?: 'FULL' | 'PARTIAL' | 'NONE'; updated_at: string; workflow_log?: PtwWorkflowLog[];
+  // Written by the permit engine / service (src/lib/ptw, src/services/ptwService.ts).
+  permit_no?: string; public_token?: string;
+  creator_id?: string; receiver_id?: string; issuer_id?: string;
+  valid_from?: string; valid_until?: string; first_activated_at?: string;
+  /** Server-stamped twins of the ISO fields above; the database rules check these. */
+  valid_from_ts?: any; valid_until_ts?: any; first_activated_ts?: any;
+  last_transition_at?: any; stage_times?: Record<string, any>;
+  signatures?: Record<string, { user_id: string; name: string; role: string; signed_at: string; action: string }>;
+  extensions?: { at: string; by_id: string; by_name: string; reason: string; from_until: string; to_until: string }[];
+}
 
 export type CertificationLevel = 'Beginner' | 'Competent' | 'Advanced' | 'Expert' | 'Certified Professional';
 export interface Qualification { id: string; title: string; issuer: string; date_obtained: string; expiry_date?: string; verification_status: 'Pending' | 'Verified' | 'Rejected'; attachment_url?: string; }

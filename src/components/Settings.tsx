@@ -156,7 +156,7 @@ export const Settings: React.FC = () => {
           profile: activeUser,
           incident_reports: reportList.filter(r => r.reporter_id === activeUser.id || r.creator_id === activeUser.id),
           training_records: trainingRecordList.filter((t: any) => t.user_id === activeUser.id),
-          permits: ptwList.filter(p => (p as any).issuer_id === activeUser.id || p.payload?.requester?.id === activeUser.id),
+          permits: ptwList.filter(p => (p as any).issuer_id === activeUser.id || p.creator_id === activeUser.id || p.receiver_id === activeUser.id || (p.payload as any)?.requester?.id === activeUser.id),
         },
       };
       const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });

@@ -1,39 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import type { 
-  Ptw, User, PtwSafetyRequirement, PtwLiftingPayload, PtwHotWorkPayload, 
-  PtwConfinedSpacePayload, PtwWorkAtHeightPayload, PtwSignoff, PtwStoppage,
-  PtwWorkflowStage, CanonicalPtwPayload
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type {
+  Ptw, PtwSafetyRequirement, PtwWorkAtHeightPayload, CanonicalPtwPayload, PtwTeamMember, PtwIsolationPoint, User,
 } from '../types';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
-import { useAppContext } from '../contexts';
-import { usePtwWorkflow } from '../contexts/PtwWorkflowContext';
+import { useAppContext, useDataContext } from '../contexts';
 import { WorkAtHeightPermit } from './WorkAtHeightPermit';
-import { useToast } from './ui/Toast';
 import { ActionsBar } from './ui/ActionsBar';
 import { EmailModal } from './ui/EmailModal';
 import { LoadCalculationSection } from './LoadCalculationSection';
-import { GasTestLogSection } from './GasTestLogSection';
 import { PersonnelEntryLogSection } from './PersonnelEntryLogSection';
-import { AlertTriangle, CheckCircle, Clock, XCircle, ArrowRight } from 'lucide-react';
+import { GasTestLogSection } from './ptw/GasTestLogSection';
+import { PermitActionsPanel } from './ptw/PermitActionsPanel';
+import { ValidityBanner } from './ptw/ValidityBanner';
+import { PermitTimeline } from './ptw/PermitTimeline';
+import { ControlsSection } from './ptw/ControlsSection';
+import { TeamEditor } from './ptw/TeamEditor';
+import { IsolationRegister } from './ptw/IsolationRegister';
+import { STAGE_BADGE, fmtDateTime, stageLabel } from './ptw/ptwUi';
+import { useNow } from './ptw/useNow';
+import { APPROVERS, OVERRIDERS, TYPE_RULES, normalizeStage, type PpeKey } from '../lib/ptw/model';
+import { checkContentEdit, type EnginePermit } from '../lib/ptw/engine';
+import { diffPayload, mergeThreeWay } from '../lib/ptw/writes';
+import { effectiveStatus } from '../lib/ptw/validity';
+import { splitLocalInput } from '../lib/ptw/payload';
+import { downloadPermitPdf } from '../lib/ptw/permitPdf';
+import { getPublicBaseUrl } from '../lib/certificates';
 
 interface PtwDetailModalProps {
+  /** The LIVE permit (from the permit list), not a snapshot. */
   ptw: Ptw;
   onClose: () => void;
-  onUpdate: (ptw: Ptw, action?: string) => void;
+  /** Which section to open first (defaults to General Information). */
+  initialSection?: SectionKey;
 }
 
-type SectionKey = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII' | 'VIII' | 'IX';
-const sections: { key: SectionKey, title: string }[] = [
-    { key: 'I', title: 'General Information'},
-    { key: 'II', title: 'Safety Requirement'},
-    { key: 'III', title: 'Permit Requester'},
-    { key: 'IV', title: 'Client Proponent'},
-    { key: 'V', title: 'Client HSE Dept'},
-    { key: 'VI', title: 'Joint Site Inspection'},
-    { key: 'VII', title: 'Holding/Stoppage'},
-    { key: 'VIII', title: 'Extension'},
-    { key: 'IX', title: 'Permit Closure'},
+export type SectionKey = 'I' | 'II' | 'III' | 'IV' | 'V' | 'VI' | 'VII' | 'VIII' | 'IX' | 'X' | 'XI';
+const sections: { key: SectionKey; title: string }[] = [
+  { key: 'I', title: 'General Information' },
+  { key: 'II', title: 'Safety Requirement' },
+  { key: 'III', title: 'Permit Requester' },
+  { key: 'IV', title: 'Client Proponent' },
+  { key: 'V', title: 'Client HSE Dept' },
+  { key: 'VI', title: 'Joint Site Inspection' },
+  { key: 'VII', title: 'Holding/Stoppage' },
+  { key: 'VIII', title: 'Extensions' },
+  { key: 'IX', title: 'Permit Closure' },
+  { key: 'X', title: 'Controls & Checks' },
+  { key: 'XI', title: 'Activity Log' },
 ];
 
 // --- HELPER COMPONENTS ---
@@ -44,199 +58,98 @@ const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const FormInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, type?: string, required?: boolean, disabled?: boolean }> = ({ label, value, onChange, type = 'text', required = false, disabled = false }) => (
-    <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
-        <input
-            type={type}
-            value={value || ''}
-            onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-            required={required}
-            disabled={disabled}
-        />
-    </div>
+const fieldCls = 'mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md bg-white dark:bg-dark-background text-gray-900 dark:text-gray-100 text-sm disabled:opacity-60 disabled:cursor-not-allowed';
+
+const FormInput: React.FC<{ label: string; value: any; onChange: (val: any) => void; type?: string; required?: boolean; disabled?: boolean; placeholder?: string }> =
+  ({ label, value, onChange, type = 'text', required = false, disabled = false, placeholder }) => (
+    <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">
+      {label}{required && <span className="text-red-500"> *</span>}
+      <input type={type} value={value ?? ''} onChange={e => onChange(e.target.value)} className={fieldCls} required={required} disabled={disabled} placeholder={placeholder} />
+    </label>
+  );
+
+const SignatureInput: React.FC<{ label: string; value: any; onChange: (val: any) => void; disabled?: boolean }> = ({ label, value, onChange, disabled = false }) => (
+  <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">
+    {label}
+    <input type="text" value={value ?? ''} onChange={e => onChange(e.target.value)} disabled={disabled}
+      className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-200 disabled:opacity-60"
+      placeholder="Type name (record only)" />
+  </label>
 );
 
-const SignatureInput: React.FC<{ label: string, value: any, onChange: (val: any) => void, disabled?: boolean }> = ({ label, value, onChange, disabled = false }) => (
-    <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">{label}</label>
-        <input
-            type="text"
-            value={value || ''}
-            onChange={e => onChange(e.target.value)}
-            className="mt-1 w-full p-2 border border-gray-300 dark:border-dark-border rounded-md font-serif text-lg bg-white dark:bg-dark-background text-blue-800 dark:text-blue-200 disabled:opacity-60"
-            placeholder={disabled ? "Signed" : "Type name to sign"}
-            disabled={disabled}
-        />
-    </div>
+const InfoField: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div className="border-b py-2 dark:border-dark-border">
+    <span className="font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
+    <span className="ml-2 text-gray-800 dark:text-gray-200">{value}</span>
+  </div>
 );
 
-const InfoField: React.FC<{label: string, value: React.ReactNode}> = ({label, value}) => (
-    <div className="border-b py-2 dark:border-dark-border">
-        <span className="font-semibold text-gray-600 dark:text-gray-400">{label}:</span>
-        <span className="ml-2 text-gray-800 dark:text-gray-200">{value}</span>
-    </div>
+/** Typed names are a RECORD of what was agreed with the client, not a system signature. */
+const ExternalNote: React.FC = () => (
+  <p className="text-xs rounded border border-dashed border-gray-300 dark:border-dark-border text-gray-600 dark:text-gray-400 px-3 py-2 mb-4" data-testid="external-note">
+    <strong>External record.</strong> Names typed here record what was agreed on site with the client. They are not system signatures.
+    The signed-in person who carried out each step, and when, is recorded in the Activity log.
+  </p>
 );
 
-const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChange: (value: PtwSafetyRequirement) => void; disabled: boolean }> = ({ index, item, onChange, disabled }) => (
-    <tr className={`border-b dark:border-dark-border ${disabled ? '' : 'hover:bg-gray-50 dark:hover:bg-dark-background'}`}>
-        <td className="p-2 w-8 text-center text-gray-600 dark:text-gray-400">{index}</td>
-        <td className="p-2 text-gray-900 dark:text-gray-200">{item.text}</td>
-        <td className="p-2 w-16 text-center"><input type="radio" checked={item.response === 'Yes'} onChange={() => onChange({ ...item, response: 'Yes' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
-        <td className="p-2 w-16 text-center"><input type="radio" checked={item.response === 'No'} onChange={() => onChange({ ...item, response: 'No' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
-        <td className="p-2 w-16 text-center"><input type="radio" checked={item.response === 'N/A'} onChange={() => onChange({ ...item, response: 'N/A' })} disabled={disabled} className="w-4 h-4 text-blue-600" /></td>
+const ChecklistRow: React.FC<{ index: number; item: PtwSafetyRequirement; onChange: (value: PtwSafetyRequirement) => void; disabled: boolean }> = ({ index, item, onChange, disabled }) => {
+  const unanswered = !item.response;
+  return (
+    <tr className={`border-b dark:border-dark-border ${disabled ? '' : 'hover:bg-gray-50 dark:hover:bg-dark-background'} ${unanswered && !disabled ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
+      <td className="p-2 w-8 text-center text-gray-600 dark:text-gray-400">{index}</td>
+      <td className="p-2 text-gray-900 dark:text-gray-200">{item.text}{item.is_critical && <span className="ml-2 text-[10px] font-bold text-red-600 uppercase">critical</span>}</td>
+      {(['Yes', 'No', 'N/A'] as const).map(v => (
+        <td key={v} className="p-2 w-16 text-center">
+          <input type="radio" name={`chk-${item.id}`} aria-label={`${item.text}: ${v}`} checked={item.response === v} onChange={() => onChange({ ...item, response: v })} disabled={disabled} className="w-4 h-4 text-blue-600" />
+        </td>
+      ))}
     </tr>
-);
-
-// --- WORKFLOW ACTIONS ---
-const WorkflowActions: React.FC<{ ptw: Ptw, onUpdate: (ptw: Ptw) => void }> = ({ ptw, onUpdate }) => {
-    const { activeUser } = useAppContext();
-    const { getNextPossibleStages, validateUserPermission, moveToNextStage, getStageResponsibilities } = usePtwWorkflow();
-    const [comment, setComment] = useState('');
-    const [showComment, setShowComment] = useState(false);
-    const [targetStage, setTargetStage] = useState<PtwWorkflowStage | null>(null);
-    const toast = useToast();
-
-    if (!activeUser) return null;
-
-    const nextStages = getNextPossibleStages(ptw);
-    const responsibilities = getStageResponsibilities(ptw.status);
-
-    const handleTransition = (stage: PtwWorkflowStage) => {
-        const permission = validateUserPermission(ptw, activeUser.id, activeUser.role);
-        if (!permission) {
-            toast.error("You do not have permission to perform this action.");
-            return;
-        }
-
-        if ((stage === 'REJECTED' || stage === 'SUSPENDED') && !showComment) {
-            setTargetStage(stage);
-            setShowComment(true);
-            return;
-        }
-
-        const updatedPtw = moveToNextStage(ptw, activeUser.id, comment);
-        if (updatedPtw) {
-            onUpdate(updatedPtw);
-            toast.success(`Permit moved to ${stage}`);
-            setShowComment(false);
-            setComment('');
-        }
-    };
-
-    const getActionColor = (stage: string) => {
-        if (['REJECTED', 'CANCELLED', 'SUSPENDED'].includes(stage)) return 'danger';
-        if (['ACTIVE', 'COMPLETED', 'CLOSED'].includes(stage)) return 'primary';
-        return 'secondary';
-    };
-
-    return (
-        <div className="flex flex-col gap-4 w-full">
-            {responsibilities.length > 0 && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200">
-                    <strong>Current Stage Requirements:</strong>
-                    <ul className="list-disc list-inside mt-1">
-                        {responsibilities.map((r, i) => <li key={i}>{r}</li>)}
-                    </ul>
-                </div>
-            )}
-
-            {showComment && (
-                <div className="flex gap-2 animate-fade-in">
-                    <input 
-                        type="text" 
-                        value={comment} 
-                        onChange={e => setComment(e.target.value)}
-                        placeholder="Reason for this action..."
-                        className="flex-1 p-2 border rounded text-sm dark:bg-gray-800 dark:border-gray-700 dark:text-white"
-                    />
-                    <Button size="sm" onClick={() => targetStage && handleTransition(targetStage)}>Confirm</Button>
-                    <Button size="sm" variant="ghost" onClick={() => setShowComment(false)}>Cancel</Button>
-                </div>
-            )}
-
-            <div className="flex flex-wrap justify-end gap-2">
-                {nextStages.map(stage => (
-                    <Button 
-                        key={stage} 
-                        variant={getActionColor(stage)}
-                        onClick={() => handleTransition(stage)}
-                    >
-                        {stage.replace('_', ' ')}
-                    </Button>
-                ))}
-                {nextStages.length === 0 && (
-                    <span className="text-sm text-gray-500 italic">No further actions available</span>
-                )}
-            </div>
-        </div>
-    );
+  );
 };
 
 // --- DATA SAFETY NET ---
-// Existing PTW records in Firestore may not always have every nested field
-// populated (older test data, manually-entered records, partial writes).
-// This normalizer guarantees every field this modal reads is always present
-// with a safe default, so opening ANY permit — regardless of its actual
-// stored shape — can never crash the UI.
-function normalizePayload(payload: any): CanonicalPtwPayload {
+// Saved permits may lack some nested fields (older data, partial writes). This guarantees every
+// field the modal reads exists, WITHOUT dropping fields it does not know about (team, isolation,
+// wizard notes, external reference...): the whole saved payload is spread first.
+export function normalizePayload(payload: any, type?: string): CanonicalPtwPayload {
   const p = payload ?? {};
   return {
+    ...p,
     creator_id: p.creator_id ?? '',
     permit_no: p.permit_no ?? '',
     category: p.category ?? 'standard',
-    requester: {
-      name: '', email: '', mobile: '', designation: '', contractor: '', signature: '',
-      ...(p.requester ?? {}),
-    },
-    contractor_safety_personnel: p.contractor_safety_personnel ?? undefined,
+    requester: { name: '', email: '', mobile: '', designation: '', contractor: '', signature: '', ...(p.requester ?? {}) },
     work: {
-      location: '', description: '', number_of_workers: undefined, associated_permits: [],
-      risk_assessment_ref: '', emergency_contact: '',
+      location: '', description: '', number_of_workers: undefined, associated_permits: [], risk_assessment_ref: '', emergency_contact: '',
       ...(p.work ?? {}),
-      coverage: {
-        start_date: '', end_date: '', start_time: '', end_time: '',
-        ...(p.work?.coverage ?? {}),
-      },
+      coverage: { start_date: '', end_date: '', start_time: '', end_time: '', ...(p.work?.coverage ?? {}) },
     },
     safety_requirements: Array.isArray(p.safety_requirements) ? p.safety_requirements : [],
-    ppe: {
-      hard_hat: false, safety_shoes: false, safety_harness: false, goggles: false,
-      coverall: false, respirator: false, safety_gloves: false, vest: false,
-      ...(p.ppe ?? {}),
-    },
+    ppe: { hard_hat: false, safety_shoes: false, safety_harness: false, goggles: false, coverall: false, respirator: false, safety_gloves: false, vest: false, ...(p.ppe ?? {}) },
     signoffs: {
       client_proponent: { name: '', designation: '', signature: '', ...(p.signoffs?.client_proponent ?? {}) },
       other_stakeholders: Array.isArray(p.signoffs?.other_stakeholders) ? p.signoffs.other_stakeholders : [],
       client_hs: { name: '', designation: '', signature: '', ...(p.signoffs?.client_hs ?? {}) },
-    } as any,
+    },
     joint_inspection: {
       remarks: p.joint_inspection?.remarks ?? '',
       requester: { signature: '', ...(p.joint_inspection?.requester ?? {}) },
       client_proponent: { signature: '', ...(p.joint_inspection?.client_proponent ?? {}) },
       client_hs: { signature: '', ...(p.joint_inspection?.client_hs ?? {}) },
-    } as any,
+    },
     holding_or_stoppage: Array.isArray(p.holding_or_stoppage) ? p.holding_or_stoppage : [],
-    extension: {
-      reason: p.extension?.reason ?? '',
-      days: { from: '', ...(p.extension?.days ?? {}) },
-      hours: { to: '', ...(p.extension?.hours ?? {}) },
-      requester: { signature: '', ...(p.extension?.requester ?? {}) },
-      client_proponent: { signature: '', ...(p.extension?.client_proponent ?? {}) },
-      client_hs: { signature: '', ...(p.extension?.client_hs ?? {}) },
-    } as any,
+    extension: p.extension ?? {},
     closure: {
       note: p.closure?.note ?? '',
       permit_requester: { signature: '', ...(p.closure?.permit_requester ?? {}) },
       client_proponent: { signature: '', ...(p.closure?.client_proponent ?? {}) },
       client_hs: { signature: '', ...(p.closure?.client_hs ?? {}) },
-    } as any,
+    },
     attachments: Array.isArray(p.attachments) ? p.attachments : [],
     audit: Array.isArray(p.audit) ? p.audit : [],
     global_compliance: p.global_compliance ?? { standards: [] },
-    // Type-specific fields — always default so child sections never crash
-    // regardless of which permit type is open.
+    team: Array.isArray(p.team) ? p.team : [],
+    isolation: Array.isArray(p.isolation) ? p.isolation : [],
     fire_watcher: p.fire_watcher ?? { name: '', mobile: '' },
     post_watch_minutes: p.post_watch_minutes ?? 30,
     access_equipment: p.access_equipment ?? {},
@@ -245,360 +158,425 @@ function normalizePayload(payload: any): CanonicalPtwPayload {
     soil_type: p.soil_type ?? 'A',
     cave_in_protection: Array.isArray(p.cave_in_protection) ? p.cave_in_protection : [],
     closure_type: p.closure_type ?? 'partial',
-    load_calculation: p.load_calculation ?? { load_weight: 0, crane_capacity: 0, utilization_percent: 0 },
+    load_calculation: p.load_calculation ?? (type === 'Lifting' ? { lift_plan_ref: '', crane_certification_no: '', operator_certification_no: '', hook_rigging_weight: '', load_weight: '', total_weight: '', crane_capacity_at_radius: '', utilization_percent: '' } : {}),
   } as any;
 }
 
-function normalizePtw(ptw: Ptw): Ptw {
-  if (!ptw) return ptw;
-  return {
-    ...ptw,
-    status: ptw.status ?? 'DRAFT',
-    type: ptw.type ?? 'General Work',
-    payload: normalizePayload(ptw.payload),
-  } as Ptw;
-}
+const PPE_LABELS: Record<PpeKey, string> = {
+  hard_hat: 'Hard hat', safety_shoes: 'Safety shoes', goggles: 'Safety goggles', safety_harness: 'Safety harness',
+  coverall: 'Coverall', respirator: 'Respirator', safety_gloves: 'Safety gloves', vest: 'Hi-vis vest',
+};
 
 // --- MAIN COMPONENT ---
-export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, onUpdate }) => {
-  const [formData, setFormData] = useState<Ptw>(normalizePtw(JSON.parse(JSON.stringify(ptw))));
-  const [activeSection, setActiveSection] = useState<SectionKey>('I');
-  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
-  const [stoppageFormData, setStoppageFormData] = useState<Partial<PtwStoppage>>({ reason: '', stopped_by: '', informed_to: '' });
-  
-  // Editability Flags
-  const isEditable = formData.status === 'DRAFT' || formData.status === 'REQUESTED';
-  const isProponentEditable = formData.status === 'ISSUER_REVIEW' || formData.status === 'SUBMITTED';
-  const isHseEditable = formData.status === 'PRE_SCREEN' || formData.status === 'APPROVAL';
-  const isInspectionEditable = formData.status === 'SITE_INSPECTION' || formData.status === 'JOINT_INSPECTION';
-  const isStoppageEditable = formData.status === 'ACTIVE';
-  const isExtensionEditable = formData.status === 'ACTIVE';
-  const isClosureEditable = formData.status === 'COMPLETED' || formData.status === 'CLOSED';
+export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, initialSection = 'I' }) => {
+  const { usersList, impersonatedUser, activeOrg } = useAppContext();
+  const { ptwActor, handlePtwTransition, handleUpdatePtw, handleDeletePtw, getPtwGateInputs, projects } = useDataContext();
+  const now = useNow(15_000);
 
+  const [activeSection, setActiveSection] = useState<SectionKey>(initialSection);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [pdfState, setPdfState] = useState<'idle' | 'busy' | 'error'>('idle');
+
+  // What the form is compared with: the saved permit as last loaded.
+  const baseRef = useRef({ payload: normalizePayload(ptw.payload, ptw.type), title: ptw.title ?? '', receiver_id: ptw.receiver_id ?? '' });
+  const [form, setForm] = useState(() => ({ payload: baseRef.current.payload as any, title: baseRef.current.title, receiver_id: baseRef.current.receiver_id }));
+
+  // The permit is live: when it changes elsewhere, take the new saved version but KEEP anything the person has edited.
   useEffect(() => {
-      setFormData(normalizePtw(JSON.parse(JSON.stringify(ptw))));
+    const remote = { payload: normalizePayload(ptw.payload, ptw.type) as any, title: ptw.title ?? '', receiver_id: ptw.receiver_id ?? '' };
+    const base = baseRef.current;
+    setForm(prev => {
+      return {
+        payload: mergeThreeWay(base.payload, prev.payload, remote.payload),
+        title: prev.title !== base.title ? prev.title : remote.title,
+        receiver_id: prev.receiver_id !== base.receiver_id ? prev.receiver_id : remote.receiver_id,
+      };
+    });
+    baseRef.current = remote;
   }, [ptw]);
 
-  const handlePayloadChange = (path: string, value: any) => {
-    setFormData(prev => {
-        const keys = path.split('.');
-        const newPayload = JSON.parse(JSON.stringify(prev.payload));
-        let current: any = newPayload;
-        for (let i = 0; i < keys.length - 1; i++) {
-            if (!current[keys[i]]) current[keys[i]] = {};
-            current = current[keys[i]];
-        }
-        current[keys[keys.length - 1]] = value;
-        return { ...prev, payload: newPayload };
+  const p = ptw as unknown as EnginePermit;
+  const stage = normalizeStage(ptw.status);
+  const shown = effectiveStatus(p, now) ?? stage;
+  const isLegacy = !ptw.permit_no;
+  const isDraft = stage === 'DRAFT';
+  const edit = ptwActor ? checkContentEdit(p, ptwActor) : ({ ok: false, reason: 'Your profile is still loading.' } as const);
+  const canEdit = edit.ok === true;
+  const draftFields = canEdit && isDraft;                        // details, checklist, PPE, team, type-specific inputs
+  const siteRecords = canEdit && !isDraft;                       // gas tests, entry log, isolation stamps, external records
+  const rule = TYPE_RULES[ptw.type as keyof typeof TYPE_RULES];
+  const gateInputs = getPtwGateInputs(ptw);
+
+  const dirty = useMemo(() => {
+    const changed = Object.keys(diffPayload(baseRef.current.payload, form.payload, true)).length > 0;
+    return changed || form.title !== baseRef.current.title || form.receiver_id !== baseRef.current.receiver_id;
+  }, [form, ptw]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setPayload = (path: string, value: any) => {
+    setForm(prev => {
+      const next = JSON.parse(JSON.stringify(prev.payload));
+      const keys = path.split('.');
+      let cur: any = next;
+      for (let i = 0; i < keys.length - 1; i++) { if (!cur[keys[i]]) cur[keys[i]] = {}; cur = cur[keys[i]]; }
+      cur[keys[keys.length - 1]] = value;
+      return { ...prev, payload: next };
     });
   };
+  const handleChecklistChange = (updated: PtwSafetyRequirement) =>
+    setPayload('safety_requirements', (form.payload.safety_requirements || []).map((i: PtwSafetyRequirement) => (i.id === updated.id ? updated : i)));
 
-  const handleChecklistChange = (updatedItem: PtwSafetyRequirement) => {
-      setFormData(prev => {
-          const newSafetyRequirements = (prev.payload?.safety_requirements || []).map(item => 
-              item.id === updatedItem.id ? updatedItem : item
-          );
-          return { ...prev, payload: { ...prev.payload, safety_requirements: newSafetyRequirements } } as Ptw;
+  const save = async () => {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      await handleUpdatePtw(
+        ptw.id,
+        { payload: form.payload, title: form.title, ...(form.receiver_id !== baseRef.current.receiver_id ? { receiver_id: form.receiver_id } : {}) },
+        baseRef.current.payload as any,
+      );
+    } finally { setSaving(false); }
+  };
+  const discard = () => setForm({ payload: baseRef.current.payload as any, title: baseRef.current.title, receiver_id: baseRef.current.receiver_id });
+
+  const canDelete = !!ptwActor && (isLegacy
+    ? (OVERRIDERS as readonly string[]).includes(ptwActor.role)
+    : isDraft && (ptwActor.id === ptw.creator_id || (APPROVERS as readonly string[]).includes(ptwActor.role)));
+  const remove = async () => {
+    if (!window.confirm(isLegacy ? 'Delete this old permit permanently?' : 'Delete this draft permit permanently?')) return;
+    await handleDeletePtw(ptw.id);
+    onClose();
+  };
+
+  const projectName = projects?.find(x => x.id === ptw.project_id)?.name || ptw.project_id;
+
+  // The formal PDF (with a QR to the public status page) replaces printing this window.
+  const downloadPdf = async () => {
+    if (pdfState === 'busy') return;
+    setPdfState('busy');
+    try {
+      await downloadPermitPdf({
+        permit: ptw, orgName: activeOrg?.name ?? '', projectName, baseUrl: getPublicBaseUrl(), now: Date.now(),
+        users: (usersList ?? []).map((u: User) => ({ id: u.id, name: u.name })),
       });
-  }
-
-  const handleLogStoppage = () => {
-    const newStoppage: PtwStoppage = {
-        ...stoppageFormData,
-        time: new Date().toISOString(),
-        restarted_time: '',
-        signature: '',
-    } as PtwStoppage;
-
-    const updatedFormData = {
-        ...formData,
-        payload: {
-            ...formData.payload,
-            holding_or_stoppage: [...(formData.payload?.holding_or_stoppage || []), newStoppage]
-        }
-    };
-    setFormData(updatedFormData);
-    onUpdate(updatedFormData, 'SUSPENDED'); // Trigger workflow update
-    setStoppageFormData({ reason: '', stopped_by: '', informed_to: '' });
+      setPdfState('idle');
+    } catch (e) {
+      console.error('Permit PDF failed:', e);
+      setPdfState('error');
+    }
   };
-
-  const handleResumeWork = (signature: string, index: number) => {
-      const updatedFormData = { ...formData };
-      if (updatedFormData.payload.holding_or_stoppage && updatedFormData.payload.holding_or_stoppage[index]) {
-          updatedFormData.payload.holding_or_stoppage[index].restarted_time = new Date().toISOString();
-          updatedFormData.payload.holding_or_stoppage[index].signature = signature;
-      }
-      setFormData(updatedFormData);
-      onUpdate(updatedFormData, 'ACTIVE'); // Trigger workflow update
-  };
+  const receivers: User[] = useMemo(
+    () => (usersList || []).filter(u => u.role !== 'CLIENT_VIEWER' && (!u.status || u.status === 'active') && (u.project_ids?.includes(ptw.project_id) || u.role === 'ADMIN' || u.role === 'ORG_ADMIN')),
+    [usersList, ptw.project_id],
+  );
+  const payload = form.payload;
+  const cov = payload.work?.coverage ?? {};
+  const savedGas = Array.isArray((ptw.payload as any)?.gas_tests) ? (ptw.payload as any).gas_tests.length : 0;
+  const savedEntries = Array.isArray((ptw.payload as any)?.entry_log) ? (ptw.payload as any).entry_log.length : 0;
+  const stoppages = Array.isArray(ptw.payload?.holding_or_stoppage) ? ptw.payload.holding_or_stoppage : [];
+  const extensions = ptw.extensions ?? [];
+  const isoNeeded = !!rule?.isolation;
 
   const renderSectionContent = () => {
-    switch(activeSection) {
-        case 'I':
-            return (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InfoField label="Permit Type" value={formData.type} />
-                        <InfoField label="Permit Status" value={<Badge color="blue">{(formData.status || '').replace('_', ' ')}</Badge>} />
-                        <InfoField label="Permit Number" value={formData.payload?.permit_no || 'Draft'} />
-                        <InfoField label="Project" value={formData.project_id} />
-                        <InfoField label="Work Location" value={formData.payload?.work?.location || 'Not specified'} />
-                        <InfoField label="Number of Workers" value={formData.payload?.work?.number_of_workers || 'Not specified'} />
-                    </div>
-                    <div className="mt-4">
-                        <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Work Description</h4>
-                        <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded">{formData.payload?.work?.description || 'No description provided.'}</p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                        <InfoField label="Start Time" value={formData.payload?.work?.coverage ? `${formData.payload.work.coverage.start_date || ''} ${formData.payload.work.coverage.start_time || ''}`.trim() || 'Not set' : 'Not set'} />
-                        <InfoField label="End Time" value={formData.payload?.work?.coverage ? `${formData.payload.work.coverage.end_date || ''} ${formData.payload.work.coverage.end_time || ''}`.trim() || 'Not set' : 'Not set'} />
-                    </div>
+    switch (activeSection) {
+      case 'I':
+        return (
+          <div className="space-y-4">
+            {draftFields ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2"><FormInput label="Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} required /></div>
+                <FormInput label="Work location" value={payload.work.location} onChange={v => setPayload('work.location', v)} required />
+                <FormInput label="Number of workers" type="number" value={payload.work.number_of_workers} onChange={v => setPayload('work.number_of_workers', v === '' ? undefined : Number(v))} required />
+                <FormInput label="Emergency contact (name and phone)" value={payload.work.emergency_contact} onChange={v => setPayload('work.emergency_contact', v)} required />
+                <FormInput label={`Risk assessment / method statement ref.${rule?.rams ? '' : ' (optional)'}`} value={payload.work.risk_assessment_ref} onChange={v => setPayload('work.risk_assessment_ref', v)} required={!!rule?.rams} />
+                <div className="md:col-span-2">
+                  <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm">Work description <span className="text-red-500">*</span></label>
+                  <textarea rows={3} className={fieldCls} value={payload.work.description} onChange={e => setPayload('work.description', e.target.value)} />
                 </div>
-            );
-            
-        case 'II':
-            return (
-                <div className="space-y-6">
-                    {formData.type === 'Lifting' && formData.payload && 'load_calculation' in formData.payload && (formData.payload as any).load_calculation && (
-                        <LoadCalculationSection 
-                            loadCalc={formData.payload.load_calculation as any}
-                            onChange={(calc) => handlePayloadChange('load_calculation', calc)}
-                            disabled={!isEditable}
-                        />
-                    )}
-                    {formData.type === 'Confined Space Entry' && formData.payload && 'gas_tests' in formData.payload && (formData.payload as any).gas_tests && (
-                        <GasTestLogSection 
-                            gasTests={formData.payload.gas_tests}
-                            onChange={(tests) => handlePayloadChange('gas_tests', tests)}
-                            disabled={!isEditable}
-                        />
-                    )}
-                    {formData.type === 'Confined Space Entry' && formData.payload && 'entry_log' in formData.payload && (formData.payload as any).entry_log && (
-                        <PersonnelEntryLogSection 
-                            entries={formData.payload.entry_log}
-                            onChange={(entries) => handlePayloadChange('entry_log', entries)}
-                            disabled={!isEditable}
-                        />
-                    )}
-                    {formData.type === 'Work at Height' && formData.payload && 'access_equipment' in formData.payload && (formData.payload as any).access_equipment && (
-                        <WorkAtHeightPermit 
-                            payload={formData.payload as PtwWorkAtHeightPayload}
-                            onChange={(updatedPayload) => setFormData(prev => ({ ...prev, payload: updatedPayload } as Ptw))}
-                            readOnly={!isEditable}
-                        />
-                    )}
-                    <div className="border rounded-lg overflow-hidden">
-                        <div className="bg-gray-100 dark:bg-gray-800 p-3 border-b">
-                            <h4 className="font-bold text-gray-800 dark:text-gray-200">Safety Requirements Checklist</h4>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-gray-50 dark:bg-gray-900">
-                                    <tr className="border-b dark:border-dark-border text-gray-700 dark:text-gray-300">
-                                        <th className="p-3 w-8">#</th>
-                                        <th className="p-3 text-left">Requirement</th>
-                                        <th className="p-3 w-16 text-center">Yes</th>
-                                        <th className="p-3 w-16 text-center">No</th>
-                                        <th className="p-3 w-16 text-center">N/A</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(formData.payload?.safety_requirements || []).map((item, index) => (
-                                        <ChecklistRow key={item.id} index={index + 1} item={item} onChange={handleChecklistChange} disabled={!isEditable} />
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <FormInput label="Start (local time)" type="datetime-local" value={cov.start_date && cov.start_time ? `${cov.start_date}T${cov.start_time}` : ''}
+                  onChange={v => { const s = splitLocalInput(v); setPayload('work.coverage', { ...cov, start_date: s.date, start_time: s.time }); }} required />
+                <FormInput label="End (local time)" type="datetime-local" value={cov.end_date && cov.end_time ? `${cov.end_date}T${cov.end_time}` : ''}
+                  onChange={v => { const s = splitLocalInput(v); setPayload('work.coverage', { ...cov, end_date: s.date, end_time: s.time }); }} required />
+                <label className="block font-medium text-gray-700 dark:text-gray-300 text-sm md:col-span-2">Receiver (person who will accept the handover on site)
+                  <select className={fieldCls} value={form.receiver_id} onChange={e => setForm(f => ({ ...f, receiver_id: e.target.value }))}>
+                    <option value="">Same as requester</option>
+                    {receivers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </label>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InfoField label="Permit number" value={ptw.permit_no || 'Legacy permit (no number)'} />
+                  <InfoField label="Permit type" value={ptw.type} />
+                  <InfoField label="Status" value={<Badge color={STAGE_BADGE[(shown ?? 'DRAFT')]}>{stageLabel(shown, ptw.status)}</Badge>} />
+                  <InfoField label="Project" value={projectName} />
+                  <InfoField label="Work location" value={payload.work.location || 'Not specified'} />
+                  <InfoField label="Number of workers" value={payload.work.number_of_workers || 'Not specified'} />
+                  <InfoField label="Emergency contact" value={payload.work.emergency_contact || 'Not specified'} />
+                  <InfoField label="Risk assessment ref." value={payload.work.risk_assessment_ref || 'Not specified'} />
+                  {payload.external_ref && <InfoField label="Paper permit ref." value={payload.external_ref} />}
+                  <InfoField label="Receiver" value={usersList?.find(u => u.id === ptw.receiver_id)?.name || 'Same as requester'} />
                 </div>
-            );
-            
-        case 'III':
-            return (
-                <div className="space-y-6">
-                    <div className="border rounded-lg p-4">
-                        <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section III — Permit Requester Confirmation</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <FormInput label="Permit Holder Name" value={formData.payload?.requester?.name || ''} onChange={val => handlePayloadChange('requester.name', val)} required disabled={!isEditable} />
-                            <FormInput label="Designation" value={formData.payload?.requester?.designation || ''} onChange={val => handlePayloadChange('requester.designation', val)} required disabled={!isEditable} />
-                            <FormInput label="Contractor Company" value={formData.payload?.requester?.contractor || ''} onChange={val => handlePayloadChange('requester.contractor', val)} required disabled={!isEditable} />
-                            <div className="md:col-span-2">
-                                <SignatureInput label="Signature" value={formData.payload?.requester?.signature || ''} onChange={val => handlePayloadChange('requester.signature', val)} disabled={!isEditable} />
-                            </div>
-                        </div>
-                    </div>
+                <div className="mt-4">
+                  <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Work description</h4>
+                  <p className="text-gray-700 dark:text-gray-300 p-3 bg-gray-50 dark:bg-gray-900/30 rounded whitespace-pre-wrap">{payload.work.description || 'No description.'}</p>
                 </div>
-            );
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <InfoField label="Requested start" value={cov.start_date ? `${cov.start_date} ${cov.start_time || ''}` : 'Not set'} />
+                  <InfoField label="Requested end" value={cov.end_date ? `${cov.end_date} ${cov.end_time || ''}` : 'Not set'} />
+                </div>
+              </>
+            )}
+            {payload.wizard && (
+              <div className="rounded-lg border dark:border-dark-border p-3 text-sm">
+                <h4 className="font-bold mb-1 text-gray-800 dark:text-gray-200">From the guided permit</h4>
+                {payload.wizard.hazards?.length > 0 && <p><strong>Hazards:</strong> {payload.wizard.hazards.join('; ')}</p>}
+                {payload.wizard.controls?.length > 0 && <p><strong>Controls:</strong> {payload.wizard.controls.join('; ')}</p>}
+                {payload.wizard.rescue_plan && <p><strong>Rescue plan:</strong> {payload.wizard.rescue_plan}</p>}
+                {payload.wizard.receiver_name && <p><strong>Receiver:</strong> {payload.wizard.receiver_name}{payload.wizard.receiver_company ? `, ${payload.wizard.receiver_company}` : ''}</p>}
+              </div>
+            )}
+          </div>
+        );
 
-        case 'IV':
-             return (
-                <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section IV – Client Proponent / Stakeholder</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="Name" value={formData.payload?.signoffs?.client_proponent?.name || ''} onChange={val => handlePayloadChange('signoffs.client_proponent.name', val)} disabled={!isProponentEditable} />
-                        <FormInput label="Designation" value={formData.payload?.signoffs?.client_proponent?.designation || ''} onChange={val => handlePayloadChange('signoffs.client_proponent.designation', val)} disabled={!isProponentEditable} />
-                        <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload?.signoffs?.client_proponent?.signature || ''} onChange={val => handlePayloadChange('signoffs.client_proponent.signature', val)} disabled={!isProponentEditable} />
-                        </div>
-                    </div>
+      case 'II':
+        return (
+          <div className="space-y-6">
+            {ptw.type === 'Hot Work' && (
+              <div className="border rounded-lg p-4 dark:border-dark-border">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-3">Fire watch</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormInput label="Fire watcher name" value={payload.fire_watcher?.name} onChange={v => setPayload('fire_watcher.name', v)} disabled={!draftFields} required />
+                  <FormInput label="Fire watcher mobile" value={payload.fire_watcher?.mobile} onChange={v => setPayload('fire_watcher.mobile', v)} disabled={!draftFields} />
+                  <FormInput label="Post-work watch (minutes, at least 30)" type="number" value={payload.post_watch_minutes} onChange={v => setPayload('post_watch_minutes', v === '' ? '' : Number(v))} disabled={!draftFields} required />
                 </div>
-            );
+              </div>
+            )}
+            {ptw.type === 'Lifting' && payload.load_calculation && (
+              <LoadCalculationSection loadCalc={payload.load_calculation as any} onChange={calc => setPayload('load_calculation', calc)} disabled={!draftFields} />
+            )}
+            {ptw.type === 'Confined Space Entry' && (
+              <>
+                <GasTestLogSection gasTests={payload.gas_tests} onChange={rows => setPayload('gas_tests', rows)} disabled={!siteRecords} lockedCount={savedGas} permitType={ptw.type} testerName={ptwActor?.name ?? ''} />
+                <PersonnelEntryLogSection entries={payload.entry_log} onChange={rows => setPayload('entry_log', rows)} disabled={!siteRecords} lockedCount={savedEntries} />
+              </>
+            )}
+            {ptw.type === 'Work at Height' && payload.access_equipment && (
+              <WorkAtHeightPermit payload={payload as PtwWorkAtHeightPayload} onChange={updated => setForm(f => ({ ...f, payload: updated as any }))} readOnly={!draftFields} />
+            )}
 
-        case 'V':
-            return (
-                 <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section V – Client HSE Department</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <FormInput label="HSE Representative Name" value={formData.payload?.signoffs?.client_hs?.name || ''} onChange={val => handlePayloadChange('signoffs.client_hs.name', val)} disabled={!isHseEditable} />
-                        <div className="col-span-2">
-                            <SignatureInput label="Signature" value={formData.payload?.signoffs?.client_hs?.signature || ''} onChange={val => handlePayloadChange('signoffs.client_hs.signature', val)} disabled={!isHseEditable} />
-                        </div>
-                    </div>
+            <div className="border rounded-lg p-4 dark:border-dark-border">
+              <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-1">Personal protective equipment</h4>
+              {rule && rule.ppe.length > 0 && <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Required for {ptw.type}: {rule.ppe.map(k => PPE_LABELS[k]).join(', ')}.</p>}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                {(Object.keys(PPE_LABELS) as PpeKey[]).map(k => (
+                  <label key={k} className="flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                    <input type="checkbox" checked={!!payload.ppe?.[k]} disabled={!draftFields} onChange={e => setPayload(`ppe.${k}`, e.target.checked)} className="w-4 h-4" />
+                    {PPE_LABELS[k]}{rule?.ppe.includes(k) && <span className="text-red-500">*</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <TeamEditor team={(payload.team ?? []) as PtwTeamMember[]} onChange={t => setPayload('team', t)} users={receivers} disabled={!draftFields} />
+
+            {(isoNeeded || (payload.isolation ?? []).length > 0) && (
+              <IsolationRegister
+                points={(payload.isolation ?? []) as PtwIsolationPoint[]}
+                onChange={pts => setPayload('isolation', pts)}
+                actorName={ptwActor?.name ?? ''}
+                canDefine={canEdit && (isDraft || stage === 'SITE_INSPECTION')}
+                canStamp={siteRecords}
+                required={isoNeeded}
+                now={now}
+              />
+            )}
+
+            <div className="border rounded-lg overflow-hidden dark:border-dark-border">
+              <div className="bg-gray-100 dark:bg-gray-800 p-3 border-b dark:border-dark-border">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200">Safety requirements checklist</h4>
+                {draftFields && <p className="text-xs text-gray-500 dark:text-gray-400">Every item must be answered before the permit can be submitted.</p>}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
+                    <tr className="border-b dark:border-dark-border text-gray-700 dark:text-gray-300">
+                      <th className="p-3 w-8">#</th><th className="p-3 text-left">Requirement</th><th className="p-3 w-16 text-center">Yes</th><th className="p-3 w-16 text-center">No</th><th className="p-3 w-16 text-center">N/A</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(payload.safety_requirements || []).map((item: PtwSafetyRequirement, index: number) => (
+                      <ChecklistRow key={item.id} index={index + 1} item={item} onChange={handleChecklistChange} disabled={!draftFields} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'III':
+        return (
+          <div className="space-y-4">
+            <ExternalNote />
+            <div className="border rounded-lg p-4 dark:border-dark-border">
+              <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section III — Permit Requester Confirmation</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <FormInput label="Permit holder name" value={payload.requester?.name} onChange={v => setPayload('requester.name', v)} disabled={!canEdit} />
+                <FormInput label="Designation" value={payload.requester?.designation} onChange={v => setPayload('requester.designation', v)} disabled={!canEdit} />
+                <FormInput label="Contractor company" value={payload.requester?.contractor} onChange={v => setPayload('requester.contractor', v)} disabled={!canEdit} />
+                <FormInput label="Mobile" value={payload.requester?.mobile} onChange={v => setPayload('requester.mobile', v)} disabled={!canEdit} />
+                <div className="md:col-span-2"><SignatureInput label="Name typed as confirmation" value={payload.requester?.signature} onChange={v => setPayload('requester.signature', v)} disabled={!canEdit} /></div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'IV':
+        return (
+          <div>
+            <ExternalNote />
+            <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section IV — Client Proponent / Stakeholder</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <FormInput label="Name" value={payload.signoffs?.client_proponent?.name} onChange={v => setPayload('signoffs.client_proponent.name', v)} disabled={!canEdit} />
+              <FormInput label="Designation" value={payload.signoffs?.client_proponent?.designation} onChange={v => setPayload('signoffs.client_proponent.designation', v)} disabled={!canEdit} />
+              <div className="md:col-span-2"><SignatureInput label="Name typed as confirmation" value={payload.signoffs?.client_proponent?.signature} onChange={v => setPayload('signoffs.client_proponent.signature', v)} disabled={!canEdit} /></div>
+            </div>
+          </div>
+        );
+
+      case 'V':
+        return (
+          <div>
+            <ExternalNote />
+            <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section V — Client HSE Department</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <FormInput label="HSE representative name" value={payload.signoffs?.client_hs?.name} onChange={v => setPayload('signoffs.client_hs.name', v)} disabled={!canEdit} />
+              <div className="md:col-span-2"><SignatureInput label="Name typed as confirmation" value={payload.signoffs?.client_hs?.signature} onChange={v => setPayload('signoffs.client_hs.signature', v)} disabled={!canEdit} /></div>
+            </div>
+          </div>
+        );
+
+      case 'VI':
+        return (
+          <div>
+            <ExternalNote />
+            <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section VI — Joint Site Inspection</h3>
+            <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6 dark:border-dark-border">
+              <p className="text-sm italic text-gray-700 dark:text-gray-300">“The work area has been jointly inspected by all parties, and all safety requirements have been met.”</p>
+            </div>
+            <div className="space-y-6">
+              <FormInput label="Remarks (required before the permit can be closed)" value={payload.joint_inspection?.remarks} onChange={v => setPayload('joint_inspection.remarks', v)} disabled={!siteRecords} />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <SignatureInput label="Permit requester (required to close)" value={payload.joint_inspection?.requester?.signature} onChange={v => setPayload('joint_inspection.requester', { ...(payload.joint_inspection?.requester ?? {}), signature: v, signed_at: v ? new Date().toISOString() : '' })} disabled={!siteRecords} />
+                <SignatureInput label="Client proponent" value={payload.joint_inspection?.client_proponent?.signature} onChange={v => setPayload('joint_inspection.client_proponent', { ...(payload.joint_inspection?.client_proponent ?? {}), signature: v, signed_at: v ? new Date().toISOString() : '' })} disabled={!siteRecords} />
+                <SignatureInput label="Client HSE" value={payload.joint_inspection?.client_hs?.signature} onChange={v => setPayload('joint_inspection.client_hs', { ...(payload.joint_inspection?.client_hs ?? {}), signature: v, signed_at: v ? new Date().toISOString() : '' })} disabled={!siteRecords} />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'VII':
+        return (
+          <div>
+            <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section VII — Holding / Stoppage of Work</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Stoppages are recorded by the system when someone uses <strong>Stop work</strong> or <strong>Resume work</strong> in the action bar. They cannot be edited here.</p>
+            <div className="space-y-4">
+              {stoppages.map((s: any, index: number) => (
+                <div key={index} className="p-4 border rounded-md dark:border-dark-border text-gray-800 dark:text-gray-200 text-sm">
+                  <p className="font-bold">Stoppage #{index + 1} at {fmtDateTime(new Date(s.time).getTime())}</p>
+                  <p><strong>Reason:</strong> {s.reason}</p>
+                  <p><strong>Stopped by:</strong> {s.stopped_by}</p>
+                  {s.restarted_time
+                    ? <div className="mt-2 pt-2 border-t dark:border-dark-border"><p className="text-green-600 font-semibold">Resumed {fmtDateTime(new Date(s.restarted_time).getTime())}{s.resumed_by ? ` by ${s.resumed_by}` : ''}</p>{s.resume_note && <p>{s.resume_note}</p>}</div>
+                    : <p className="mt-2 text-red-600 font-semibold">Still on hold</p>}
                 </div>
-            );
+              ))}
+              {stoppages.length === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">No work stoppages have been logged.</p>}
+            </div>
+          </div>
+        );
 
-        case 'VI':
-            return (
-                <div>
-                    <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section VI — Joint Site Inspection</h3>
-                    <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6">
-                        <p className="text-sm italic text-gray-700 dark:text-gray-300">“The work area has been jointly inspected by all parties, and all safety requirements specified in Section II have been implemented and verified.”</p>
-                    </div>
-                    <div className="space-y-6">
-                        <FormInput label="Remarks" value={formData.payload?.joint_inspection?.remarks || ''} onChange={val => handlePayloadChange('joint_inspection.remarks', val)} disabled={!isInspectionEditable} />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <SignatureInput label="Permit Requester" value={formData.payload?.joint_inspection?.requester?.signature || ''} onChange={val => handlePayloadChange('joint_inspection.requester.signature', val)} disabled={!isInspectionEditable} />
-                            <SignatureInput label="Client Proponent" value={formData.payload?.joint_inspection?.client_proponent?.signature || ''} onChange={val => handlePayloadChange('joint_inspection.client_proponent.signature', val)} disabled={!isInspectionEditable} />
-                            <SignatureInput label="Client HSE" value={formData.payload?.joint_inspection?.client_hs?.signature || ''} onChange={val => handlePayloadChange('joint_inspection.client_hs.signature', val)} disabled={!isInspectionEditable} />
-                        </div>
-                    </div>
+      case 'VIII':
+        return (
+          <div>
+            <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section VIII — Extensions</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">An extension (revalidation) is done by a reviewer with <strong>Revalidate</strong> in the action bar, with a reason and a password confirmation. A permit never runs longer than 7 days in total, and an expired permit cannot be extended.</p>
+            <div className="space-y-3">
+              {extensions.map((e, i) => (
+                <div key={i} className="p-4 border rounded-md dark:border-dark-border text-sm text-gray-800 dark:text-gray-200">
+                  <p className="font-bold">Extension #{i + 1} · {fmtDateTime(new Date(e.at).getTime())}</p>
+                  <p><strong>By:</strong> {e.by_name}</p>
+                  <p><strong>Reason:</strong> {e.reason}</p>
+                  <p><strong>New end:</strong> {e.to_until ? fmtDateTime(new Date(e.to_until).getTime()) : ''}</p>
                 </div>
-            );
+              ))}
+              {extensions.length === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">This permit has not been extended.</p>}
+            </div>
+          </div>
+        );
 
-        case 'VII':
-            return (
-                <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section VII – Holding / Stoppage of Work</h3>
-                    <div className="space-y-4">
-                        {formData.payload?.holding_or_stoppage?.map((stoppage, index) => (
-                            <div key={index} className="p-4 border rounded-md dark:border-dark-border text-gray-800 dark:text-gray-200">
-                                <p className="font-bold">Stoppage #{index+1} at {new Date(stoppage.time).toLocaleString()}</p>
-                                <p><strong>Reason:</strong> {stoppage.reason}</p>
-                                <p><strong>Stopped By:</strong> {stoppage.stopped_by}</p>
-                                {stoppage.restarted_time ? (
-                                    <div className="mt-2 pt-2 border-t dark:border-dark-border">
-                                        <p className="text-green-600 font-semibold">Resumed at {new Date(stoppage.restarted_time).toLocaleString()}</p>
-                                        <p><strong>Signed by:</strong> {stoppage.signature}</p>
-                                    </div>
-                                ) : (
-                                     <div className="mt-4">
-                                        {formData.status === 'HOLD' && (
-                                            <div className="flex items-center space-x-2">
-                                                <input type="text" placeholder="Your Name for Signature" className="w-full p-2 border rounded-md text-sm bg-white dark:bg-dark-background dark:border-dark-border text-gray-900 dark:text-white" onBlur={e => handleResumeWork(e.target.value, index)} />
-                                                <Button size="sm">Resume Work</Button>
-                                            </div>
-                                        )}
-                                     </div>
-                                )}
-                            </div>
-                        ))}
-                        {(formData.payload?.holding_or_stoppage?.length ?? 0) === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">No work stoppages have been logged.</p>}
-                    </div>
+      case 'IX':
+        return (
+          <div>
+            <ExternalNote />
+            <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section IX — Permit Closure</h3>
+            <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6 dark:border-dark-border">
+              <p className="text-sm italic text-gray-700 dark:text-gray-300">“We confirm the work is complete, the area is clean and safe, all isolations have been removed and all personnel are accounted for.”</p>
+            </div>
+            <FormInput label="Closure note / handover" value={payload.closure?.note} onChange={v => setPayload('closure.note', v)} disabled={!siteRecords} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <SignatureInput label="Requester closure" value={payload.closure?.permit_requester?.signature} onChange={v => setPayload('closure.permit_requester.signature', v)} disabled={!siteRecords} />
+              <SignatureInput label="Proponent closure" value={payload.closure?.client_proponent?.signature} onChange={v => setPayload('closure.client_proponent.signature', v)} disabled={!siteRecords} />
+              <SignatureInput label="HSE closure" value={payload.closure?.client_hs?.signature} onChange={v => setPayload('closure.client_hs.signature', v)} disabled={!siteRecords} />
+            </div>
+          </div>
+        );
 
-                    {isStoppageEditable && (
-                        <div className="mt-6 border-t pt-4 dark:border-dark-border">
-                            <h4 className="font-semibold mb-2 text-gray-800 dark:text-gray-200">Log a New Work Stoppage</h4>
-                             <div className="grid grid-cols-2 gap-4">
-                                <FormInput label="Reason" value={stoppageFormData.reason} onChange={val => setStoppageFormData(p => ({...p, reason: val}))} />
-                                <FormInput label="Stopped By" value={stoppageFormData.stopped_by} onChange={val => setStoppageFormData(p => ({...p, stopped_by: val}))} />
-                                <div className="col-span-2"><FormInput label="Informed To" value={stoppageFormData.informed_to} onChange={val => setStoppageFormData(p => ({...p, informed_to: val}))} /></div>
-                            </div>
-                            <Button className="mt-4" variant="danger" onClick={handleLogStoppage}>Log Stoppage & Suspend Permit</Button>
-                        </div>
-                    )}
-                </div>
-            );
+      case 'X':
+        return <ControlsSection permit={ptw} gateInputs={gateInputs} />;
 
-        case 'VIII':
-            return (
-                <div>
-                    <h3 className="text-base font-semibold mb-4 text-gray-800 dark:text-gray-200">Section VIII – Extension</h3>
-                    <div className="space-y-6">
-                        <FormInput label="Reason for Extension" value={formData.payload?.extension?.reason || ''} onChange={val => handlePayloadChange('extension.reason', val)} disabled={!isExtensionEditable} />
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormInput label="New From Date/Time" type="datetime-local" value={formData.payload?.extension?.days?.from || ''} onChange={val => handlePayloadChange('extension.days.from', val)} disabled={!isExtensionEditable} />
-                            <FormInput label="New To Date/Time" type="datetime-local" value={formData.payload?.extension?.hours?.to || ''} onChange={val => handlePayloadChange('extension.hours.to', val)} disabled={!isExtensionEditable} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-                            <SignatureInput label="Requester" value={formData.payload?.extension?.requester?.signature || ''} onChange={val => handlePayloadChange('extension.requester.signature', val)} disabled={!isExtensionEditable} />
-                            <SignatureInput label="Client Proponent" value={formData.payload?.extension?.client_proponent?.signature || ''} onChange={val => handlePayloadChange('extension.client_proponent.signature', val)} disabled={!isExtensionEditable} />
-                            <SignatureInput label="Client HSE" value={formData.payload?.extension?.client_hs?.signature || ''} onChange={val => handlePayloadChange('extension.client_hs.signature', val)} disabled={!isExtensionEditable} />
-                        </div>
-                    </div>
-                </div>
-            );
+      case 'XI':
+        return <PermitTimeline log={ptw.workflow_log ?? []} users={usersList} />;
 
-        case 'IX':
-            return (
-                 <div>
-                    <h3 className="text-base font-semibold mb-2 text-gray-800 dark:text-gray-200">Section IX – Permit Closure</h3>
-                    <div className="p-4 border rounded-md bg-gray-50 dark:bg-dark-background mb-6">
-                        <p className="text-sm italic text-gray-700 dark:text-gray-300">“We confirm the work is complete, the area is clean and safe, all isolations have been removed, and the permit is now closed.”</p>
-                    </div>
-                    <FormInput label="Closure Note / Handover" value={formData.payload?.closure?.note || ''} onChange={val => handlePayloadChange('closure.note', val)} disabled={!isClosureEditable} />
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                         <SignatureInput label="Requester Closure Sign" value={formData.payload?.closure?.permit_requester?.signature || ''} onChange={val => handlePayloadChange('closure.permit_requester.signature', val)} disabled={!isClosureEditable} />
-                         <SignatureInput label="Proponent Closure Sign" value={formData.payload?.closure?.client_proponent?.signature || ''} onChange={val => handlePayloadChange('closure.client_proponent.signature', val)} disabled={!isClosureEditable} />
-                         <SignatureInput label="HSE Closure Sign" value={formData.payload?.closure?.client_hs?.signature || ''} onChange={val => handlePayloadChange('closure.client_hs.signature', val)} disabled={!isClosureEditable} />
-                    </div>
-                </div>
-            );
-        default:
-            return null;
+      default:
+        return null;
     }
   };
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-4" onClick={onClose} aria-modal="true" role="dialog" aria-labelledby="ptw-title">
-        <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
-          <header className="p-4 border-b dark:border-dark-border flex justify-between items-center flex-shrink-0 print:hidden">
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex justify-center items-center p-2 md:p-4" onClick={onClose} aria-modal="true" role="dialog" aria-labelledby="ptw-title">
+        <div id="ptw-printable-area" className="bg-white dark:bg-dark-card rounded-lg shadow-2xl w-full max-w-7xl h-[96vh] md:h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <header className="p-3 md:p-4 border-b dark:border-dark-border flex justify-between items-start md:items-center flex-shrink-0 print:hidden gap-2">
             <div>
-              <h2 id="ptw-title" className="text-xl font-bold text-gray-900 dark:text-gray-100">{formData.type} - {formData.payload?.permit_no || `Draft #${formData.id?.slice(-6) || '------'}`}</h2>
-              <div className="flex items-center space-x-2">
-                <Badge color={
-                    formData.status === 'ACTIVE' ? 'green' : 
-                    (formData.status ?? '').includes('SUBMITTED') ? 'yellow' : 
-                    formData.status === 'APPROVAL' ? 'blue' : 
-                    'gray'
-                }>
-                    {(formData.status ?? 'DRAFT').replace(/_/g, ' ')}
-                </Badge>
-                {formData.compliance_level && (
-                    <span className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                        <span className="text-yellow-500">⚠️</span> {formData.compliance_level} Compliance
-                    </span>
-                )}
+              <h2 id="ptw-title" className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100">{ptw.permit_no || 'Legacy permit'} · {ptw.type}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">{form.title || ptw.title}</p>
+              <div className="flex items-center flex-wrap gap-2 mt-1">
+                <Badge color={STAGE_BADGE[(shown ?? 'DRAFT')]}>{stageLabel(shown, ptw.status)}</Badge>
+                {rule && <Badge color={rule.risk === 'high' ? 'red' : rule.risk === 'medium' ? 'yellow' : 'green'}>{rule.risk} risk</Badge>}
+                {isLegacy && <Badge color="gray">Legacy</Badge>}
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <ActionsBar onPrint={() => window.print()} onEmail={() => setIsEmailModalOpen(true)} downloadOptions={[{ label: 'Download PDF', handler: () => window.print() }]} />
+            <div className="flex items-center gap-3">
+              <ActionsBar onEmail={() => setIsEmailModalOpen(true)} onDownloadPdf={downloadPdf} />
               <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><CloseIcon className="w-6 h-6" /></button>
             </div>
           </header>
 
-          <div className="flex-grow flex overflow-hidden">
-            <nav className="w-64 bg-gray-50 dark:bg-dark-background border-r dark:border-dark-border overflow-y-auto p-4 flex-shrink-0 print:hidden">
-              <h3 className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">SECTIONS</h3>
-              <ul className="space-y-1">
+          <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
+            <nav className="md:w-64 bg-gray-50 dark:bg-dark-background md:border-r border-b md:border-b-0 dark:border-dark-border overflow-x-auto md:overflow-y-auto p-2 md:p-4 flex-shrink-0 print:hidden">
+              <h3 className="hidden md:block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-2 px-2">SECTIONS</h3>
+              <ul className="flex md:block gap-1 md:space-y-1">
                 {sections.map(section => (
-                  <li key={section.key}>
+                  <li key={section.key} className="shrink-0">
                     <button
                       onClick={() => setActiveSection(section.key)}
-                      className={`w-full text-left p-3 rounded-md text-sm font-medium transition-colors ${
-                        activeSection === section.key 
-                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-4 border-primary-500' 
-                          : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 border-l-4 border-transparent'
+                      className={`w-full text-left px-3 py-2 md:p-3 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                        activeSection === section.key
+                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 md:border-l-4 border-primary-500'
+                          : 'hover:bg-gray-100 dark:hover:bg-white/5 text-gray-700 dark:text-gray-300 md:border-l-4 border-transparent'
                       }`}
                     >
                       {section.key}. {section.title}
@@ -608,44 +586,55 @@ export const PtwDetailModal: React.FC<PtwDetailModalProps> = ({ ptw, onClose, on
               </ul>
             </nav>
 
-            <main className="flex-1 p-8 overflow-y-auto">
+            <main className="flex-1 p-4 md:p-8 overflow-y-auto space-y-4">
+              {isLegacy && (
+                <p role="alert" className="text-sm rounded border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-900 dark:text-amber-200 px-3 py-2">
+                  This permit was created before the new permit system. It can be read, but not progressed or edited.{canDelete ? ' You can delete it and raise a new one.' : ' An administrator can delete it so a new one can be raised.'}
+                </p>
+              )}
+              {pdfState !== 'idle' && (
+                <p role="status" className={`text-sm rounded px-3 py-2 ${pdfState === 'error' ? 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-200' : 'bg-gray-50 text-gray-700 dark:bg-white/5 dark:text-gray-300'}`} data-testid="pdf-state">
+                  {pdfState === 'busy' ? 'Preparing the PDF...' : 'The PDF could not be created. Try again.'}
+                </p>
+              )}
+              <ValidityBanner permit={ptw} />
               {renderSectionContent()}
             </main>
           </div>
 
-          <footer className="p-4 border-t bg-gray-100 dark:bg-black/20 dark:border-dark-border flex justify-end items-center flex-shrink-0 print:hidden">
-            <WorkflowActions ptw={formData} onUpdate={onUpdate} />
+          <footer className="p-3 md:p-4 border-t bg-gray-100 dark:bg-black/20 dark:border-dark-border flex-shrink-0 print:hidden space-y-3">
+            {canEdit && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={save} disabled={!dirty || saving} data-testid="save-changes">{saving ? 'Saving...' : 'Save changes'}</Button>
+                {dirty && <Button variant="ghost" onClick={discard}>Discard changes</Button>}
+                <span className="text-xs text-gray-500 dark:text-gray-400">{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
+              </div>
+            )}
+            {!canEdit && !isLegacy && edit.ok === false && stage && !['CLOSED', 'CANCELLED', 'REJECTED', 'ARCHIVED'].includes(stage) && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">{edit.reason}</p>
+            )}
+            {!isLegacy && (
+              <PermitActionsPanel
+                permit={ptw}
+                actor={ptwActor}
+                gateInputs={gateInputs}
+                dirty={dirty}
+                onPerform={(action, opts) => handlePtwTransition(ptw.id, action, opts)}
+                impersonatingAs={impersonatedUser?.name ?? null}
+              />
+            )}
+            {canDelete && <button type="button" onClick={remove} className="text-xs text-red-600 underline" data-testid="delete-permit">{isLegacy ? 'Delete this old permit' : 'Delete this draft'}</button>}
           </footer>
         </div>
       </div>
 
-      <EmailModal 
+      <EmailModal
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}
-        documentTitle={`PTW: ${formData.payload?.permit_no || formData.id}`}
-        documentLink={`${window.location.href}?ptw=${formData.id}`}
-        defaultRecipients={[...Object.values(formData.payload?.signoffs ?? {}).flat(), formData.payload?.requester].filter(Boolean) as Partial<User>[]}
+        documentTitle={`PTW: ${ptw.permit_no || ptw.id}`}
+        documentLink={`${window.location.href}?ptw=${ptw.id}`}
+        defaultRecipients={[...Object.values(payload.signoffs ?? {}).flat(), payload.requester].filter(Boolean) as Partial<User>[]}
       />
-
-      <style>{`
-          @media print {
-              body * { visibility: hidden; }
-              #ptw-printable-area, #ptw-printable-area * { visibility: visible; }
-              #ptw-printable-area {
-                  position: absolute; left: 0; top: 0; width: 100%; height: auto; max-height: none;
-                  display: block;
-              }
-              /* The content row (nav + main) is flex-grow inside overflow-hidden, sized
-                 against the modal's 95vh height on screen. Print has no definite
-                 viewport height for flex-grow to compute against, so browsers collapse
-                 it to near-zero and overflow-hidden clips everything inside to nothing -
-                 which is exactly why the printed page showed empty. Breaking it into
-                 plain block flow lets content take its natural, unclipped height. */
-              #ptw-printable-area > div { display: block; height: auto; overflow: visible; }
-              #ptw-printable-area main { overflow: visible; height: auto; }
-              @page { size: A4; margin: 1.5cm; }
-          }
-      `}</style>
     </>
   );
 };

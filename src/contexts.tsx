@@ -32,6 +32,9 @@ import { sendInviteEmail } from './services/emailService';
 
 // --- CERTIFICATES ---
 import { cleanAttendance } from './lib/certificates';
+
+// --- PERMITS TO WORK ---
+import { usePtwController, type PtwController } from './hooks/usePtwController';
 import {
   closeSessionAndIssueCertificates, issueCertificatesForSession, issueCertificateForExistingRecord, revokeCertificate, describeCertificateError,
 } from './services/certificateService';
@@ -437,8 +440,13 @@ interface DataContextType {
   handleAddCapaAction: (reportId: string, action: Omit<CapaAction, 'status'>) => void;
   handleAcknowledgeReport: (id: string) => void;
   handleUpdateInspection: (data: any, action?: any) => void;
-  handleCreatePtw: (data: any) => void;
-  handleUpdatePtw: (data: any, action?: any) => void;
+  // Permits to work: see src/hooks/usePtwController.ts
+  handleCreatePtw: PtwController['handleCreatePtw'];
+  handleUpdatePtw: PtwController['handleUpdatePtw'];
+  handlePtwTransition: PtwController['handlePtwTransition'];
+  getPtwGateInputs: PtwController['getPtwGateInputs'];
+  ptwActor: PtwController['ptwActor'];
+  ptwOrgId: PtwController['ptwOrgId'];
   handleCreatePlan: (data: any) => void;
   handleUpdatePlan: (data: any) => void;
   handlePlanStatusChange: (id: string, status: any, reason?: string) => void;
@@ -507,7 +515,7 @@ interface DataContextType {
   // --- DELETE HANDLERS ---
   handleDeleteReport: (id: string) => void;
   handleDeleteInspection: (id: string) => void;
-  handleDeletePtw: (id: string) => void;
+  handleDeletePtw: PtwController['handleDeletePtw'];
   handleDeletePlan: (id: string) => void;
   handleDeleteRams: (id: string) => void;
   handleDeleteTbt: (id: string) => void;
@@ -563,6 +571,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([]);
     const [manHoursEntries, setManHoursEntries] = useState<ManHoursEntry[]>([]);
     const [audits, setAudits] = useState<Audit[]>([]);
+
+    // Permits to work: identity, live updates, create / act / save / delete, expiry sweep.
+    const ptwController = usePtwController({
+        uid: currentUser?.uid ?? null,
+        ptwList, setPtwList, usersList, trainingCourseList, trainingRecordList, toast,
+    });
 
     useEffect(() => {
       if (!currentUser) {
@@ -770,14 +784,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await deleteDoc(doc(db, 'inspections', id));
             setInspectionList(prev => prev.filter(item => item.id !== id));
             toast.success("Inspection deleted.");
-        } catch (e) { console.error(e); toast.error("Failed to delete."); }
-    };
-
-    const handleDeletePtw = async (id: string) => {
-        try {
-            await deleteDoc(doc(db, 'ptws', id));
-            setPtwList(prev => prev.filter(item => item.id !== id));
-            toast.success("Permit deleted.");
         } catch (e) { console.error(e); toast.error("Failed to delete."); }
     };
 
@@ -1263,15 +1269,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const handleCreatePtw = async (data: any) => {
-        // The Guided Permit wizard doesn't collect a dedicated "title" field, so
-        // without this fallback newPtw.title is undefined and the PTW list crashes
-        // as soon as it's searched (p.title.toLowerCase() on undefined).
-        const newPtw = { ...data, title: data.title || data.description || 'Untitled Permit', org_id: activeOrg.id, id: `ptw_${Date.now()}`, status: 'DRAFT' };
-        setPtwList(prev => [newPtw, ...prev]);
-        try { await setDoc(doc(db, 'ptws', newPtw.id), newPtw); toast.success("Permit created."); } catch (e) { console.error(e); toast.error("Failed to create permit."); setPtwList(prev => prev.filter(p => p.id !== newPtw.id)); }
-    };
-
     const handleCreateChecklistTemplate = async (data: any) => {
         const newTemplate = { ...data, id: `ct_${Date.now()}`, org_id: activeOrg.id };
         setChecklistTemplates(prev => [...prev, newTemplate]);
@@ -1354,35 +1351,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
             toast.error("Failed to update inspection.");
             if (previous) setInspectionList(prev => prev.map(x => x.id === inspection.id ? previous : x));
-        }
-    };
-
-    const handleUpdatePtw = async (ptw: any, action?: any) => {
-        let updatedPtw = { ...ptw };
-        if (action === 'submit') updatedPtw.status = 'SUBMITTED';
-        if (action === 'approve_proponent') updatedPtw.status = 'APPROVAL';
-        if (action === 'approve_hse') updatedPtw.status = 'ACTIVE';
-        if (action === 'reject') updatedPtw.status = 'DRAFT';
-        if (action === 'suspend') updatedPtw.status = 'HOLD';
-        if (action === 'resume') updatedPtw.status = 'ACTIVE';
-        if (action === 'close') updatedPtw.status = 'CLOSED';
-
-        if (action === 'submit') {
-            await notifyRole(activeOrg.id, 'SUPERVISOR', `PTW #${ptw.payload.permit_no || ptw.id} submitted for review`, 'info');
-        } else if (action === 'approve_hse') {
-            await sendNotification(ptw.payload.creator_id, `Your PTW #${ptw.payload.permit_no || ptw.id} is ACTIVE`, 'success');
-        } else if (action === 'reject') {
-            await sendNotification(ptw.payload.creator_id, `Your PTW #${ptw.payload.permit_no || ptw.id} was REJECTED`, 'error');
-        }
-
-        const previous = ptwList.find(p => p.id === ptw.id);
-        setPtwList(prev => prev.map(p => p.id === ptw.id ? updatedPtw : p));
-        try {
-            await updateDB('ptws', ptw.id, updatedPtw);
-            toast.success("Permit updated.");
-        } catch (e) {
-            toast.error("Failed to update permit.");
-            if (previous) setPtwList(prev => prev.map(p => p.id === ptw.id ? previous : p));
         }
     };
 
@@ -1819,7 +1787,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         correctiveActions, manHoursEntries, audits,
         setInspectionList, setChecklistRunList, setPtwList,
         handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
-        handleUpdateInspection, handleCreatePtw, handleUpdatePtw, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
+        handleUpdateInspection, ...ptwController, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleSaveSessionAttendance, handleIssueSessionCertificates, handleIssueCertificate, handleRevokeCertificate,
         handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
@@ -1835,7 +1803,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateProcessingActivity, handleUpdateProcessingActivity, handleCreateDataBreach, handleUpdateDataBreach,
         handleUpdateComplianceTracking, handleCreateRcaRecord, handleCreateSiteAccessLog, handleUpdateSiteAccessLog,
         handleCreateCorrectiveAction, handleUpdateCorrectiveAction, handleSaveManHoursEntry, handleCreateAudit, handleUpdateAudit,
-        handleDeleteReport, handleDeleteInspection, handleDeletePtw, handleDeletePlan, handleDeleteRams, handleDeleteTbt
+        handleDeleteReport, handleDeleteInspection, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 
     return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

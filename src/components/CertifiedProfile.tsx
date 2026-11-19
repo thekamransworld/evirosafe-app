@@ -81,7 +81,7 @@ export const CertifiedProfile: React.FC = () => {
 
   const stats = {
     reports:     reportList.filter(r => r.reporter_id === activeUser.id || r.creator_id === activeUser.id).length,
-    ptws:        ptwList.filter(p => (p as any).issuer_id === activeUser.id || p.payload?.requester?.id === activeUser.id).length,
+    ptws:        ptwList.filter(p => (p as any).issuer_id === activeUser.id || p.creator_id === activeUser.id || p.receiver_id === activeUser.id || (p.payload as any)?.requester?.id === activeUser.id).length,
     inspections: inspectionList.filter(i => (i as any).conducted_by_id === activeUser.id).length,
     validCerts:
       myRecords.filter(r => { const st = getRecordCertificateStatus(r); return st === 'valid' || st === 'expiring'; }).length +

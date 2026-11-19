@@ -1,3 +1,4 @@
+import { CompetencyTagEditor } from './ptw/CompetencyTagEditor';
 import React, { useState } from 'react';
 import type { TrainingCourse } from '../types';
 import { Button } from './ui/Button';
@@ -28,6 +29,7 @@ export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen
     syllabus: '',
     learning_objectives: [],
     requires_assessment: true,
+    competencies: [],
   });
   
   const [isGenerating, setIsGenerating] = useState(false);
@@ -76,6 +78,7 @@ export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen
         syllabus: '',
         learning_objectives: [],
         requires_assessment: true,
+        competencies: [],
     });
   };
 
@@ -128,6 +131,10 @@ export const TrainingCourseModal: React.FC<TrainingCourseModalProps> = ({ isOpen
                         )}
                     </FormField>
                     
+                    <FormField label="Competencies this course proves (for permits to work)">
+                        <CompetencyTagEditor value={newCourse.competencies ?? []} onChange={v => setNewCourse(p => ({ ...p, competencies: v }))} />
+                    </FormField>
+
                     {error && <p className="text-sm text-red-500">{error}</p>}
                 </div>
 

@@ -4,6 +4,8 @@ import { useAppContext, useDataContext } from '../contexts';
 import { Plus, BookOpen, Award, Clock, Users, ChevronRight, Calendar, AlertTriangle, CheckCircle, Search, Download, Link2, Loader2, Ban } from 'lucide-react';
 import { useCertificateActions } from '../hooks/useCertificateActions';
 import { planSessionCertificates } from '../lib/certificates';
+import { COMPETENCY_LABEL } from '../lib/ptw/model';
+import { CourseCompetencyModal } from './CourseCompetencyModal';
 
 interface TrainingsProps {
   courses:               TrainingCourse[];
@@ -49,7 +51,8 @@ export const Trainings: React.FC<TrainingsProps> = ({
 }) => {
   const { can } = useAppContext();
   const certActions = useCertificateActions();
-  const { handleIssueSessionCertificates } = useDataContext();
+  const { handleIssueSessionCertificates, handleCreateOrUpdateCourse } = useDataContext();
+  const [tagCourse, setTagCourse] = useState<TrainingCourse | null>(null);
   const [issuingSessionId, setIssuingSessionId] = useState<string | null>(null);
   const [tab, setTab]       = useState<'courses' | 'sessions' | 'records' | 'matrix'>('courses');
   const [search, setSearch] = useState('');
@@ -213,6 +216,16 @@ export const Trainings: React.FC<TrainingsProps> = ({
               <div>
                 <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{course.title}</h3>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{course.category}</p>
+                <div className="flex flex-wrap items-center gap-1.5 mt-2" data-testid="course-tags">
+                  {(course.competencies ?? []).map(k => (
+                    <span key={k} className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.12)', color: '#8b5cf6' }}>{(COMPETENCY_LABEL as Record<string, string>)[k] ?? k}</span>
+                  ))}
+                  {can('create', 'reports') && (
+                    <button onClick={() => setTagCourse(course)} className="text-[10px] font-semibold underline" style={{ color: 'var(--text-muted)' }}>
+                      {(course.competencies ?? []).length ? 'Edit competency tags' : 'Tag competencies for permits'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-default)' }}>
                 <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -449,6 +462,7 @@ export const Trainings: React.FC<TrainingsProps> = ({
           )}
         </div>
       )}
+      <CourseCompetencyModal course={tagCourse} onClose={() => setTagCourse(null)} onSave={c => handleCreateOrUpdateCourse(c)} />
     </div>
   );
 };

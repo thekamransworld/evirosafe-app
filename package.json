@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:ptw": "node scripts/test-ptw.mjs",
+    "gen:ptw-rules": "node scripts/gen-ptw-rules.mjs",
+    "check:ptw-rules": "node scripts/gen-ptw-rules.mjs --check",
     "test:rules": "firebase emulators:exec --only firestore --project demo-evirosafe \"node --test tests/firestore.rules.test.js\""
   },
   "dependencies": {

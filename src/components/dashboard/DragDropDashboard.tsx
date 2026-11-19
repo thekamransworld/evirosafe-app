@@ -27,6 +27,7 @@
  *   • Dark mode compatible — all colors use CSS variables
  */
 
+import { effectiveStatus } from '../../lib/ptw/validity';
 import React, {
   useState, useRef, useCallback, useMemo, useEffect,
 } from 'react';
@@ -301,8 +302,10 @@ const WidgetContent: React.FC<WidgetContentProps> = ({ id, snapshot, data, onNav
     }
 
     case 'ptw_status': {
-      const active    = data.ptwList?.filter((p: any) => p.status === 'ACTIVE').length ?? 0;
-      const pending   = data.ptwList?.filter((p: any) => ['SUBMITTED','PENDING_APPROVAL','APPROVAL'].includes(p.status)).length ?? 0;
+      // Effective status: a permit past its end time is EXPIRED, not active, even before anything has marked it so.
+      const stageOf   = (p: any) => effectiveStatus(p, Date.now());
+      const active    = data.ptwList?.filter((p: any) => stageOf(p) === 'ACTIVE').length ?? 0;
+      const pending   = data.ptwList?.filter((p: any) => ['SUBMITTED', 'SITE_INSPECTION', 'APPROVAL', 'SITE_HANDOVER'].includes(stageOf(p) ?? '')).length ?? 0;
       return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Permit Status</p>
