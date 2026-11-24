@@ -16,7 +16,29 @@ export function parseArgs(argv) {
     else if (k === '--limit') { const v = val(); if (v !== '') { const n = Number(v); if (!Number.isInteger(n) || n < 1) a.errors.push('--limit needs a whole number of 1 or more'); else a.limit = n; } }
     else a.errors.push(`unknown option ${k}`);
   }
+  if (a.email && !looksLikeEmail(a.email)) {
+    a.errors.push(`"${a.email}" is not an email address. Type the email you sign in to EviroSafe with, for example name@company.com (not the words in the instructions).`);
+  }
   return a;
+}
+
+/** Something@something.something, nothing odd in it. Not a full validation: it catches a placeholder left in. */
+export function looksLikeEmail(s) {
+  return /^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(String(s || ''));
+}
+
+/** A plain sentence for a Firebase sign-in error code. */
+export function describeSignInError(code) {
+  switch (code) {
+    case 'auth/invalid-email': return 'That is not a valid email address.';
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found': return 'The email or the password is wrong.';
+    case 'auth/too-many-requests': return 'Too many attempts. Wait a few minutes and try again.';
+    case 'auth/user-disabled': return 'This account is disabled.';
+    case 'auth/network-request-failed': return 'Could not reach Firebase. Check the internet connection.';
+    default: return `Could not sign in (${code || 'unknown error'}).`;
+  }
 }
 
 const pad = n => String(n).padStart(4, '0');

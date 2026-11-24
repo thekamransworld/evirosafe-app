@@ -28,7 +28,7 @@ import readline from 'node:readline';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-import { parseArgs, runMigration } from './migrate-actions-lib.mjs';
+import { describeSignInError, parseArgs, runMigration } from './migrate-actions-lib.mjs';
 
 // ─── command line ─────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ function ask(question, { hidden = false } = {}) {
       const write = rl._writeToOutput.bind(rl);
       rl._writeToOutput = s => { if (!muted) write(s); };
     }
-    rl.question(question, answer => { muted = false; rl.close(); if (hidden) process.stdout.write('\n'); resolveAnswer(answer); });
+    rl.question(question, answer => { muted = false; rl.close(); try { process.stdin.pause(); } catch { /* not a terminal */ } if (hidden) process.stdout.write('\n'); resolveAnswer(answer); });
     muted = hidden;
   });
 }
@@ -58,11 +58,25 @@ function readFirebaseConfig() {
   return cfg;
 }
 
+/**
+ * Ends the program. Calling process.exit() while the terminal handle is still closing crashes Node on Windows
+ * ("Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)"), so the exit code is set, the terminal is released,
+ * and Node is left to end by itself; the forced exit is only a fallback for connections that keep it alive.
+ */
+function finish(code) {
+  process.exitCode = code;
+  try { process.stdin.pause(); } catch { /* not a terminal */ }
+  setTimeout(() => process.exit(code), 1500).unref();
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.errors.length) {
     if (args.errors.length) console.error(args.errors.map(e => `Error: ${e}`).join('\n') + '\n');
-    console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').slice(0, 25).map(l => l.replace(/^\/\/ ?/, '')).join('\n'));
+    // The help is the comment block at the top of this file.
+    const help = [];
+    for (const l of readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n')) { if (l.startsWith('//')) help.push(l.replace(/^\/\/ ?/, '')); else if (l.trim() === '' && help.length) help.push(''); else break; }
+    console.log(help.join('\n').trim());
     process.exit(args.errors.length ? 2 : 0);
   }
   if (!args.email) { console.error('Error: --email is required (the administrator login).'); process.exit(2); }
@@ -86,16 +100,21 @@ async function main() {
   });
   const lib = await import(`${pathToFileURL(outfile).href}?t=${Date.now()}`);
 
-  const { initializeApp } = await import('firebase/app');
+  const { initializeApp, deleteApp } = await import('firebase/app');
   const { getAuth, signInWithEmailAndPassword } = await import('firebase/auth');
   const fs = await import('firebase/firestore');
   const app = initializeApp(readFirebaseConfig(), 'migrate-actions');
+  const closeApp = async () => { try { await deleteApp(app); } catch { /* already closed */ } };
   const db = fs.getFirestore(app);
 
   const password = await ask(`Password for ${args.email} (what you type is not shown): `, { hidden: true });
   let cred;
   try { cred = await signInWithEmailAndPassword(getAuth(app), args.email, password); }
-  catch (e) { console.error(`\nCould not sign in: ${e.code || e.message}`); process.exit(1); }
+  catch (e) {
+    console.error(`\nCould not sign in. ${describeSignInError(e.code)}`);
+    await closeApp();
+    return finish(1);
+  }
 
   const io = {
     log: m => console.log(m),
@@ -127,7 +146,8 @@ async function main() {
   };
 
   const result = await runMigration({ args, uid: cred.user.uid, email: args.email, io, lib });
-  process.exit(result.exitCode);
+  await closeApp();
+  finish(result.exitCode);
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => { console.error(e); finish(1); });

@@ -282,7 +282,7 @@ test('import: forged imports are refused', () => {
 // ─── the command-line flow (scripts/migrate-actions-lib.mjs), against the in-memory database ─────────────
 
 // @ts-ignore (plain .mjs, no types)
-import { parseArgs, runMigration } from '../scripts/migrate-actions-lib.mjs';
+import { describeSignInError, looksLikeEmail, parseArgs, runMigration } from '../scripts/migrate-actions-lib.mjs';
 import { IMPORT_ROLES } from '../src/lib/actions/model';
 import type { Person } from './helpers/actionFixtures';
 
@@ -346,10 +346,29 @@ test('import command: argument parsing', () => {
   assert.ok(parseArgs(['--email']).errors.length === 1);
 });
 
+test('import command: a placeholder left in the email is caught before anything is asked or read', () => {
+  for (const bad of ['YOUR_ADMIN_EMAIL', '<admin login>', 'name@', '@company.com', 'a b@c.d', 'plain']) {
+    const errs = parseArgs(['--email', bad]).errors;
+    assert.equal(errs.length, 1, bad);
+    assert.match(errs[0], /is not an email address/);
+  }
+  for (const good of ['a@b.co', 'first.last@company.com', 'x+tag@sub.domain.org']) assert.deepEqual(parseArgs(['--email', good]).errors, [], good);
+  assert.ok(looksLikeEmail('name@company.com') && !looksLikeEmail('') && !looksLikeEmail(undefined));
+});
+
+test('import command: sign-in errors are explained in plain words', () => {
+  assert.match(describeSignInError('auth/invalid-email'), /not a valid email/);
+  for (const c of ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found']) assert.match(describeSignInError(c), /email or the password is wrong/);
+  assert.match(describeSignInError('auth/too-many-requests'), /Wait a few minutes/);
+  assert.match(describeSignInError('auth/network-request-failed'), /internet/);
+  assert.match(describeSignInError('auth/weird'), /auth\/weird/);
+  assert.match(describeSignInError(undefined), /unknown error/);
+});
+
 test('import command: the default is a dry run that writes nothing and says what it would do', async () => {
   const w = oldWorld();
   const before = JSON.stringify(w.docs);
-  const { r, text } = await run(w, P.orgAdmin, ['--email', 'x']);
+  const { r, text } = await run(w, P.orgAdmin, ['--email', 'admin@example.test']);
   assert.equal(r.exitCode, 0);
   assert.equal(JSON.stringify(w.docs), before, 'nothing was written');
   const out = text();
@@ -365,18 +384,18 @@ test('import command: the default is a dry run that writes nothing and says what
 test('import command: --apply asks first, then imports everything once, and a second run adds nothing', async () => {
   const w = oldWorld();
   // declined: nothing happens
-  const declined = await run(w, P.orgAdmin, ['--email', 'x', '--apply'], { confirm: false });
+  const declined = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply'], { confirm: false });
   assert.equal(declined.r.exitCode, 0); assert.equal(actionDocs(w).length, 0);
   assert.match(declined.text(), /Cancelled\. Nothing was written\./);
   assert.match(declined.asked[0], /Type IMPORT to continue/);
   // confirmed
-  const first = await run(w, P.orgAdmin, ['--email', 'x', '--apply']);
+  const first = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply']);
   assert.equal(first.r.created, 7); assert.equal(first.r.failed.length, 0); assert.equal(first.r.exitCode, 0);
   assert.equal(actionDocs(w).length, 7);
   assert.equal(w.docs['/counters/act_org1_2026'].value, 7);
   assert.match(first.text(), /Done\. Created 7, already there 0, failed 0\. The old records were not changed\./);
   // again: nothing to import
-  const second = await run(w, P.orgAdmin, ['--email', 'x', '--apply', '--yes']);
+  const second = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes']);
   assert.equal(second.r.created, 0); assert.equal(actionDocs(w).length, 7);
   assert.match(second.text(), /Already imported \(skipped\) \.+ 7/);
   assert.match(second.text(), /Nothing to import\./);
@@ -384,10 +403,10 @@ test('import command: --apply asks first, then imports everything once, and a se
 
 test('import command: --limit tries a few first, and the next run resumes with the numbering unbroken', async () => {
   const w = oldWorld();
-  const few = await run(w, P.orgAdmin, ['--email', 'x', '--apply', '--yes', '--limit', '3']);
+  const few = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes', '--limit', '3']);
   assert.equal(few.r.created, 3);
   assert.match(few.text(), /only the first 3 of 7/);
-  const rest = await run(w, P.orgAdmin, ['--email', 'x', '--apply', '--yes']);
+  const rest = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes']);
   assert.equal(rest.r.created, 4);
   assert.match(rest.text(), /ACT-2026-0004 to ACT-2026-0007/);
   const numbers = actionDocs(w).map(k => w.docs[k].number).sort();
@@ -397,19 +416,19 @@ test('import command: --limit tries a few first, and the next run resumes with t
 test('import command: only administrators of that organisation can run it', async () => {
   for (const who of [P.approver, P.reviewer, P.creator, P.worker, P.viewer]) {
     const w = oldWorld();
-    const { r, text } = await run(w, who, ['--email', 'x', '--apply', '--yes']);
+    const { r, text } = await run(w, who, ['--email', 'admin@example.test', '--apply', '--yes']);
     assert.equal(r.exitCode, 1, who.role);
     assert.match(text(), /cannot run the import/);
     assert.equal(actionDocs(w).length, 0);
   }
   const w = oldWorld();
-  const other = await run(w, P.orgAdmin, ['--email', 'x', '--apply', '--yes', '--org', 'org2']);
+  const other = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes', '--org', 'org2']);
   assert.equal(other.r.exitCode, 1); assert.match(other.text(), /only import your own organisation/);
   const unknown = makeIo(w, P.orgAdmin);
   const none = await runMigration({ args: parseArgs([]), uid: 'nobody', email: 'x', io: unknown.io, lib, now: new Date(T0) });
   assert.equal(none.exitCode, 1); assert.match(unknown.text(), /has no user record/);
   // the platform administrator may name the organisation
-  const ok = await run(oldWorld(), P.admin, ['--email', 'x', '--apply', '--yes', '--org', 'org1']);
+  const ok = await run(oldWorld(), P.admin, ['--email', 'admin@example.test', '--apply', '--yes', '--org', 'org1']);
   assert.equal(ok.r.created, 7);
 });
 
@@ -417,27 +436,27 @@ test('import command: failures are reported, stop after three in a row, and the 
   const w = oldWorld();
   const all = planImport(sources(), new Set(), ctx).toCreate.map(c => c.ref);
   const failFor = new Set(all.slice(0, 3)); // the first three records fail
-  const bad = await run(w, P.orgAdmin, ['--email', 'x', '--apply', '--yes'], { failFor });
+  const bad = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes'], { failFor });
   assert.equal(bad.r.exitCode, 1);
   assert.equal(bad.r.failed.length, 3);
   assert.match(bad.text(), /Three failures in a row: stopping/);
   assert.equal(actionDocs(w).length, 0);
   // a single failure in the middle does not stop the rest
   const w2 = oldWorld();
-  const one = await run(w2, P.orgAdmin, ['--email', 'x', '--apply', '--yes'], { failFor: new Set([all[2]]) });
+  const one = await run(w2, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes'], { failFor: new Set([all[2]]) });
   assert.equal(one.r.created, 6); assert.equal(one.r.failed.length, 1); assert.equal(one.r.exitCode, 1);
   assert.match(one.text(), /Run the command again to retry the failed ones/);
-  const retry = await run(w2, P.orgAdmin, ['--email', 'x', '--apply', '--yes']);
+  const retry = await run(w2, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes']);
   assert.equal(retry.r.created, 1); assert.equal(retry.r.failed.length, 0);
   assert.equal(actionDocs(w2).length, 7);
   assert.equal(w2.docs['/counters/act_org1_2026'].value, 7, 'no number was skipped or reused');
 });
 
 test('import command: --default-project places records that have no project', async () => {
-  const noDefault = await run(oldWorld(), P.orgAdmin, ['--email', 'x']);
+  const noDefault = await run(oldWorld(), P.orgAdmin, ['--email', 'admin@example.test']);
   assert.match(noDefault.text(), /Without a project \.+ [1-9]\d* +\(visible to administrators only; use --default-project PROJECT_ID/);
   const w = oldWorld();
-  const placed = await run(w, P.orgAdmin, ['--email', 'x', '--apply', '--yes', '--default-project', 'proj']);
+  const placed = await run(w, P.orgAdmin, ['--email', 'admin@example.test', '--apply', '--yes', '--default-project', 'proj']);
   assert.match(placed.text(), /Without a project \.+ 0/);
   assert.equal(actionDocs(w).filter(k => !w.docs[k].project_id).length, 0);
 });
