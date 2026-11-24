@@ -1,4 +1,5 @@
-// Builds the PTW section of firestore.rules from src/lib/ptw/model.ts.
+// Builds the PTW section of firestore.rules from src/lib/ptw/model.ts. The helpers every module shares (role
+// checks, project scope, yearly counters, notifications) are in the COMMON block, built by scripts/rules-lib.mjs.
 //
 // The same table that drives the buttons in the app (who may do what, from
 // which stage, to which stage) is turned into rules here, so the client and
@@ -63,13 +64,6 @@ export function buildPtwRules(m) {
       return ${transitionBody};
     }
 
-    // One pointer read; mirrors isAccessible(). Pass the pointer in so it is read once.
-    function ptwInScope(me, data) {
-      return me.role == 'ADMIN' ||
-        (data.org_id == me.org_id &&
-          (me.role == 'ORG_ADMIN' || !('project_id' in data) || data.project_id in me.get('project_ids', [])));
-    }
-
     function ptwIsRequester(me, data) {
       return me.docId == data.get('creator_id', '') || me.docId == data.get('receiver_id', '');
     }
@@ -92,7 +86,7 @@ export function buildPtwRules(m) {
         && last.action is string
         && last.timestamp is string
         && (last.get('override', false) != true
-            || (me.role in ${L(m.APPROVERS)}
+            || (isApprover(me)
                 && last.get('justification', '') is string
                 && last.get('justification', '').size() >= ${m.MIN_JUSTIFICATION_CHARS}));
     }
@@ -192,11 +186,11 @@ ${slotChecks};
     // site staff record work.
     function ptwContentUpdate(me, before, after) {
       let changed = after.diff(before).affectedKeys();
-      return me.role in ${L(m.STAFF)}
+      return isStaff(me)
         && after.status == before.status
         && !after.payload.diff(before.payload).affectedKeys().hasAny(${L(m.TRANSITION_ONLY_PAYLOAD_KEYS)})
         && (before.status == 'DRAFT'
-            ? ((ptwIsRequester(me, before) || me.role in ${L(m.APPROVERS)}) && changed.hasOnly(${L(m.PERMIT_DRAFT_CONTENT_KEYS)}))
+            ? ((ptwIsRequester(me, before) || isApprover(me)) && changed.hasOnly(${L(m.PERMIT_DRAFT_CONTENT_KEYS)}))
             : (before.status in ${L(m.CONTENT_STAGES)} && changed.hasOnly(${L(m.PERMIT_LIVE_CONTENT_KEYS)})));
     }
 
@@ -204,15 +198,10 @@ ${slotChecks};
     function ptwUpdateOk(before, after) {
       let me = myPointer();
       return 'permit_no' in before
-        && ptwInScope(me, before)
+        && inScope(me, before)
         && (after.get('workflow_log', []) != before.get('workflow_log', [])
             ? ptwTransitionUpdate(me, before, after)
             : ptwContentUpdate(me, before, after));
-    }
-
-    function ptwCounterBumped(d) {
-      let c = /databases/$(database)/documents/counters/$('ptw_' + d.org_id + '_' + string(d.permit_year));
-      return getAfter(c).data.value == (exists(c) ? get(c).data.value : 0) + 1;
     }
 
     function ptwMirrorMatches(docId, d) {
@@ -224,8 +213,8 @@ ${slotChecks};
     // consuming the next counter value in the same transaction, with a server-stamped start.
     function ptwCreateOk(docId, d) {
       let me = myPointer();
-      return me.role in ${L(m.STAFF)}
-        && ptwInScope(me, d)
+      return isStaff(me)
+        && inScope(me, d)
         && d.keys().hasOnly(${L(m.PERMIT_CREATE_KEYS)})
         && d.keys().hasAll(${L(m.PERMIT_CREATE_REQUIRED)})
         && d.status == 'DRAFT'
@@ -245,7 +234,7 @@ ${slotChecks};
         && d.stage_times.keys().hasOnly(['DRAFT'])
         && d.stage_times.DRAFT == request.time
         && d.signatures == {} && d.extensions == [] && d.approvals == [] && d.audit_log == []
-        && ptwCounterBumped(d)
+        && counterBumped('ptw', d.org_id, d.permit_year)
         && ptwMirrorMatches(docId, d);
     }
 
@@ -253,10 +242,10 @@ ${slotChecks};
     // rebuild (no permit_no) can be deleted by an administrator.
     function ptwDeleteOk(data) {
       let me = myPointer();
-      return me.role in ${L(m.STAFF)}
-        && ptwInScope(me, data)
+      return isStaff(me)
+        && inScope(me, data)
         && ('permit_no' in data
-            ? (data.status == 'DRAFT' && (me.docId == data.get('creator_id', '') || me.role in ${L(m.APPROVERS)}))
+            ? (data.status == 'DRAFT' && (me.docId == data.get('creator_id', '') || isApprover(me)))
             : me.role in ${OVERRIDERS});
     }
 
@@ -265,8 +254,8 @@ ${slotChecks};
     function ptwPublicWriteOk(token, mirror) {
       let me = myPointer();
       let p = getAfter(/databases/$(database)/documents/ptws/$(mirror.permit_id)).data;
-      return me.role in ${L(m.STAFF)}
-        && ptwInScope(me, p)
+      return isStaff(me)
+        && inScope(me, p)
         && p.public_token == token
         && mirror.keys().hasOnly(${L(m.PUBLIC_MIRROR_KEYS)})
         && mirror.keys().hasAll(['token', 'permit_id', 'org_id', 'permit_no', 'type', 'status', 'location', 'updated_at'])
@@ -281,30 +270,9 @@ ${slotChecks};
 
     function ptwPublicDeleteOk(mirror) {
       let me = myPointer();
-      return me.role in ${L(m.STAFF)}
-        && ptwInScope(me, mirror)
+      return isStaff(me)
+        && inScope(me, mirror)
         && !existsAfter(/databases/$(database)/documents/ptws/$(mirror.permit_id));
-    }
-
-    // Permit-number counters: one per organisation per year; the value only ever goes up by 1.
-    function ptwCounterCreateOk(counterId, d) {
-      let me = myPointer();
-      return me.role in ${L(m.STAFF)}
-        && ptwInScope(me, d)
-        && d.keys().hasOnly(['org_id', 'year', 'value'])
-        && d.value == 1
-        && d.year is int
-        && counterId == 'ptw_' + d.org_id + '_' + string(d.year);
-    }
-
-    function ptwCounterBumpOk(before, after) {
-      let me = myPointer();
-      return me.role in ${L(m.STAFF)}
-        && ptwInScope(me, before)
-        && after.keys().hasOnly(['org_id', 'year', 'value'])
-        && after.org_id == before.org_id
-        && after.year == before.year
-        && after.value == before.value + 1;
     }`;
 
   // ── match blocks, kept as data so the simulator evaluates the same text ──
@@ -328,17 +296,6 @@ ${slotChecks};
         { ops: ['delete'], expr: 'ptwPublicDeleteOk(resource.data)' },
       ],
     },
-    {
-      path: '/counters/{counterId}',
-      comment: 'A missing counter must be readable (resource == null) so the first permit of a year can create it.',
-      allows: [
-        { ops: ['get'], expr: 'isSignedIn() && (resource == null || ptwInScope(myPointer(), resource.data))' },
-        { ops: ['list'], expr: 'false' },
-        { ops: ['create'], expr: 'ptwCounterCreateOk(counterId, request.resource.data)' },
-        { ops: ['update'], expr: 'ptwCounterBumpOk(resource.data, request.resource.data)' },
-        { ops: ['delete'], expr: 'false' },
-      ],
-    },
   ];
 
   const matchText = matches.map(mt => {
@@ -351,7 +308,9 @@ ${slotChecks};
   }).join('\n\n');
 
   const header = `${START_MARK}
-    // Regenerate with: npm run gen:ptw-rules      Verify in CI with: npm run check:ptw-rules
+    // Regenerate with: npm run gen:rules      Verify in CI with: npm run check:rules
+    // (npm run gen:ptw-rules / check:ptw-rules still work.) Uses the shared helpers of the COMMON block:
+    // isStaff, isApprover, inScope, counterBumped.
     //
     // ENFORCED HERE   who may make which transition (role, requester vs reviewer, and the
     //                 administrator override), the validity window (stamped from server time,

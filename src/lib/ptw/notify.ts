@@ -5,6 +5,7 @@
 // showed them), and the "who" was a hard-coded role.
 
 import { APPROVERS, REVIEWERS, STAGE_LABEL, type ActionId, type Stage } from './model';
+import { severityFromTone, type NotificationInput, type NotificationType } from '../shared/notifications';
 
 export interface NotifyUser {
   id: string;
@@ -113,4 +114,26 @@ export function planNotifications(
     if (out.length >= MAX_RECIPIENTS) break;
   }
   return out;
+}
+
+/**
+ * The notification document for one planned message. `type` picks the icon on the notification screen;
+ * the permit number and type are the title; clicking opens the permit screen.
+ */
+export function toNotificationInput(permit: NotifyPermit & { id?: string }, to: Stage, n: PlannedNotification): NotificationInput {
+  const type: NotificationType =
+    to === 'REJECTED' || to === 'CANCELLED' || to === 'HOLD' ? 'ptw_rejected'
+    : to === 'EXPIRED' ? 'ptw_expiring'
+    : to === 'SITE_HANDOVER' || to === 'ACTIVE' || to === 'CLOSED' ? 'ptw_approved'
+    : 'system';
+  return {
+    org_id: permit.org_id,
+    user_id: n.user_id,
+    type,
+    severity: severityFromTone(n.type),
+    title: [permit.permit_no, permit.type].filter(Boolean).join(' \u00b7 ') || 'Permit to work',
+    message: n.message,
+    link_page: 'ptw',
+    ...(permit.id ? { link_id: permit.id } : {}),
+  };
 }

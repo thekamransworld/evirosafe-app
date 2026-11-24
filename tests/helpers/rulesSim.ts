@@ -462,6 +462,31 @@ export class World {
     }
   }
 
+  /** Does the `get` / `read` rule of this document's collection allow this person to read it? */
+  canRead(uid: string | null, path: string, now = 0): boolean {
+    const [, coll, id] = path.split('/');
+    const match = this.matches.find(m => m.path.split('/')[1] === coll);
+    const rule = match?.allows.find(a => a.ops.includes('get') || a.ops.includes('read'));
+    if (!match || !rule) return false;
+    const sim = this.sim;
+    sim.stats = { evals: 0, accessCalls: 0, byFn: {} };
+    sim.before = this.docs;
+    sim.after = this.docs;
+    sim.request = { auth: uid ? { uid } : null, time: new Ts(now), resource: null };
+    sim.resource = path in this.docs ? { data: this.docs[path] } : null;
+    sim.host = {
+      isSignedIn: () => !!uid,
+      myPointer: () => {
+        const p = uid ? this.docs[`/users_by_uid/${uid}`] : null;
+        if (!p) err('no pointer');
+        return p;
+      },
+    };
+    const vars: Record<string, any> = {};
+    for (const seg of match.path.split('/')) { const m = /^\{(\w+)\}$/.exec(seg); if (m) vars[m[1]] = id; }
+    try { return sim.evalExpr(rule.expr, vars) === true; } catch (e) { if (e instanceof RulesError) return false; throw e; }
+  }
+
   /** A batch / transaction: every op must be allowed, judged against the state after ALL ops. */
   commit(uid: string | null, ops: Op[], now: number): { ok: true } | { ok: false; op: Op; why: string } {
     const after: Record<string, any> = { ...this.docs };

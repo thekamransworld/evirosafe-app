@@ -12,7 +12,7 @@
 
 import { db } from '../firebase';
 import {
-  addDoc, collection, deleteField, doc, getDocFromServer, getDocsFromServer, query, runTransaction,
+  collection, deleteField, doc, getDocFromServer, getDocsFromServer, query, runTransaction,
   serverTimestamp, Timestamp, where, writeBatch,
   type DocumentSnapshot,
 } from 'firebase/firestore';
@@ -26,7 +26,8 @@ import { ACTIONS, type ActionId, type PermitType } from '../lib/ptw/model';
 import { counterDocId } from '../lib/ptw/numbering';
 import { effectiveStatus } from '../lib/ptw/validity';
 import { stripUndefined } from '../lib/ptw/clean';
-import { planNotifications, type NotifyUser } from '../lib/ptw/notify';
+import { planNotifications, toNotificationInput, type NotifyUser } from '../lib/ptw/notify';
+import { writeNotifications } from './notificationService';
 import {
   buildNewPermit, generatePublicToken, planContentWrite, planTransitionWrite,
   resolveSentinels, type Sentinel,
@@ -327,15 +328,8 @@ export async function notifyAfter(
 ): Promise<void> {
   try {
     const plan = planNotifications(permit as unknown as Parameters<typeof planNotifications>[0], action, to, actorId, users, note);
-    await Promise.allSettled(plan.map(n =>
-      addDoc(collection(db, 'notifications'), {
-        org_id: permit.org_id, // without this the rules refuse the document and nobody sees it
-        user_id: n.user_id,
-        message: n.message,
-        type: n.type,
-        is_read: false,
-        timestamp: new Date().toISOString(),
-      })));
+    // Documents carry org_id and the fields the notification screen reads (see src/lib/shared/notifications.ts).
+    await writeNotifications(plan.map(n => toNotificationInput(permit as unknown as Parameters<typeof toNotificationInput>[0], to, n)));
   } catch (e) {
     console.error('PTW notification failed:', e);
   }

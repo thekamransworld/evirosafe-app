@@ -52,7 +52,7 @@ const MORE_GROUPS = [
     items: [
       { id: 'documents',    label: 'Document Control',     icon: FolderOpen },
       { id: 'environment',  label: 'Environmental',        icon: Leaf },
-      { id: 'audit-log',    label: 'Audit Log',            icon: FileText },
+      { id: 'audit-log',    label: 'Activity Log',         icon: FileText },
       { id: 'exports',      label: 'Data Export',          icon: Download },
       { id: 'privacy',      label: 'Data & Privacy',       icon: Lock },
       { id: 'notifications',label: 'Notifications',        icon: Bell },

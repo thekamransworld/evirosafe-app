@@ -38,6 +38,7 @@ import {
 } from '../../lib/kpiCalculations';
 import { useDataContext } from '../../contexts';
 import { useAppContext } from '../../contexts';
+import { summarize, ymd } from '../../lib/actions/overdue';
 import type { Report } from '../../types';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,12 +228,12 @@ export const KpiDashboard: React.FC<KpiDashboardProps> = ({
   const annualHours = manHoursOverride ?? totalWorkers * avgHoursPerWorkerPerMonth * 12;
 
   // Action leading indicators
-  const overdueActions = actionItems.filter(
-    (a) => a.status !== 'Closed' && a.due_date && new Date(a.due_date) < new Date(),
-  ).length;
-  const onTimeActions = actionItems.filter(
-    (a) => a.status === 'Closed' && a.due_date && new Date(a.due_date) >= new Date((a as any).completed_at ?? ''),
-  ).length;
+  // Only actions made by the action tracker count (old, unimported ones are listed on the tracker itself).
+  // "On time" means verified and closed no later than the due date; an imported action with no known close
+  // time is not counted as on time.
+  const actionSummary = summarize(actionItems.filter(a => !!a.number) as any, ymd(Date.now()));
+  const overdueActions = actionSummary.overdue;
+  const onTimeActions = actionSummary.closedOnTime;
 
   // Main snapshot
   const snapshot = useMemo<KpiSnapshot>(

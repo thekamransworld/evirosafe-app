@@ -1,13 +1,12 @@
 // Shared by the rules-simulation and service tests: people, a seeded rules world, and payload fixtures.
-// @ts-ignore (plain .mjs, no types)
-import { buildPtwRules } from '../../scripts/ptw-rules-lib.mjs';
-import * as model from '../../src/lib/ptw/model';
 import { Ts, World } from './rulesSim';
+import { allRules } from './allRules';
 import type { Sentinel } from '../../src/lib/ptw/writes';
 
 export const MIN = 60_000, H = 3_600_000, DAY = 24 * H;
 
-export const rules = buildPtwRules(model);
+/** Every generated section (shared helpers, PTW, ACTIONS): the permit rules call the shared helpers. */
+export const rules = { functions: allRules.functions, matches: allRules.matches };
 
 // ─── people ───────────────────────────────────────────────────────────────
 

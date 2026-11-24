@@ -62,7 +62,6 @@ const MENU_SECTIONS: MenuSection[] = [
     { label: 'Toolbox Talks',      view: 'tbt' },
     { label: 'Training',           view: 'training' },
     { label: 'Man-Hours Log',      view: 'man-hours',          roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
-    { label: 'Corrective Actions', view: 'corrective-actions', roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
     { label: 'Chemical Register',  view: 'chemical-register',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER','SUPERVISOR'] },
   ]},
   { id: 'analytics', label: 'Analytics', items: [
@@ -84,7 +83,7 @@ const MENU_SECTIONS: MenuSection[] = [
   ]},
   { id: 'compliance', label: 'Compliance', items: [
     { label: 'Compliance Register', view: 'compliance',  roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
-    { label: 'Audit Log',           view: 'audit-log',   roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
+    { label: 'Activity Log',        view: 'audit-log',   roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
     { label: 'Data Export',         view: 'exports',     roles: ['ADMIN','ORG_ADMIN','HSE_MANAGER','HSE_OFFICER'] },
     { label: 'Data & Privacy',      view: 'privacy',     roles: ['ADMIN','ORG_ADMIN'] },
   ]},

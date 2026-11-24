@@ -85,23 +85,18 @@ export const STAGE_GROUPS = {
 export type StageGroup = keyof typeof STAGE_GROUPS;
 
 // ─── Roles ────────────────────────────────────────────────────────────────
+// The role lists are shared by every module (src/lib/shared/roles.ts).
 
-export type Role =
-  | 'ADMIN' | 'ORG_ADMIN' | 'HSE_MANAGER' | 'HSE_OFFICER' | 'SUPERVISOR'
-  | 'INSPECTOR' | 'WORKER' | 'CLIENT_VIEWER' | 'CUSTOM_SITE_LEAD';
+import {
+  APPROVERS, MIN_JUSTIFICATION_CHARS, MIN_REASON_CHARS, OVERRIDERS, REVIEWERS, STAFF, type Role,
+} from '../shared/roles';
+import type { CounterSpec } from '../shared/counters';
 
-/** Everyone except a read-only client viewer. */
-export const STAFF: readonly Role[] = [
-  'ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'HSE_OFFICER', 'SUPERVISOR',
-  'INSPECTOR', 'WORKER', 'CUSTOM_SITE_LEAD',
-];
-export const REVIEWERS: readonly Role[] = [
-  'ADMIN', 'ORG_ADMIN', 'HSE_MANAGER', 'HSE_OFFICER', 'SUPERVISOR',
-  'INSPECTOR', 'CUSTOM_SITE_LEAD',
-];
-export const APPROVERS: readonly Role[] = ['ADMIN', 'ORG_ADMIN', 'HSE_MANAGER'];
-/** May bypass a segregation-of-duties rule, in writing, with an audit flag. */
-export const OVERRIDERS: readonly Role[] = ['ADMIN', 'ORG_ADMIN'];
+export { APPROVERS, MIN_JUSTIFICATION_CHARS, MIN_REASON_CHARS, OVERRIDERS, REVIEWERS, STAFF };
+export type { Role };
+
+/** Permit numbers: PTW-YYYY-NNNN, one counter per organisation per year. Read by the rules generator. */
+export const COUNTER: CounterSpec = { kind: 'ptw', prefix: 'PTW', roles: STAFF };
 
 // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -228,10 +223,6 @@ export const FORWARD_ACTIONS: Partial<Record<Stage, readonly ActionId[]>> = {
   EXPIRED: ['request_completion'],
   COMPLETION_PENDING: ['close'],
 };
-
-/** Minimum length of a written reason / override justification. */
-export const MIN_REASON_CHARS = 5;
-export const MIN_JUSTIFICATION_CHARS = 10;
 
 // ─── Permit types ─────────────────────────────────────────────────────────
 

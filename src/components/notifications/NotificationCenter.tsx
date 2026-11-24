@@ -58,26 +58,9 @@ import { useAppContext } from '../../contexts';
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type NotificationType =
-  | 'ptw_approved'
-  | 'ptw_rejected'
-  | 'ptw_expiring'
-  | 'incident_submitted'
-  | 'incident_assigned'
-  | 'action_overdue'
-  | 'action_assigned'
-  | 'certification_expiry'
-  | 'inspection_due'
-  | 'inspection_assigned'
-  | 'capa_assigned'
-  | 'document_review_due'
-  | 'drill_scheduled'
-  | 'bbs_follow_up'
-  | 'env_breach'
-  | 'fatigue_alert'
-  | 'system';
+import type { NotificationType, NotifSeverity } from '../../lib/shared/notifications';
+export type { NotificationType };
 
-type NotifSeverity = 'info' | 'warning' | 'critical' | 'success';
 
 export interface AppNotification {
   id: string;

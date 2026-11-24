@@ -63,6 +63,7 @@ test('the generated block is balanced and has one match block per collection', (
   const open = (text.match(/\{/g) ?? []).length, close = (text.match(/\}/g) ?? []).length;
   assert.equal(open, close, 'unbalanced braces');
   assert.equal((text.match(/\(/g) ?? []).length, (text.match(/\)/g) ?? []).length, 'unbalanced parentheses');
-  assert.equal((text.match(/^\s*match \//gm) ?? []).length, 3);
-  for (const m of ['/ptws/{docId}', '/ptw_public/{token}', '/counters/{counterId}']) assert.ok(text.includes(`match ${m}`), m);
+  assert.equal((text.match(/^\s*match \//gm) ?? []).length, 2); // the counters rule moved to the shared COMMON block
+  for (const m of ['/ptws/{docId}', '/ptw_public/{token}']) assert.ok(text.includes(`match ${m}`), m);
+  assert.ok(!text.includes('/counters/'), 'counters are generated in the COMMON block, not here');
 });

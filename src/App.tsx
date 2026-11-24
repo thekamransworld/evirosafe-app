@@ -88,7 +88,6 @@ import { People }          from './components/People';
 import { Roles }           from './components/Roles';
 import { Organizations }   from './components/Organizations';
 import { ChemicalRegister }   from './components/ChemicalRegister';
-import { CorrectiveActions }  from './components/CorrectiveActions';
 import { ManHoursLogger }     from './components/ManHoursLogger';
 import { AuditInspection }    from './components/AuditInspection';
 import { Projects }        from './components/Projects';
@@ -151,7 +150,6 @@ import { TbtSessionModal }         from './components/TbtSessionModal';
 import { TrainingCourseModal }     from './components/TrainingCourseModal';
 import { TrainingSessionModal }    from './components/TrainingSessionModal';
 import { SessionAttendanceModal }  from './components/SessionAttendanceModal';
-import { ActionCreationModal }     from './components/ActionCreationModal';
 import { InspectionCreationModal } from './components/InspectionCreationModal';
 import { InspectionConductModal }  from './components/InspectionConductModal';
 import { ChecklistRunModal }       from './components/ChecklistRunModal';
@@ -180,18 +178,17 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
     isSessionModalOpen, setSessionModalOpen,
     isAttendanceModalOpen, setAttendanceModalOpen,
     courseForSession, sessionForAttendance,
-    isActionCreationModalOpen, setIsActionCreationModalOpen,
     isInspectionCreationModalOpen, setIsInspectionCreationModalOpen,
   } = useModalContext();
 
   const {
-    handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
+    handleCreateReport, handleStatusChange, handleAcknowledgeReport,
     ptwList,
     handleCreatePlan, handlePlanStatusChange, handleUpdatePlan,
     handleCreateRams, handleRamsStatusChange, handleUpdateRams,
     handleCreateTbt, handleUpdateTbt,
     handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleSaveSessionAttendance,
-    handleCreateStandaloneAction, handleCreateInspection,
+    handleCreateInspection,
     projects, trainingCourseList, checklistTemplates,
   } = useDataContext();
 
@@ -217,8 +214,6 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
           activeUser={activeUser}
           onClose={() => setSelectedReport(null)}
           onStatusChange={handleStatusChange}
-          onCapaActionChange={handleCapaActionChange}
-          onAddCapaAction={handleAddCapaAction}
           onAcknowledgeReport={handleAcknowledgeReport}
           onInvestigate={(report) => { setSelectedReport(null); onInvestigate(report); }}
         />
@@ -319,13 +314,6 @@ const GlobalModals: React.FC<{ onInvestigate: (report: any) => void }> = ({ onIn
           users={usersList}
         />
       )}
-      <ActionCreationModal
-        isOpen={isActionCreationModalOpen}
-        onClose={() => setIsActionCreationModalOpen(false)}
-        onSubmit={handleCreateStandaloneAction}
-        users={usersList}
-        projects={projects}
-      />
       <InspectionCreationModal
         isOpen={isInspectionCreationModalOpen}
         onClose={() => setIsInspectionCreationModalOpen(false)}
@@ -478,7 +466,7 @@ const AppContent: React.FC = () => {
           )}
 
           {currentView === 'inspections' && <Inspections />}
-          {currentView === 'actions'     && <Actions />}
+          {(currentView === 'actions' || currentView === 'corrective-actions') && <Actions />}
 
           {currentView === 'plans' && (
             <Plans
@@ -529,7 +517,6 @@ const AppContent: React.FC = () => {
           {currentView === 'roles'          && <Roles roles={rolesConfig} />}
           {currentView === 'organizations'  && <Organizations />}
           {currentView === 'chemical-register'  && <ChemicalRegister />}
-          {currentView === 'corrective-actions' && <CorrectiveActions />}
           {currentView === 'man-hours'           && <ManHoursLogger />}
           {currentView === 'audit-inspection'    && <AuditInspection />}
           {currentView === 'projects'       && <Projects />}

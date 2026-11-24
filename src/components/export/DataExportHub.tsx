@@ -183,14 +183,16 @@ const EXPORT_MODULES: ExportModule[] = [
     category: 'Safety',
     formats: ['csv', 'excel'],
     columns: [
-      { key: 'id',       label: 'Action ID',  width: 14 },
-      { key: 'action',   label: 'Action',     width: 40 },
+      { key: 'number',   label: 'Number',     width: 16 },
+      { key: 'title',    label: 'Action',     width: 40 },
+      { key: 'kind',     label: 'Type',       width: 12 },
       { key: 'owner_id', label: 'Owner',      width: 20 },
       { key: 'due_date', label: 'Due Date',   width: 12, format: (v) => fmtDate(v) },
-      { key: 'status',   label: 'Status',     width: 12 },
+      { key: 'status',   label: 'Status',     width: 14 },
       { key: 'priority', label: 'Priority',   width: 10 },
     ],
-    getData: (ctx) => ctx.actionItems,
+    // Numbered actions only: old ones that are not yet imported are not part of the register.
+    getData: (ctx) => (ctx.actionItems ?? []).filter((a: any) => a.number),
   },
 
   {

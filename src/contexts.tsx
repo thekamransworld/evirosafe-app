@@ -12,12 +12,13 @@ import { translations, supportedLanguages, roles } from './config';
 import type { 
   Organization, User, Report, ChecklistRun, Inspection, Plan as PlanType, 
   Rams as RamsType, TbtSession, TrainingCourse, TrainingRecord, TrainingSession, 
-  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, ActionItem, Notification, CapaAction, Chemical, BbsObservation,
+  Project, View, Ptw, Action, Resource, Sign, ChecklistTemplate, Notification, Chemical, BbsObservation,
   Hazard, ContractorCompany, ContractorWorker, PpeItem, PpeAssignment, ShiftLog, FfdAssessment, EnvReading, SafetyMeeting,
   EmergencyPlan, EmergencyDrill, ControlledDocument, DataRequest, RetentionPolicy, ProcessingActivity, DataBreach, ComplianceTracking, RcaRecord,
-  SiteAccessLog, CorrectiveAction, ManHoursEntry, Audit, LegalComplianceItem, WasteRecord
+  SiteAccessLog, ManHoursEntry, Audit, LegalComplianceItem, WasteRecord
 } from './types';
 import { useToast } from './components/ui/Toast';
+import type { ActionDoc } from './lib/actions/engine';
 
 // --- FIREBASE IMPORTS ---
 import { db } from './firebase';
@@ -35,6 +36,7 @@ import { cleanAttendance } from './lib/certificates';
 
 // --- PERMITS TO WORK ---
 import { usePtwController, type PtwController } from './hooks/usePtwController';
+import { useActionsController, type ActionsController } from './hooks/useActionsController';
 import {
   closeSessionAndIssueCertificates, issueCertificatesForSession, issueCertificateForExistingRecord, revokeCertificate, describeCertificateError,
 } from './services/certificateService';
@@ -400,7 +402,9 @@ interface DataContextType {
   signs: Sign[];
   checklistTemplates: ChecklistTemplate[];
   ptwList: Ptw[];
-  actionItems: ActionItem[];
+  /** Every document of the `actions` collection (see src/lib/actions). Old, unnumbered ones are included until imported. */
+  actionItems: ActionDoc[];
+  setActionItems: React.Dispatch<React.SetStateAction<ActionDoc[]>>;
   chemicalList: Chemical[];
   bbsObservations: BbsObservation[];
   legalComplianceList: LegalComplianceItem[];
@@ -424,7 +428,6 @@ interface DataContextType {
   complianceTracking: ComplianceTracking[];
   rcaRecords: RcaRecord[];
   siteAccessLogs: SiteAccessLog[];
-  correctiveActions: CorrectiveAction[];
   manHoursEntries: ManHoursEntry[];
   audits: Audit[];
   
@@ -436,8 +439,6 @@ interface DataContextType {
   handleUpdateProject: (projectId: string, updates: Partial<Project>) => void;
   handleCreateReport: (data: any) => void;
   handleStatusChange: (id: string, status: any) => void;
-  handleCapaActionChange: (id: string, index: number, status: any) => void;
-  handleAddCapaAction: (reportId: string, action: Omit<CapaAction, 'status'>) => void;
   handleAcknowledgeReport: (id: string) => void;
   handleUpdateInspection: (data: any, action?: any) => void;
   // Permits to work: see src/hooks/usePtwController.ts
@@ -462,9 +463,7 @@ interface DataContextType {
   handleIssueSessionCertificates: (sessionId: string) => Promise<boolean>;
   handleIssueCertificate: (recordId: string) => Promise<boolean>;
   handleRevokeCertificate: (recordId: string) => Promise<boolean>;
-  handleUpdateActionStatus: (origin: any, status: any) => void;
   handleCreateInspection: (data: any) => void;
-  handleCreateStandaloneAction: (data: any) => void;
   handleCreateChecklistTemplate: (data: any) => void;
   handleCreateChemical: (data: any) => void;
   handleUpdateChemical: (data: Chemical) => void;
@@ -506,8 +505,6 @@ interface DataContextType {
   handleCreateRcaRecord: (data: RcaRecord) => void;
   handleCreateSiteAccessLog: (data: SiteAccessLog) => void;
   handleUpdateSiteAccessLog: (data: SiteAccessLog) => void;
-  handleCreateCorrectiveAction: (data: CorrectiveAction) => void;
-  handleUpdateCorrectiveAction: (data: CorrectiveAction) => void;
   handleSaveManHoursEntry: (data: Omit<ManHoursEntry, 'id' | 'org_id'> & { id?: string }) => void;
   handleCreateAudit: (data: Audit) => void;
   handleUpdateAudit: (data: Audit) => void;
@@ -516,6 +513,14 @@ interface DataContextType {
   handleDeleteReport: (id: string) => void;
   handleDeleteInspection: (id: string) => void;
   handleDeletePtw: PtwController['handleDeletePtw'];
+  // Actions: see src/hooks/useActionsController.ts
+  handleCreateAction: ActionsController['handleCreateAction'];
+  handleActionStep: ActionsController['handleActionStep'];
+  handleSaveActionContent: ActionsController['handleSaveActionContent'];
+  actionActor: ActionsController['actionActor'];
+  actionOrgId: ActionsController['actionOrgId'];
+  actionProjectIds: ActionsController['actionProjectIds'];
+  actionsReady: ActionsController['actionsReady'];
   handleDeletePlan: (id: string) => void;
   handleDeleteRams: (id: string) => void;
   handleDeleteTbt: (id: string) => void;
@@ -544,7 +549,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [ptwList, setPtwList] = useState<Ptw[]>([]);
     const [signs, setSigns] = useState<Sign[]>(initialSigns || []);
     const [checklistTemplates, setChecklistTemplates] = useState<ChecklistTemplate[]>(initialTemplates || []);
-    const [standaloneActions, setStandaloneActions] = useState<ActionItem[]>([]);
+    const [actionItems, setActionItems] = useState<ActionDoc[]>([]);
     const [chemicalList, setChemicalList] = useState<Chemical[]>([]);
     const [bbsObservations, setBbsObservations] = useState<BbsObservation[]>([]);
     const [legalComplianceList, setLegalComplianceList] = useState<LegalComplianceItem[]>([]);
@@ -568,7 +573,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [complianceTracking, setComplianceTracking] = useState<ComplianceTracking[]>([]);
     const [rcaRecords, setRcaRecords] = useState<RcaRecord[]>([]);
     const [siteAccessLogs, setSiteAccessLogs] = useState<SiteAccessLog[]>([]);
-    const [correctiveActions, setCorrectiveActions] = useState<CorrectiveAction[]>([]);
     const [manHoursEntries, setManHoursEntries] = useState<ManHoursEntry[]>([]);
     const [audits, setAudits] = useState<Audit[]>([]);
 
@@ -576,6 +580,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const ptwController = usePtwController({
         uid: currentUser?.uid ?? null,
         ptwList, setPtwList, usersList, trainingCourseList, trainingRecordList, toast,
+    });
+
+    // Actions: identity, live updates, create / step / save.
+    const actionsController = useActionsController({
+        uid: currentUser?.uid ?? null,
+        actionItems, setActionItems, usersList, toast,
     });
 
     useEffect(() => {
@@ -703,12 +713,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('plans', setPlanList, initialPlans),
             fetchCol('rams', setRamsList, initialRams),
             fetchCol('signs', setSigns, initialSigns),
-            fetchCol('actions', setStandaloneActions),
+            fetchCol('actions', setActionItems),
             fetchCol('tbt_sessions', setTbtList),
             fetchCol('training_courses', setTrainingCourseList),
             fetchCol('training_records', setTrainingRecordList),
             fetchCol('training_sessions', setTrainingSessionList),
-            fetchCol('notifications', setNotifications),
+            // Notifications are private to their recipient: the database only answers a query by user.
+            (async () => {
+                if (!myDocId) { setNotifications([]); return; }
+                try {
+                    const snap = await getDocs(query(collection(db, 'notifications'), where('user_id', '==', myDocId)));
+                    setNotifications(snap.docs.map(d => ({ ...(d.data() as object), id: d.id }) as any));
+                } catch (e) { console.error('Could not load notifications:', e); }
+            })(),
             fetchCol('chemicals', setChemicalList),
             fetchCol('bbs_observations', setBbsObservations),
             fetchCol('hazards', setHazardList),
@@ -732,7 +749,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             fetchCol('compliance_tracking', setComplianceTracking),
             fetchCol('rca_records', setRcaRecords),
             fetchCol('site_access_logs', setSiteAccessLogs),
-            fetchCol('corrective_actions', setCorrectiveActions),
             fetchCol('man_hours_entries', setManHoursEntries),
             fetchCol('audits', setAudits),
           ]);
@@ -826,7 +842,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setReportList(prev => [newReport, ...prev]);
         try { 
             await setDoc(doc(db, 'reports', newReport.id), newReport); 
-            await notifyRole(activeOrg.id, 'HSE_MANAGER', `New ${newReport.type} reported by ${activeUser?.name}`, 'warning');
+            await notifyRole(activeOrg.id, 'HSE_MANAGER', `New ${newReport.type} reported by ${activeUser?.name}`, 'warning', { type: 'incident_submitted', title: 'New incident report', link_page: 'reports', link_id: newReport.id });
             toast.success("Report saved."); 
         } catch (e) {
             console.error(e);
@@ -847,7 +863,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setInspectionList(prev => [newInspection, ...prev]);
         try { 
             await setDoc(doc(db, 'inspections', newInspection.id), newInspection); 
-            await notifyRole(activeOrg.id, 'SUPERVISOR', `New Inspection: ${newInspection.title}`, 'info');
+            await notifyRole(activeOrg.id, 'SUPERVISOR', `New Inspection: ${newInspection.title}`, 'info', { type: 'inspection_assigned', title: 'New inspection', link_page: 'inspections', link_id: newInspection.id });
             toast.success("Inspection created."); 
         } catch (e) {
             console.error(e);
@@ -1170,19 +1186,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         catch (e) { console.error(e); toast.error("Failed to update access log entry."); if (previous) setSiteAccessLogs(prev => prev.map(l => l.id === data.id ? previous : l)); }
     };
 
-    const handleCreateCorrectiveAction = async (data: CorrectiveAction) => {
-        const record = { ...data, org_id: activeOrg.id };
-        setCorrectiveActions(prev => [record, ...prev]);
-        try { await setDoc(doc(db, 'corrective_actions', record.id), record); }
-        catch (e) { console.error(e); toast.error("Failed to save corrective action."); setCorrectiveActions(prev => prev.filter(c => c.id !== record.id)); }
-    };
-    const handleUpdateCorrectiveAction = async (data: CorrectiveAction) => {
-        const previous = correctiveActions.find(c => c.id === data.id);
-        setCorrectiveActions(prev => prev.map(c => c.id === data.id ? data : c));
-        try { await updateDoc(doc(db, 'corrective_actions', data.id), data as any); }
-        catch (e) { console.error(e); toast.error("Failed to update corrective action."); if (previous) setCorrectiveActions(prev => prev.map(c => c.id === data.id ? previous : c)); }
-    };
-
     // Upsert keyed by project_id + log_date, matching the component's
     // existing one-entry-per-project-per-day semantics exactly - re-logging
     // the same day/project naturally overwrites via setDoc rather than
@@ -1213,33 +1216,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         catch (e) { console.error(e); toast.error("Failed to update audit."); if (previous) setAudits(prev => prev.map(a => a.id === data.id ? previous : a)); }
     };
 
-    const handleCreateStandaloneAction = async (data: any) => {
-        const newAction = {
-            id: `act_${Date.now()}`,
-            org_id: activeOrg.id,
-            action: data.action,
-            owner_id: data.owner_id,
-            due_date: data.due_date,
-            status: 'Open',
-            priority: data.priority,
-            project_id: data.project_id,
-            source: { type: 'Standalone', id: '-', description: 'Direct Entry' },
-            origin: { type: 'standalone', parentId: '', itemId: '' }
-        };
-        setStandaloneActions(prev => [newAction as any, ...prev]);
-        try { 
-            await setDoc(doc(db, 'actions', newAction.id), newAction); 
-            if (data.owner_id) {
-                await sendNotification(data.owner_id, `You have been assigned a new action: ${data.action}`, 'info');
-            }
-            toast.success("Action created."); 
-        } catch (e) {
-            console.error(e);
-            toast.error("Failed to create action.");
-            setStandaloneActions(prev => prev.filter(a => a.id !== newAction.id));
-        }
-    };
-    
     const handleCreateProject = async (data: any) => {
         try {
             const projectData = {
@@ -1283,56 +1259,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (e) {
             toast.error("Failed to update status.");
             if (previous) setReportList(prev => prev.map(r => r.id === id ? previous : r));
-        }
-    };
-
-    const handleCapaActionChange = async (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => {
-        const report = reportList.find(r => r.id === reportId);
-        if (report) {
-            const previousCapa = report.capa;
-            const newCapa = [...report.capa];
-            if (newCapa[capaIndex]) {
-                newCapa[capaIndex] = { ...newCapa[capaIndex], status: newStatus };
-                setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
-                try {
-                    await updateDB('reports', reportId, { capa: newCapa });
-                } catch (e) {
-                    toast.error("Failed to update CAPA status.");
-                    setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: previousCapa } : r));
-                }
-            }
-        }
-    };
-
-    const handleAddCapaAction = async (reportId: string, action: Omit<CapaAction, 'status'>) => {
-        const report = reportList.find(r => r.id === reportId);
-        if (report) {
-            const previousCapa = report.capa;
-            const newCapaAction: CapaAction = { ...action, status: 'Open' };
-            const newCapa = [...(report.capa || []), newCapaAction];
-            setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: newCapa } : r));
-            try {
-                await updateDB('reports', reportId, { capa: newCapa });
-                toast.success("CAPA action added.");
-            } catch (e) {
-                toast.error("Failed to add CAPA action.");
-                setReportList(prev => prev.map(r => r.id === reportId ? { ...r, capa: previousCapa } : r));
-            }
-        }
-    };
-
-    const handleUpdateActionStatus = async (origin: any, newStatus: any) => {
-        if (origin.type === 'report-capa') {
-            await handleCapaActionChange(origin.parentId, parseInt(origin.itemId), newStatus);
-        } else if (origin.type === 'standalone') {
-             const previous = standaloneActions.find(a => a.id === origin.parentId);
-             setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? { ...a, status: newStatus } : a));
-             try {
-                 await updateDB('actions', origin.parentId, { status: newStatus });
-             } catch (e) {
-                 toast.error("Failed to update action status.");
-                 if (previous) setStandaloneActions(prev => prev.map(a => a.id === origin.parentId ? previous : a));
-             }
         }
     };
 
@@ -1755,27 +1681,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const actionItems = useMemo<ActionItem[]>(() => {
-        const items: ActionItem[] = [];
-        (reportList || []).forEach(report => {
-            if (report.capa) {
-                report.capa.forEach((action, index) => {
-                    items.push({
-                        id: `report-${report.id}-capa-${index}`,
-                        action: action.action,
-                        owner_id: action.owner_id,
-                        due_date: action.due_date,
-                        status: action.status,
-                        project_id: report.project_id,
-                        source: { type: 'Report', id: report.id, description: report.description },
-                        origin: { type: 'report-capa', parentId: report.id, itemId: index.toString() }
-                    });
-                });
-            }
-        });
-        return [...items, ...standaloneActions];
-    }, [reportList, standaloneActions]);
-
     const value = {
         isLoading,
         projects, reportList, inspectionList, checklistRunList, planList, ramsList, tbtList, 
@@ -1784,13 +1689,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hazardList, contractorCompanies, contractorWorkers, ppeItems, ppeAssignments, shiftLogs, ffdAssessments,
         envReadings, safetyMeetings, emergencyPlans, emergencyDrills, controlledDocuments, dataRequests, retentionPolicies,
         processingActivities, dataBreaches, complianceTracking, rcaRecords, siteAccessLogs,
-        correctiveActions, manHoursEntries, audits,
-        setInspectionList, setChecklistRunList, setPtwList,
-        handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleCapaActionChange, handleAddCapaAction, handleAcknowledgeReport,
-        handleUpdateInspection, ...ptwController, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
+        manHoursEntries, audits,
+        setInspectionList, setChecklistRunList, setPtwList, setActionItems,
+        handleCreateProject, handleUpdateProject, handleCreateReport, handleStatusChange, handleAcknowledgeReport,
+        handleUpdateInspection, ...ptwController, ...actionsController, handleCreatePlan, handleUpdatePlan, handlePlanStatusChange,
         handleCreateRams, handleUpdateRams, handleRamsStatusChange, handleCreateTbt, handleUpdateTbt,
         handleCreateOrUpdateCourse, handleScheduleSession, handleCloseSession, handleSaveSessionAttendance, handleIssueSessionCertificates, handleIssueCertificate, handleRevokeCertificate,
-        handleUpdateActionStatus, handleCreateInspection, handleCreateStandaloneAction,
+        handleCreateInspection,
         handleCreateChecklistTemplate, handleCreateChemical, handleUpdateChemical, handleCreateBbsObservation, handleUpdateBbsObservation,
         handleCreateLegalComplianceItem, handleUpdateLegalComplianceItem, handleCreateWasteRecord,
         handleCreateHazard, handleUpdateHazard, handleCreateContractorCompany, handleUpdateContractorCompany,
@@ -1802,7 +1707,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateDataRequest, handleUpdateDataRequest, handleCreateRetentionPolicy, handleUpdateRetentionPolicy,
         handleCreateProcessingActivity, handleUpdateProcessingActivity, handleCreateDataBreach, handleUpdateDataBreach,
         handleUpdateComplianceTracking, handleCreateRcaRecord, handleCreateSiteAccessLog, handleUpdateSiteAccessLog,
-        handleCreateCorrectiveAction, handleUpdateCorrectiveAction, handleSaveManHoursEntry, handleCreateAudit, handleUpdateAudit,
+        handleSaveManHoursEntry, handleCreateAudit, handleUpdateAudit,
         handleDeleteReport, handleDeleteInspection, handleDeletePlan, handleDeleteRams, handleDeleteTbt
     };
 

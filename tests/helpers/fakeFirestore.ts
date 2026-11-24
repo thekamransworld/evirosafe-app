@@ -15,6 +15,8 @@ export const fake = {
   uid: null as string | null,
   serverNow: 0,
   notifications: [] as any[],
+  /** Notification writes the generated rules refused (should stay empty). */
+  deniedNotifications: [] as Array<{ data: any; why: string }>,
   lastDenied: null as null | { path: string; why: string },
   commits: 0,
   autoId: 0,
@@ -38,6 +40,7 @@ export async function getDocFromServer(r: Ref) { return snap(r); }
 
 export const where = (field: string, op: string, value: unknown) => ({ field, op, value });
 export const query = (col: Ref, ...constraints: Array<{ field: string; op: string; value: unknown }>) => ({ col, constraints });
+export async function getDocs(q: { col: Ref; constraints: Array<{ field: string; op: string; value: unknown }> }) { return getDocsFromServer(q); }
 export async function getDocsFromServer(q: { col: Ref; constraints: Array<{ field: string; op: string; value: unknown }> }) {
   const prefix = `${q.col.path}/`;
   const docs = Object.entries(fake.world.docs)
@@ -109,8 +112,38 @@ export async function runTransaction<T>(_db: unknown, fn: (tx: any) => Promise<T
   return out;
 }
 
-/** Notifications are not part of the PTW rules; record them so tests can inspect what would be written. */
+/**
+ * Notifications are judged by the generated COMMON rules like every other write, then recorded so tests
+ * can inspect what was written. A refused notification is recorded in `fake.deniedNotifications`.
+ */
 export async function addDoc(col: Ref, data: any) {
-  if (col.id === 'notifications') fake.notifications.push(data);
-  return docRef(`${col.path}/n${fake.notifications.length}`);
+  const path = `${col.path}/n${++fake.autoId}`; // a fresh id every time (tests reset the arrays)
+  const resolved = resolveSentinels(data, resolveFake);
+  if (col.id !== 'notifications') { fake.world.docs[path] = resolved; return docRef(path); }
+  const res = fake.world.commit(fake.uid, [{ kind: 'set', path, data: resolved }], fake.serverNow);
+  if (res.ok === false) { fake.deniedNotifications.push({ data: resolved, why: res.why }); throw denied(); }
+  fake.notifications.push(resolved);
+  return docRef(path);
+}
+
+/**
+ * A live query that delivers the current matching documents once and returns an unsubscribe function.
+ * Supports `==` and `in`, like the real constraints the screens use.
+ */
+export function onSnapshot(
+  q: { col: Ref; constraints: Array<{ field: string; op: string; value: unknown }> },
+  onNext: (s: { docs: Array<{ id: string; data: () => any }> }) => void,
+  _onError?: (e: unknown) => void,
+) {
+  const prefix = `${q.col.path}/`;
+  const docs = Object.entries(fake.world.docs)
+    .filter(([path, data]) => path.startsWith(prefix) && q.constraints.every(c => {
+      const v = (data as any)[c.field];
+      if (c.op === '==') return v === c.value;
+      if (c.op === 'in') return (c.value as unknown[]).includes(v);
+      throw new Error(`fake firestore: operator ${c.op} not supported`);
+    }))
+    .map(([path, data]) => ({ id: path.split('/').pop() as string, data: () => data }));
+  onNext({ docs });
+  return () => {};
 }

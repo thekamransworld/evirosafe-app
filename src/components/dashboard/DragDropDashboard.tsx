@@ -28,6 +28,7 @@
  */
 
 import { effectiveStatus } from '../../lib/ptw/validity';
+import { summarize, ymd } from '../../lib/actions/overdue';
 import React, {
   useState, useRef, useCallback, useMemo, useEffect,
 } from 'react';
@@ -288,15 +289,14 @@ const WidgetContent: React.FC<WidgetContentProps> = ({ id, snapshot, data, onNav
         description="Days lost per million exposure hours" />;
 
     case 'open_actions': {
-      const open = data.actionItems?.filter((a: any) => a.status !== 'Closed').length ?? 0;
+      // Only actions made by the action tracker count; old, unimported ones are shown on the tracker itself.
+      const open = summarize((data.actionItems ?? []).filter((a: any) => a.number), ymd(Date.now())).live;
       return <KpiMetricWidget label="Open Actions" value={open}
         upIsBad description="Actions requiring attention" color="#185FA5" />;
     }
 
     case 'overdue_actions': {
-      const overdue = data.actionItems?.filter((a: any) =>
-        a.status !== 'Closed' && a.due_date && new Date(a.due_date) < new Date()
-      ).length ?? 0;
+      const overdue = summarize((data.actionItems ?? []).filter((a: any) => a.number), ymd(Date.now())).overdue;
       return <KpiMetricWidget label="Overdue Actions" value={overdue}
         upIsBad color="#A32D2D" description="Past their due date" />;
     }

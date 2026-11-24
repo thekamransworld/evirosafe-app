@@ -3,7 +3,8 @@ import type { Report, User, ReportStatus, CapaAction } from '../types';
 import { getRiskResult } from '../utils/riskUtils';
 import { RiskMatrixDisplay } from './RiskMatrixDisplay';
 import { AuditTrail } from './AuditTrail';
-import { useAppContext } from '../contexts';
+import { useAppContext, useDataContext } from '../contexts';
+import { LinkedActions } from './actions/LinkedActions';
 import { generateReportSummary } from '../services/geminiService';
 import { exportReportToPdf } from '../lib/exportUtils';
 import { useToast } from './ui/Toast';
@@ -21,8 +22,6 @@ interface ReportDetailModalProps {
   activeUser:           User;
   onClose:              () => void;
   onStatusChange:       (reportId: string, newStatus: ReportStatus) => void;
-  onCapaActionChange:   (reportId: string, capaIndex: number, newStatus: CapaAction['status']) => void;
-  onAddCapaAction?:     (reportId: string, action: Omit<CapaAction, 'status'>) => void;
   onAcknowledgeReport:  (reportId: string) => void;
   onInvestigate?:       (report: Report) => void;
 }
@@ -81,61 +80,33 @@ const DetailRow: React.FC<{ label: string; value: React.ReactNode; icon?: React.
 
 // ─── CAPA row ─────────────────────────────────────────────────────────────────
 
-const CapaRow: React.FC<{ action: CapaAction; index: number; canEdit: boolean; onChange: (status: CapaAction['status']) => void }> = ({ action, index, canEdit, onChange }) => {
-  const statusColors: Record<string, { bg: string; color: string }> = {
-    'Open':        { bg: 'rgba(59,130,246,0.1)',   color: '#3b82f6' },
-    'In Progress': { bg: 'rgba(245,158,11,0.1)',   color: '#f59e0b' },
-    'Closed':      { bg: 'rgba(16,185,129,0.1)',   color: '#10b981' },
-  };
-  const cfg = statusColors[action.status] || statusColors['Open'];
-
-  return (
-    <div className="flex items-start gap-3 py-3" style={{ borderBottom: '1px solid var(--border-default)' }}>
-      <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5"
-        style={{ background: '#10b981' }}>{index + 1}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{action.action}</p>
-        <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <span className="flex items-center gap-1">
-            <UserIcon className="w-3 h-3" />{action.owner_id || 'Unassigned'}
-          </span>
-          {action.due_date && (
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />{new Date(action.due_date).toLocaleDateString()}
-            </span>
-          )}
-        </div>
+const CapaRow: React.FC<{ action: CapaAction; index: number }> = ({ action, index }) => (
+  <div className="flex items-start gap-3 py-3" style={{ borderBottom: '1px solid var(--border-default)' }}>
+    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5"
+      style={{ background: '#9ca3af' }}>{index + 1}</div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{action.action}</p>
+      <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <span className="flex items-center gap-1"><UserIcon className="w-3 h-3" />{action.owner_id || 'Unassigned'}</span>
+        {action.due_date && <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(action.due_date).toLocaleDateString()}</span>}
       </div>
-      {canEdit ? (
-        <select value={action.status} onChange={e => onChange(e.target.value as CapaAction['status'])}
-          className="text-xs py-1 px-2 rounded-lg"
-          style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.color}30`, minWidth: '110px' }}>
-          {['Open', 'In Progress', 'Closed'].map(s => <option key={s}>{s}</option>)}
-        </select>
-      ) : (
-        <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0"
-          style={{ background: cfg.bg, color: cfg.color }}>{action.status}</span>
-      )}
     </div>
-  );
-};
+    <span className="text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(107,114,128,0.12)', color: '#6b7280' }}>{action.status}</span>
+  </div>
+);
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
 export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
-  report, users, activeUser, onClose, onStatusChange, onCapaActionChange, onAddCapaAction, onAcknowledgeReport, onInvestigate,
+  report, users, activeUser, onClose, onStatusChange, onAcknowledgeReport, onInvestigate,
 }) => {
   const { info, success, error: toastError } = useToast();
   const { can, activeOrg } = useAppContext();
+  const { actionItems } = useDataContext();
   const [tab, setTab]             = useState<Tab>('overview');
   const [aiSummary, setAiSummary] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [showAddCapa, setShowAddCapa] = useState(false);
-  const [newCapaType, setNewCapaType]   = useState<'Corrective' | 'Preventive'>('Corrective');
-  const [newCapaAction, setNewCapaAction] = useState('');
-  const [newCapaOwner, setNewCapaOwner]   = useState('');
-  const [newCapaDue, setNewCapaDue]       = useState('');
 
   if (!report) return null;
 
@@ -143,7 +114,11 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
   const risk       = getRiskResult(report.risk_pre_control || { severity: 1, likelihood: 1 });
   const typeColor  = TYPE_COLORS[report.type] || '#6b7280';
   const statusCfg  = STATUS_CONFIG[report.status] || STATUS_CONFIG.submitted;
-  const capaList   = report.capa || [];
+  // Corrective and preventive actions now live in the one action store, linked to this incident. Items still
+  // inside the report (made before) are shown read-only until the import copies them across.
+  const importedIds = new Set((actionItems || []).map((a: any) => a.id));
+  const capaList   = (report.capa || []).filter((_, i) => !importedIds.has(`imp_capa_${report.id}_${i}`));
+  const linkedOpen = (actionItems || []).filter((a: any) => a.number && a.source?.type === 'incident' && a.source?.id === report.id && a.status !== 'CLOSED' && a.status !== 'CANCELLED').length;
   const distList   = report.distribution?.user_ids || [];
   const acks       = report.acknowledgements || [];
   const auditList  = report.audit_trail || [];
@@ -229,7 +204,7 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
         {/* ── Tabs ────────────────────────────────────────────────────── */}
         <div className="flex flex-shrink-0 overflow-x-auto" style={{ borderBottom: '1px solid var(--border-default)' }}>
           <TabBtn label="Overview"           active={tab === 'overview'}     onClick={() => setTab('overview')} />
-          <TabBtn label="CAPA"               active={tab === 'capa'}         onClick={() => setTab('capa')}         badge={capaList.filter(c => c.status !== 'Closed').length} />
+          <TabBtn label="CAPA"               active={tab === 'capa'}         onClick={() => setTab('capa')}         badge={linkedOpen + capaList.filter(c => c.status !== 'Closed').length} />
           <TabBtn label="Distribution"       active={tab === 'distribution'} onClick={() => setTab('distribution')} badge={distList.length - acks.length > 0 ? distList.length - acks.length : undefined} />
           <TabBtn label={`Audit (${auditList.length})`} active={tab === 'audit'} onClick={() => setTab('audit')} />
         </div>
@@ -347,88 +322,20 @@ export const ReportDetailModal: React.FC<ReportDetailModalProps> = ({
             </div>
           )}
 
-          {/* CAPA */}
+          {/* CAPA: one action store, linked to this incident */}
           {tab === 'capa' && (
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Corrective & Preventive Actions
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
-                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981' }}>
-                    {capaList.filter(c => c.status === 'Closed').length}/{capaList.length} closed
-                  </span>
-                  {onAddCapaAction && canApprove && (
-                    <button onClick={() => setShowAddCapa(v => !v)}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg"
-                      style={{ background: '#10b981', color: 'white' }}>
-                      + Add Action
-                    </button>
-                  )}
+              <LinkedActions
+                source={{ type: 'incident', id: report.id, ref: [report.type, String(report.occurred_at || '').slice(0, 10)].filter(Boolean).join(' ') }}
+                projectId={report.project_id}
+              />
+              {capaList.length > 0 && (
+                <div className="mt-6" data-testid="legacy-capa">
+                  <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>
+                    Older items from before the action tracker ({capaList.length}). Read-only; an administrator's import copies them into the tracker.
+                  </p>
+                  {capaList.map((action, i) => <CapaRow key={i} action={action} index={i} />)}
                 </div>
-              </div>
-
-              {showAddCapa && (
-                <div className="mb-4 p-4 rounded-xl space-y-3" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)' }}>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>Type</label>
-                      <select value={newCapaType} onChange={e => setNewCapaType(e.target.value as any)} className="giq-input w-full">
-                        <option value="Corrective">Corrective</option>
-                        <option value="Preventive">Preventive</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>Owner</label>
-                      <select value={newCapaOwner} onChange={e => setNewCapaOwner(e.target.value)} className="giq-input w-full">
-                        <option value="">Select owner...</option>
-                        {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>Action Required</label>
-                    <textarea value={newCapaAction} onChange={e => setNewCapaAction(e.target.value)} rows={2}
-                      placeholder="Describe the corrective or preventive action..." className="giq-input w-full" style={{ resize: 'vertical' }} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>Due Date</label>
-                    <input type="date" value={newCapaDue} onChange={e => setNewCapaDue(e.target.value)} className="giq-input w-full" />
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => setShowAddCapa(false)} className="giq-btn-secondary text-xs">Cancel</button>
-                    <button
-                      disabled={!newCapaAction.trim() || !newCapaOwner || !newCapaDue}
-                      onClick={() => {
-                        onAddCapaAction?.(report.id, {
-                          type: newCapaType, action: newCapaAction.trim(),
-                          owner_id: newCapaOwner, due_date: newCapaDue,
-                        });
-                        setNewCapaAction(''); setNewCapaOwner(''); setNewCapaDue(''); setShowAddCapa(false);
-                      }}
-                      className="giq-btn-primary text-xs">
-                      Add Action
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {capaList.length === 0 ? (
-                <div className="py-12 text-center">
-                  <CheckCircle className="w-10 h-10 mx-auto mb-3" style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No CAPA actions assigned yet</p>
-                  {onAddCapaAction && canApprove && !showAddCapa && (
-                    <button onClick={() => setShowAddCapa(true)} className="giq-btn-primary text-xs mt-3">
-                      + Add First Action
-                    </button>
-                  )}
-                </div>
-              ) : (
-                capaList.map((action, i) => (
-                  <CapaRow key={i} action={action} index={i} canEdit={canApprove}
-                    onChange={s => onCapaActionChange(report.id, i, s)} />
-                ))
               )}
             </div>
           )}
